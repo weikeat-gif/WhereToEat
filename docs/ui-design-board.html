@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhereToEat UI Design Board</title>
+    <link rel="stylesheet" href="./ui-design-board.css" />
+  </head>
+  <body>
+    <main class="board">
+      <section class="board-hero">
+        <div>
+          <p class="eyebrow">WhereToEat design material</p>
+          <h1>Post-training food decision board</h1>
+          <p class="hero-copy">
+            A shared UI direction for future deployment: same colors, wording,
+            buttons, icon style, cards, and mobile-first flow.
+          </p>
+        </div>
+        <div class="hero-badges" aria-label="Core design principles">
+          <span class="badge primary">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2v20M5 7h14M5 17h14" />
+            </svg>
+            Mobile-first
+          </span>
+          <span class="badge accent">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6h4" />
+            </svg>
+            Night ready
+          </span>
+          <span class="badge outline">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 11h18M5 7h14M7 15h10" />
+            </svg>
+            Fast to scan
+          </span>
+        </div>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <div class="panel-header">
+            <p class="eyebrow">Color package</p>
+            <h2>Warm food board, teal action, amber status</h2>
+          </div>
+          <div class="swatch-grid">
+            <div class="swatch">
+              <span style="background: var(--primary)"></span>
+              <strong>Primary</strong>
+              <small>Search, selected state, main buttons</small>
+              <code>oklch(0.46 0.09 188)</code>
+            </div>
+            <div class="swatch">
+              <span style="background: var(--accent)"></span>
+              <strong>Accent</strong>
+              <small>Open now, useful food status</small>
+              <code>oklch(0.75 0.139 65)</code>
+            </div>
+            <div class="swatch">
+              <span style="background: var(--secondary)"></span>
+              <strong>Secondary</strong>
+              <small>Status badges and soft filters</small>
+              <code>oklch(0.93 0.018 88)</code>
+            </div>
+            <div class="swatch">
+              <span style="background: var(--background)"></span>
+              <strong>Background</strong>
+              <small>Warm, soft, easy at night</small>
+              <code>oklch(0.98 0.012 86)</code>
+            </div>
+            <div class="swatch">
+              <span style="background: var(--card)"></span>
+              <strong>Card</strong>
+              <small>Tool panels and restaurant cards</small>
+              <code>oklch(1 0 0)</code>
+            </div>
+            <div class="swatch">
+              <span style="background: var(--foreground)"></span>
+              <strong>Foreground</strong>
+              <small>Main text, icons, headings</small>
+              <code>oklch(0.18 0.021 248)</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <p class="eyebrow">Typography and wording</p>
+            <h2>Compact app language, no marketing hero</h2>
+          </div>
+          <div class="type-stack">
+            <div>
+              <span>App title</span>
+              <h3>Pick food after training</h3>
+              <small>Bold, direct, useful on first glance.</small>
+            </div>
+            <div>
+              <span>Section title</span>
+              <p class="type-section">Search nearby food</p>
+              <small>Names the task, not the feature.</small>
+            </div>
+            <div>
+              <span>Helper text</span>
+              <p class="muted">Fast picks around you within 3 km, then pick from a list.</p>
+              <small>Short sentence, no tutorial wording.</small>
+            </div>
+            <div>
+              <span>Input placeholder</span>
+              <p class="input-preview">Try nasi, cafe, coffee, halal, cheap...</p>
+              <small>Examples match real cravings after training.</small>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <div class="panel-header">
+            <p class="eyebrow">Component kit</p>
+            <h2>Buttons, badges, inputs, and icons</h2>
+          </div>
+          <div class="component-row">
+            <button class="button primary-button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Search nearby food
+            </button>
+            <button class="button outline-button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 4h16M7 12h10M10 20h4" />
+              </svg>
+              Filters
+            </button>
+          </div>
+          <div class="component-row wrap">
+            <span class="badge accent">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6h4" />
+              </svg>
+              Open now
+            </span>
+            <span class="badge outline">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 2v2M14 2v2M4 8h14a4 4 0 0 1 0 8h-1" />
+                <path d="M4 8v9a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8" />
+              </svg>
+              Chill
+            </span>
+            <span class="badge outline">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+                <path d="M7 2v20M21 15V2a5 5 0 0 0-5 5v6" />
+              </svg>
+              After training
+            </span>
+          </div>
+          <div class="input-with-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <span>Try nasi, cafe, coffee, halal, cheap...</span>
+          </div>
+          <p class="rule">
+            Icons stay thin-line lucide style. Buttons use 8px radius, strong
+            teal for primary, white cards for secondary actions.
+          </p>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <p class="eyebrow">Search modes</p>
+            <h2>Two-column category grid</h2>
+          </div>
+          <div class="toggle-grid">
+            <button class="toggle selected">
+              <strong>Open nearby</strong>
+              <span>Fast picks around you</span>
+            </button>
+            <button class="toggle">
+              <strong>Food after training</strong>
+              <span>Proper meal first</span>
+            </button>
+            <button class="toggle">
+              <strong>Chill place</strong>
+              <span>Sit, talk, recover</span>
+            </button>
+            <button class="toggle">
+              <strong>Cheap food</strong>
+              <span>Budget friendly</span>
+            </button>
+            <button class="toggle">
+              <strong>Drinks/cafe</strong>
+              <span>Light bites and drinks</span>
+            </button>
+            <button class="toggle">
+              <strong>Late-night food</strong>
+              <span>Still serving</span>
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section class="grid app-grid">
+        <article class="phone-frame">
+          <div class="phone-screen">
+            <div class="app-header">
+              <div>
+                <span>WhereToEat</span>
+                <h2>Pick food after training</h2>
+              </div>
+              <span class="badge small">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 16 0" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                Ready
+              </span>
+            </div>
+
+            <div class="mobile-card">
+              <div class="chip-row">
+                <span class="badge accent small">Open now</span>
+                <span class="badge outline small">Chill</span>
+                <span class="badge outline small">After training</span>
+              </div>
+              <h3>Search nearby food</h3>
+              <p>Fast picks around you within 3 km, then pick from a list.</p>
+              <div class="input-with-icon compact">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <span>nasi, cafe, cheap...</span>
+              </div>
+              <div class="mini-grid">
+                <span class="mini selected">Open nearby</span>
+                <span class="mini">Training food</span>
+                <span class="mini">Chill</span>
+                <span class="mini">Cheap food</span>
+              </div>
+              <button class="button primary-button full">Search nearby food</button>
+            </div>
+
+            <div class="mobile-card">
+              <div class="section-title">
+                <h3>Food options</h3>
+                <span class="badge small">Select one</span>
+              </div>
+              <div class="restaurant-card selected-card">
+                <div class="card-top">
+                  <div>
+                    <h4>Training Night Mamak</h4>
+                    <p>Malaysian, Indian</p>
+                  </div>
+                  <span class="badge outline small">Sample</span>
+                </div>
+                <div class="chip-row">
+                  <span class="badge accent small">Usually late</span>
+                  <span class="badge outline small">$</span>
+                  <span class="badge outline small">1.2 km</span>
+                </div>
+                <p>Big tables, fast food, easy team hangout</p>
+                <small>Inside: Roti canai, Mee goreng, Nasi lemak, Teh tarik</small>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel flow-panel">
+          <div class="panel-header">
+            <p class="eyebrow">Experience direction</p>
+            <h2>Search, compare, inspect, then move</h2>
+          </div>
+          <ol class="flow-list">
+            <li>
+              <span>01</span>
+              <div>
+                <strong>Search food nearby</strong>
+                <p>Use GPS or a training venue fallback. Start with cravings and search modes.</p>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <strong>Compare restaurant cards</strong>
+                <p>Name, cuisine, open status, price, distance, and inside preview.</p>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <strong>Select a restaurant</strong>
+                <p>Open a bottom sheet with menu highlights and place details.</p>
+              </div>
+            </li>
+            <li>
+              <span>04</span>
+              <div>
+                <strong>Open Maps or copy</strong>
+                <p>Google Maps handles directions, photos, reviews, and latest hours.</p>
+              </div>
+            </li>
+          </ol>
+        </article>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <div class="panel-header">
+            <p class="eyebrow">Restaurant card spec</p>
+            <h2>Selection object, not decoration</h2>
+          </div>
+          <div class="restaurant-card large">
+            <div class="card-top">
+              <div>
+                <h4>Recovery Cafe</h4>
+                <p>Cafe, Drinks</p>
+              </div>
+              <span class="badge primary small">Live</span>
+            </div>
+            <div class="chip-row">
+              <span class="badge accent small">Check hours</span>
+              <span class="badge outline small">$$</span>
+              <span class="badge outline small">2.4 km</span>
+            </div>
+            <p>Quieter place for drinks, dessert, and talking</p>
+            <small>Inside: Iced coffee, Cakes, Sandwiches, Fries</small>
+          </div>
+          <ul class="spec-list">
+            <li>Name and cuisine must be visible first.</li>
+            <li>Badges carry quick decision facts.</li>
+            <li>Inside preview tells the user what food to expect.</li>
+          </ul>
+        </article>
+
+        <article class="panel detail-sheet">
+          <div class="panel-header">
+            <p class="eyebrow">Detail sheet spec</p>
+            <h2>Answer “what is inside?”</h2>
+          </div>
+          <div class="sheet-preview">
+            <h3>Training Night Mamak</h3>
+            <p>Malaysian, Indian · Big tables, fast food, easy team hangout</p>
+            <div class="chip-row">
+              <span class="badge accent small">Usually late</span>
+              <span class="badge outline small">$</span>
+              <span class="badge outline small">1.2 km away</span>
+            </div>
+            <h4>What is inside</h4>
+            <div class="menu-grid">
+              <span>Roti canai</span>
+              <span>Nasi lemak</span>
+              <span>Mee goreng</span>
+              <span>Teh tarik</span>
+            </div>
+            <h4>Place details</h4>
+            <div class="detail-box">
+              <p><strong>Address:</strong> Open in Maps for exact address</p>
+              <p><strong>Hours:</strong> Check live hours in Maps</p>
+              <p><strong>Amenities:</strong> Group tables, Quick service, Takeaway</p>
+            </div>
+            <div class="component-row">
+              <button class="button primary-button">Open Maps</button>
+              <button class="button outline-button">Copy</button>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel footer-panel">
+        <div>
+          <p class="eyebrow">Deployment rules</p>
+          <h2>Keep future UI changes inside this system</h2>
+        </div>
+        <div class="rule-grid">
+          <div>
+            <strong>Use same colors</strong>
+            <p>Teal for action, amber for status, warm surfaces for cards.</p>
+          </div>
+          <div>
+            <strong>Use same wording</strong>
+            <p>Search nearby food, Food options, What is inside, Open Maps.</p>
+          </div>
+          <div>
+            <strong>Use same icons</strong>
+            <p>Thin-line lucide direction: map, search, filter, food, copy.</p>
+          </div>
+          <div>
+            <strong>Use same flow</strong>
+            <p>Search, compare, select, inspect, then move to Maps.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
