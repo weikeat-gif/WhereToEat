@@ -4,10 +4,13 @@ import {
   Coffee,
   Copy,
   Filter,
+  Info,
   LocateFixed,
   MapPin,
   Navigation,
+  Search,
   Share2,
+  Star,
   Utensils,
 } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
@@ -41,6 +44,13 @@ import {
   type LocationPermissionState,
   type SearchIntentId,
 } from '@/lib/maps'
+import {
+  buildGoogleMapsRestaurantUrl,
+  fetchNearbyRestaurants,
+  filterRestaurants,
+  sampleRestaurants,
+  type Restaurant,
+} from '@/lib/restaurants'
 
 const preferenceKey = 'wheretoeat.preferences'
 
@@ -80,17 +90,27 @@ function readPreferences(): Preferences {
 
 function App() {
   const [preferences, setPreferences] = useState<Preferences>(() => readPreferences())
+  const [foodQuery, setFoodQuery] = useState('')
   const [manualLocation, setManualLocation] = useState('')
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null)
   const [permissionState, setPermissionState] =
     useState<LocationPermissionState>('idle')
   const [mapsUrl, setMapsUrl] = useState('')
+  const [restaurants, setRestaurants] = useState<Restaurant[]>(sampleRestaurants)
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(
+    null,
+  )
 
   useEffect(() => {
     window.localStorage.setItem(preferenceKey, JSON.stringify(preferences))
   }, [preferences])
 
   const selectedIntent = getSearchIntent(preferences.searchIntent)
+  const visibleRestaurants = useMemo(
+    () => filterRestaurants(restaurants, foodQuery),
+    [foodQuery, restaurants],
+  )
 
   const previewUrl = useMemo(
     () =>
@@ -126,16 +146,43 @@ function App() {
     return url
   }
 
+  async function loadRestaurantResults(coordinates: Coordinates | null) {
+    setIsLoadingPlaces(true)
+
+    try {
+      if (!coordinates) {
+        setRestaurants(sampleRestaurants)
+        return
+      }
+
+      const nearbyRestaurants = await fetchNearbyRestaurants(
+        coordinates,
+        preferences.radiusKm,
+      )
+
+      setRestaurants(
+        nearbyRestaurants.length > 0 ? nearbyRestaurants : sampleRestaurants,
+      )
+    } catch {
+      setRestaurants(sampleRestaurants)
+      toast.warning('Showing sample picks. Live nearby places did not load.')
+    } finally {
+      setIsLoadingPlaces(false)
+    }
+  }
+
   function findNearby() {
     if (manualLocation.trim()) {
       setPermissionState((current) => (current === 'requesting' ? 'idle' : current))
       setGeneratedUrl(null)
+      void loadRestaurantResults(null)
       return
     }
 
     if (!('geolocation' in navigator)) {
       setPermissionState('unavailable')
       setGeneratedUrl(null)
+      void loadRestaurantResults(null)
       return
     }
 
@@ -149,11 +196,13 @@ function App() {
         setUserLocation(coordinates)
         setPermissionState('granted')
         setGeneratedUrl(coordinates)
+        void loadRestaurantResults(coordinates)
       },
       () => {
         setUserLocation(null)
         setPermissionState('denied')
         setGeneratedUrl(null)
+        void loadRestaurantResults(null)
       },
       {
         enableHighAccuracy: true,
@@ -193,13 +242,21 @@ function App() {
     toast.success('Maps link copied')
   }
 
+  function openRestaurantMaps(restaurant: Restaurant) {
+    window.open(
+      buildGoogleMapsRestaurantUrl(restaurant),
+      '_blank',
+      'noopener,noreferrer',
+    )
+  }
+
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-2xl flex-col gap-4 px-4 py-4 sm:py-6">
+    <main className="mx-auto flex min-h-svh w-full max-w-3xl flex-col gap-4 px-4 py-4 sm:py-6">
       <section className="flex items-center justify-between gap-3 rounded-lg border bg-card/90 p-3 shadow-sm backdrop-blur">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-muted-foreground">WhereToEat</p>
           <h1 className="text-2xl font-bold leading-tight text-foreground">
-            Open food near the team
+            Pick food after training
           </h1>
         </div>
         <Badge variant={permissionState === 'granted' ? 'default' : 'secondary'}>
@@ -225,13 +282,33 @@ function App() {
             </Badge>
           </div>
           <div>
-            <CardTitle>Find a spot</CardTitle>
+            <CardTitle>Search nearby food</CardTitle>
             <CardDescription>
-              {selectedIntent.tone} within {preferences.radiusKm} km.
+              {selectedIntent.tone} within {preferences.radiusKm} km, then pick from
+              a list.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="food-query" className="text-sm font-semibold text-foreground">
+              What are you craving?
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                id="food-query"
+                value={foodQuery}
+                onChange={(event) => setFoodQuery(event.target.value)}
+                placeholder="Try nasi, cafe, coffee, halal, cheap..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+
           <ToggleGroup
             type="single"
             value={preferences.searchIntent}
@@ -277,11 +354,13 @@ function App() {
           <Button
             size="lg"
             onClick={findNearby}
-            disabled={permissionState === 'requesting'}
+            disabled={permissionState === 'requesting' || isLoadingPlaces}
             className="w-full"
           >
             <LocateFixed className="size-5" aria-hidden="true" />
-            {permissionState === 'requesting' ? 'Finding...' : 'Find nearby'}
+            {permissionState === 'requesting' || isLoadingPlaces
+              ? 'Searching...'
+              : 'Search nearby food'}
           </Button>
           <Sheet>
             <SheetTrigger asChild>
@@ -320,7 +399,67 @@ function App() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Maps link</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Food options</CardTitle>
+              <CardDescription>
+                {visibleRestaurants.length} places match your search.
+              </CardDescription>
+            </div>
+            <Badge variant="secondary">
+              <Star className="size-3.5" aria-hidden="true" />
+              Select one
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {visibleRestaurants.map((restaurant) => (
+            <button
+              key={restaurant.id}
+              type="button"
+              onClick={() => setSelectedRestaurant(restaurant)}
+              className="rounded-lg border bg-background p-3 text-left shadow-sm transition-colors hover:border-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold leading-6 text-foreground">
+                    {restaurant.name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">{restaurant.cuisine}</p>
+                </div>
+                <Badge variant={restaurant.source === 'live' ? 'default' : 'outline'}>
+                  {restaurant.source === 'live' ? 'Live' : 'Sample'}
+                </Badge>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Badge variant="accent">{restaurant.openStatus}</Badge>
+                <Badge variant="outline">{restaurant.price}</Badge>
+                {restaurant.distanceKm !== undefined ? (
+                  <Badge variant="outline">{restaurant.distanceKm} km</Badge>
+                ) : null}
+              </div>
+              <p className="mt-3 text-sm leading-6 text-foreground">
+                {restaurant.vibe}
+              </p>
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                Inside: {restaurant.menuHighlights.join(', ')}
+              </p>
+            </button>
+          ))}
+          {visibleRestaurants.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-5 text-center">
+              <p className="font-semibold text-foreground">No matching places yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try a broader search like food, cafe, rice, or drinks.
+              </p>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Maps search</CardTitle>
           <CardDescription className="break-words">
             {mapsUrl || previewUrl}
           </CardDescription>
@@ -343,8 +482,100 @@ function App() {
         </CardContent>
       </Card>
 
+      <Sheet
+        open={selectedRestaurant !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedRestaurant(null)
+          }
+        }}
+      >
+        <SheetContent className="max-h-[88svh] overflow-y-auto">
+          {selectedRestaurant ? (
+            <>
+              <SheetHeader>
+                <SheetTitle>{selectedRestaurant.name}</SheetTitle>
+                <SheetDescription>
+                  {selectedRestaurant.cuisine} · {selectedRestaurant.vibe}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="space-y-5">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="accent">{selectedRestaurant.openStatus}</Badge>
+                  <Badge variant="outline">{selectedRestaurant.price}</Badge>
+                  {selectedRestaurant.distanceKm !== undefined ? (
+                    <Badge variant="outline">
+                      {selectedRestaurant.distanceKm} km away
+                    </Badge>
+                  ) : null}
+                </div>
+
+                <section className="space-y-2">
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Utensils className="size-4" aria-hidden="true" />
+                    What is inside
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedRestaurant.menuHighlights.map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-md border bg-background px-3 py-2 text-sm font-semibold"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Info className="size-4" aria-hidden="true" />
+                    Place details
+                  </h3>
+                  <div className="rounded-lg border bg-background p-3 text-sm leading-6">
+                    <p>
+                      <span className="font-semibold">Address:</span>{' '}
+                      {selectedRestaurant.address}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Hours:</span>{' '}
+                      {selectedRestaurant.hours}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Amenities:</span>{' '}
+                      {selectedRestaurant.amenities.join(', ')}
+                    </p>
+                  </div>
+                </section>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button onClick={() => openRestaurantMaps(selectedRestaurant)}>
+                    <Navigation className="size-4" aria-hidden="true" />
+                    Open Maps
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(
+                        buildGoogleMapsRestaurantUrl(selectedRestaurant),
+                      )
+                      toast.success('Restaurant link copied')
+                    }}
+                  >
+                    <Copy className="size-4" aria-hidden="true" />
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
       <p className="pb-2 text-center text-xs leading-5 text-muted-foreground">
-        No login. No saved GPS history. Google Maps handles live shop details.
+        Live nearby list uses OpenStreetMap data when location is allowed. Google
+        Maps handles directions, latest photos, and full reviews.
       </p>
       <Toaster richColors position="bottom-center" />
     </main>
