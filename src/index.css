@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --color-background: oklch(0.98 0.012 86);
+  --color-foreground: oklch(0.18 0.021 248);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.18 0.021 248);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.18 0.021 248);
+  --color-primary: oklch(0.46 0.09 188);
+  --color-primary-foreground: oklch(0.99 0.008 86);
+  --color-secondary: oklch(0.93 0.018 88);
+  --color-secondary-foreground: oklch(0.24 0.027 248);
+  --color-muted: oklch(0.94 0.014 86);
+  --color-muted-foreground: oklch(0.47 0.021 248);
+  --color-accent: oklch(0.75 0.139 65);
+  --color-accent-foreground: oklch(0.19 0.026 63);
+  --color-destructive: oklch(0.58 0.18 28);
+  --color-destructive-foreground: oklch(0.99 0.008 86);
+  --color-border: oklch(0.86 0.015 86);
+  --color-input: oklch(0.86 0.015 86);
+  --color-ring: oklch(0.46 0.09 188);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    background: #172026;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100svh;
+    margin: 0;
+    background:
+      linear-gradient(180deg, rgba(255, 249, 235, 0.96), rgba(236, 249, 247, 0.92)),
+      #f6f3ea;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+}
