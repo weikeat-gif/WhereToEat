@@ -1,73 +1,75 @@
-# React + TypeScript + Vite
+# WhereToEat
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+WhereToEat is a mobile-first web app for quickly finding nearby food, cafes, and chill spots. It opens straight into the search experience, lets users search by GPS or typed location, shows selectable restaurant cards, and sends users to Google Maps for live directions, reviews, and opening hours.
 
-Currently, two official plugins are available:
+![WhereToEat app preview](docs/assets/stitch-ui-preview.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What It Does
 
-## React Compiler
+- Search nearby food using phone location or a manual area.
+- Browse recommended places, popular places, and saved-style quick picks.
+- Filter by distance, price, cuisine, halal, and group-friendly options.
+- Open a restaurant detail sheet with highlights, amenities, address, hours, and Maps actions.
+- Copy or share restaurant links.
+- Install as a basic PWA from a phone browser.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Design
 
-## Expanding the ESLint configuration
+The UI is based on the Google Stitch design direction and uses one simple brand system:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Primary teal: `#00535b`
+- Accent yellow: `#ffb702`
+- Background: `#f7fafa`
+- Surface: `#ffffff`
+- Text: `#181c1d`
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+The logo is a simplified nearby-location mark:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+![WhereToEat logo](docs/assets/wheretoeat-logo.png)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Tech Stack
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui-style components
+- Radix UI primitives
+- lucide-react icons
+- Vitest and Testing Library
+
+## How To Run
+
+Install dependencies:
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Start the local app:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+Open the local URL shown by Vite, usually:
+
+```text
+http://127.0.0.1:5175/
+```
+
+## Useful Commands
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+## Project Notes
+
+- No backend, accounts, or database are used in this MVP.
+- GPS history is not stored.
+- Restaurant live data is intentionally lightweight; Google Maps handles the full live shop data, reviews, directions, and hours.
+- Local preferences such as filters and radius can be saved in `localStorage`.
+
