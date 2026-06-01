@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">WhereToEat logo</title>
-  <desc id="desc">A simple location pin for finding nearby food.</desc>
+  <desc id="desc">A location pin with a fork for finding food nearby.</desc>
   <rect width="512" height="512" rx="112" fill="#f7fafa"/>
   <rect x="72" y="72" width="368" height="368" rx="92" fill="#00535b"/>
-  <path fill="#ffb702" d="M256 118c-76 0-138 61-138 136 0 99 138 190 138 190s138-91 138-190c0-75-62-136-138-136Z"/>
-  <circle cx="256" cy="252" r="54" fill="#ffffff"/>
+  <path fill="#ffb702" d="M256 112c-79 0-144 64-144 142 0 103 144 198 144 198s144-95 144-198c0-78-65-142-144-142Z"/>
+  <circle cx="256" cy="254" r="76" fill="#ffffff"/>
+  <path fill="#00535b" d="M220 194c-6 0-10 4-10 10v44c0 18 12 33 29 38v54c0 9 7 16 16 16s16-7 16-16v-54c17-5 29-20 29-38v-44c0-6-4-10-10-10s-10 4-10 10v39h-15v-39c0-6-4-10-10-10s-10 4-10 10v39h-15v-39c0-6-4-10-10-10Z"/>
 </svg>
