@@ -14,7 +14,6 @@ import {
   Share2,
   SlidersHorizontal,
   Star,
-  Utensils,
   UserRound,
   X,
 } from 'lucide-react'
@@ -248,7 +247,7 @@ function App() {
       <header className="sticky top-0 z-30 w-full overflow-hidden border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur">
         <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
           <Button variant="ghost" size="icon" aria-label="Food discovery">
-            <Utensils className="size-6 text-primary" aria-hidden="true" />
+            <img src="/pwa-icon.svg" alt="" className="size-8" />
           </Button>
           <h1 className="truncate text-center text-3xl font-bold tracking-tight text-primary">
             WhereToEat

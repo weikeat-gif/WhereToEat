@@ -1,6 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#2f7e83"/>
-  <circle cx="256" cy="210" r="112" fill="#fff4d7"/>
-  <path d="M162 376c44-71 144-71 188 0" fill="none" stroke="#f3a83b" stroke-width="34" stroke-linecap="round"/>
-  <path d="M211 181v106M257 181v106M303 181v106" stroke="#172026" stroke-width="22" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">WhereToEat logo</title>
+  <desc id="desc">A map pin with a bowl, representing nearby food discovery.</desc>
+  <rect width="512" height="512" rx="112" fill="#f7fafa"/>
+  <rect x="56" y="56" width="400" height="400" rx="96" fill="#00535b"/>
+  <path fill="#ffb702" d="M256 86c-82 0-148 66-148 148 0 107 148 214 148 214s148-107 148-214c0-82-66-148-148-148Z"/>
+  <circle cx="256" cy="234" r="92" fill="#ffffff"/>
+  <path fill="#00535b" d="M168 234c0-8 6-14 14-14h148c8 0 14 6 14 14 0 48-39 86-88 86s-88-38-88-86Z"/>
+  <path fill="#ffffff" d="M203 246h106c-7 24-29 42-53 42s-46-18-53-42Z"/>
+  <path fill="#00535b" d="M204 180c0-7 6-13 13-13s13 6 13 13v28h-26v-28Zm78 0c0-7 6-13 13-13s13 6 13 13v28h-26v-28Zm-39-12c0-7 6-13 13-13s13 6 13 13v40h-26v-40Z"/>
 </svg>
