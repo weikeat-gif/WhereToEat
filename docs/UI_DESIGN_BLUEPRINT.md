@@ -2,7 +2,7 @@
 
 ## Product Feel
 
-WhereToEat should feel like a fast post-training decision board. Users are tired, hungry, and usually on their phones, so the interface should help them search, compare, select, and move quickly.
+WhereToEat should feel like a fast nearby-food decision board. Users are hungry, deciding quickly, and usually on their phones, so the interface should help them search, compare, select, and move quickly.
 
 The UI should be:
 
@@ -31,7 +31,7 @@ Purpose: show identity and location status.
 Content:
 
 - App name: `WhereToEat`
-- Main title: `Pick food after training`
+- Main title: `Pick food nearby`
 - Status badge:
   - `Ready`
   - `Locating`
@@ -55,7 +55,7 @@ Controls:
   - Search icon inside the input
 - Search mode toggle grid:
   - `Open nearby`
-  - `Food after training`
+  - `Nearby food`
   - `Chill place`
   - `Cheap food`
   - `Drinks/cafe`
@@ -96,7 +96,7 @@ Design notes:
 - Keep card radius at `8px`.
 - Text must stay readable at phone widths.
 - Use badges for quick facts.
-- The list should feel like a team decision board.
+- The list should feel like a group decision board.
 
 ## Restaurant Detail Sheet
 
@@ -182,7 +182,7 @@ Rules:
 - Do not use huge hero typography.
 - Do not scale text with viewport width.
 - Avoid negative letter spacing.
-- Prioritize readability after training/night use.
+- Prioritize readability during night use and quick decisions.
 
 ### Components
 
@@ -245,16 +245,16 @@ When user taps a restaurant:
 ```text
 ┌────────────────────────────────────┐
 │ WhereToEat                  Ready  │
-│ Pick food after training           │
+│ Pick food nearby                   │
 └────────────────────────────────────┘
 
 ┌────────────────────────────────────┐
-│ Open now   Chill   After training  │
+│ Open now   Chill   Nearby food     │
 │                                    │
 │ Search nearby food                 │
 │ [ Search craving input           ] │
 │                                    │
-│ [Open nearby] [Food after training]│
+│ [Open nearby] [Nearby food]        │
 │ [Chill place] [Cheap food]         │
 │ [Drinks/cafe] [Late-night food]    │
 │                                    │

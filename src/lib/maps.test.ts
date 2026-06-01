@@ -9,14 +9,14 @@ import {
 describe('buildGoogleMapsSearchUrl', () => {
   it('builds a Maps search URL from GPS coordinates', () => {
     const url = buildGoogleMapsSearchUrl({
-      intent: 'food-after-training',
+      intent: 'nearby-food',
       coordinates: { lat: 3.139, lng: 101.6869 },
       manualLocation: '',
       radiusKm: 3,
     })
 
     expect(url).toBe(
-      'https://www.google.com/maps/search/food+after+training+open+now+within+3km/@3.139,101.6869,15z',
+      'https://www.google.com/maps/search/restaurants+food+nearby+open+now+within+3km/@3.139,101.6869,15z',
     )
   })
 

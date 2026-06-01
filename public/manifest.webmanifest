@@ -1,11 +1,11 @@
 {
   "name": "WhereToEat",
   "short_name": "WhereToEat",
-  "description": "Find open nearby food and chill spots after training.",
+  "description": "Find open nearby food, cafes, and chill spots.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f6f3ea",
-  "theme_color": "#2f7e83",
+  "background_color": "#f7fafa",
+  "theme_color": "#00535b",
   "icons": [
     {
       "src": "/pwa-icon.svg",

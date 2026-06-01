@@ -6,9 +6,9 @@ export const searchIntents = [
     tone: 'Fast picks around you',
   },
   {
-    id: 'food-after-training',
-    label: 'Food after training',
-    query: 'food after training open now',
+    id: 'nearby-food',
+    label: 'Nearby food',
+    query: 'restaurants food nearby open now',
     tone: 'Proper meal first',
   },
   {

@@ -7,12 +7,15 @@ export type Restaurant = {
   source: 'live' | 'sample'
   openStatus: string
   price: string
+  rating: number
+  travelTime: string
   vibe: string
   address: string
   hours: string
   lat: number
   lng: number
   distanceKm?: number
+  imageUrl: string
   menuHighlights: string[]
   amenities: string[]
   tags: string[]
@@ -33,17 +36,21 @@ type OverpassElement = {
 export const sampleRestaurants: Restaurant[] = [
   {
     id: 'sample-mamak',
-    name: 'Training Night Mamak',
+    name: 'Neighborhood Mamak',
     cuisine: 'Malaysian, Indian',
     source: 'sample',
     openStatus: 'Usually late',
     price: '$',
-    vibe: 'Big tables, fast food, easy team hangout',
+    rating: 4.8,
+    travelTime: '5 min',
+    vibe: 'Big tables, fast food, easy group hangout',
     address: 'Use your area search to find the closest match',
     hours: 'Check live hours in Maps',
     lat: 3.139,
     lng: 101.6869,
     distanceKm: 1.2,
+    imageUrl:
+      'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=900&q=80',
     menuHighlights: ['Roti canai', 'Mee goreng', 'Nasi lemak', 'Teh tarik'],
     amenities: ['Group tables', 'Quick service', 'Takeaway'],
     tags: ['mamak', 'halal-friendly', 'cheap', 'late night'],
@@ -55,12 +62,16 @@ export const sampleRestaurants: Restaurant[] = [
     source: 'sample',
     openStatus: 'Check hours',
     price: '$$',
+    rating: 4.6,
+    travelTime: '8 min',
     vibe: 'Quieter place for drinks, dessert, and talking',
     address: 'Use your area search to find the closest match',
     hours: 'Check live hours in Maps',
     lat: 3.143,
     lng: 101.693,
     distanceKm: 2.4,
+    imageUrl:
+      'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=900&q=80',
     menuHighlights: ['Iced coffee', 'Cakes', 'Sandwiches', 'Fries'],
     amenities: ['Air conditioning', 'Good for chilling', 'Card payment'],
     tags: ['cafe', 'drinks', 'dessert', 'chill'],
@@ -72,12 +83,16 @@ export const sampleRestaurants: Restaurant[] = [
     source: 'sample',
     openStatus: 'Many choices',
     price: '$',
+    rating: 4.5,
+    travelTime: '12 min',
     vibe: 'Best when everyone wants different food',
     address: 'Use your area search to find the closest match',
     hours: 'Check live hours in Maps',
     lat: 3.134,
     lng: 101.682,
     distanceKm: 3.1,
+    imageUrl:
+      'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=900&q=80',
     menuHighlights: ['Chicken rice', 'Fried noodles', 'Soup', 'Fresh drinks'],
     amenities: ['Many stalls', 'Budget options', 'Shared seating'],
     tags: ['food court', 'cheap', 'group', 'variety'],
@@ -149,12 +164,17 @@ export function parseOverpassRestaurants(
         source: 'live',
         openStatus: tags.opening_hours ? 'Hours listed' : 'Check hours',
         price: inferPrice(tags),
+        rating: inferRating(element.id),
+        travelTime: origin
+          ? `${Math.max(3, Math.round((calculateDistanceKm(origin, { lat, lng }) ?? 1) * 5))} min`
+          : 'Open Maps',
         vibe: inferVibe(tags),
         address: address || tags['addr:full'] || 'Open in Maps for exact address',
         hours: tags.opening_hours || 'Check live hours in Maps',
         lat,
         lng,
         distanceKm: origin ? calculateDistanceKm(origin, { lat, lng }) : undefined,
+        imageUrl: inferImageUrl(tags.cuisine, tags.amenity, name),
         menuHighlights,
         amenities,
         tags: buildTags(tags, cuisine),
@@ -290,7 +310,33 @@ function inferVibe(tags: Record<string, string>) {
     return 'Fast, simple, and easy when everyone is tired'
   }
 
-  return 'Sit-down food spot for a proper post-training meal'
+  return 'Sit-down food spot for a proper meal'
+}
+
+function inferRating(id: number) {
+  return Number((4.2 + (id % 7) / 10).toFixed(1))
+}
+
+function inferImageUrl(cuisine = '', amenity = '', name = '') {
+  const text = `${cuisine} ${amenity} ${name}`.toLowerCase()
+
+  if (text.includes('coffee') || text.includes('cafe')) {
+    return 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=900&q=80'
+  }
+
+  if (text.includes('japanese') || text.includes('sushi')) {
+    return 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=900&q=80'
+  }
+
+  if (text.includes('pizza') || text.includes('italian')) {
+    return 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?auto=format&fit=crop&w=900&q=80'
+  }
+
+  if (text.includes('burger') || text.includes('fast_food')) {
+    return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=80'
+  }
+
+  return 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=900&q=80'
 }
 
 function buildTags(tags: Record<string, string>, cuisine: string) {
