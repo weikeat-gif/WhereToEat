@@ -1109,9 +1109,11 @@ function QuickDecisionBar({
 }
 
 function DragScrollArea({
+  ariaLabel,
   children,
   className,
 }: {
+  ariaLabel?: string
   children: ReactNode
   className: string
 }) {
@@ -1126,7 +1128,7 @@ function DragScrollArea({
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     const scroller = scrollRef.current
 
-    if (!scroller) {
+    if (!scroller || event.pointerType === 'touch') {
       return
     }
 
@@ -1136,7 +1138,6 @@ function DragScrollArea({
       scrollLeft: scroller.scrollLeft,
       startX: event.clientX,
     }
-    event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
@@ -1148,11 +1149,12 @@ function DragScrollArea({
 
     const distance = event.clientX - dragState.current.startX
 
-    if (Math.abs(distance) > 14) {
+    if (Math.abs(distance) > 12) {
       dragState.current.moved = true
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+      event.preventDefault()
+      scroller.scrollLeft = dragState.current.scrollLeft - distance
     }
-
-    scroller.scrollLeft = dragState.current.scrollLeft - distance
   }
 
   function handlePointerEnd(event: PointerEvent<HTMLDivElement>) {
@@ -1168,6 +1170,7 @@ function DragScrollArea({
   return (
     <div
       ref={scrollRef}
+      aria-label={ariaLabel}
       className={className}
       onClickCapture={(event) => {
         if (dragState.current.moved) {
@@ -1193,9 +1196,9 @@ function CategoryScroller({
   onSelectCategory: (category: (typeof categories)[number]) => void
 }) {
   return (
-    <div
-      aria-label="Food type filters"
-      className="flex max-w-full touch-pan-x gap-2 overflow-x-auto pb-1 pr-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    <DragScrollArea
+      ariaLabel="Food type filters"
+      className="flex max-w-full cursor-grab touch-pan-x select-none gap-2 overflow-x-auto pb-1 pr-2 active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
         {categories.map((category) => (
           <button
@@ -1212,7 +1215,7 @@ function CategoryScroller({
             {category.label}
           </button>
         ))}
-    </div>
+    </DragScrollArea>
   )
 }
 
