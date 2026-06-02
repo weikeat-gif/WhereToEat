@@ -68,14 +68,14 @@ const defaultPreferences: Preferences = {
 }
 
 const categories = [
-  'Open Now',
-  'Halal',
-  'Cafe',
-  'Cheap Eats',
-  'Group Friendly',
-  'Dessert',
-  'Late Night',
-]
+  { label: 'Open Now', query: '' },
+  { label: 'Halal', query: 'halal' },
+  { label: 'Cafe', query: 'cafe' },
+  { label: 'Cheap Eats', query: 'cheap' },
+  { label: 'Group Friendly', query: 'group' },
+  { label: 'Dessert', query: 'dessert' },
+  { label: 'Late Night', query: 'late night' },
+] as const
 
 const cuisineFilters = ['Malay', 'Chinese', 'Indian', 'Western', 'Japanese', 'Korean', 'Thai']
 
@@ -105,6 +105,7 @@ function readPreferences(): Preferences {
 function App() {
   const [preferences, setPreferences] = useState<Preferences>(() => readPreferences())
   const [foodQuery, setFoodQuery] = useState('')
+  const [activeCategory, setActiveCategory] = useState('Open Now')
   const [manualLocation, setManualLocation] = useState('')
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null)
   const [permissionState, setPermissionState] =
@@ -127,6 +128,7 @@ function App() {
   const recommendedRestaurants = visibleRestaurants.slice(0, 4)
   const popularRestaurants = visibleRestaurants.slice(0, 6)
   const savedRestaurants = sampleRestaurants.slice(0, 3)
+  const hasResults = visibleRestaurants.length > 0
 
   const quickMapsUrl = useMemo(
     () =>
@@ -149,6 +151,16 @@ function App() {
 
   function updatePreferences(nextPreferences: Partial<Preferences>) {
     setPreferences((current) => ({ ...current, ...nextPreferences }))
+  }
+
+  function selectCategory(category: (typeof categories)[number]) {
+    setActiveCategory(category.label)
+    setFoodQuery(category.query)
+  }
+
+  function clearSearch() {
+    setFoodQuery('')
+    setActiveCategory('Open Now')
   }
 
   async function loadRestaurantResults(coordinates: Coordinates | null) {
@@ -268,7 +280,10 @@ function App() {
             <Input
               aria-label="Search food"
               value={foodQuery}
-              onChange={(event) => setFoodQuery(event.target.value)}
+              onChange={(event) => {
+                setFoodQuery(event.target.value)
+                setActiveCategory('')
+              }}
               placeholder="Search food, cafe, restaurant..."
               className="h-14 rounded-xl border-border/60 bg-card pl-11 text-base shadow-sm"
             />
@@ -394,18 +409,18 @@ function App() {
         </div>
 
         <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {categories.map((category, index) => (
+          {categories.map((category) => (
             <button
-              key={category}
+              key={category.label}
               type="button"
-              onClick={() => setFoodQuery(index === 0 ? '' : category)}
+              onClick={() => selectCategory(category)}
               className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
-                index === 0
+                activeCategory === category.label
                   ? 'border-[#ffba27] bg-[#ffdea9] text-[#271900]'
                   : 'border-border/70 bg-card text-primary'
               }`}
             >
-              {category}
+              {category.label}
             </button>
           ))}
         </div>
@@ -449,20 +464,37 @@ function App() {
         </div>
       </section>
 
-      <section className="mt-2 space-y-3 overflow-hidden pl-4">
-        <SectionHeader title="Recommended Nearby" action="See All" />
-        <div className="flex w-full max-w-full gap-4 overflow-x-auto pb-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {recommendedRestaurants.map((restaurant) => (
-            <RecommendedCard
-              key={restaurant.id}
-              restaurant={restaurant}
-              onSelect={() => setSelectedRestaurant(restaurant)}
-            />
-          ))}
+      <section className="px-4">
+        <div className="grid grid-cols-3 gap-2 rounded-xl border border-border/70 bg-card p-2 text-center shadow-sm">
+          <StatusChip label="Mode" value={activeCategory || 'Custom'} />
+          <StatusChip label="Radius" value={`${preferences.radiusKm} km`} />
+          <StatusChip label="Price" value={preferences.priceLevel} />
         </div>
       </section>
 
-      <section className="mt-4 space-y-3 px-4">
+      {!hasResults ? (
+        <EmptyResults query={foodQuery} onClear={clearSearch} />
+      ) : null}
+
+      {hasResults ? (
+        <section className="mt-4 space-y-3 overflow-hidden pl-4">
+        <SectionHeader title="Recommended Nearby" action="See All" />
+        <div className="flex w-full max-w-full gap-4 overflow-x-auto pb-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {isLoadingPlaces
+            ? [1, 2].map((item) => <RecommendedSkeleton key={item} />)
+            : recommendedRestaurants.map((restaurant) => (
+                <RecommendedCard
+                  key={restaurant.id}
+                  restaurant={restaurant}
+                  onSelect={() => setSelectedRestaurant(restaurant)}
+                />
+              ))}
+        </div>
+        </section>
+      ) : null}
+
+      {hasResults ? (
+        <section className="mt-4 space-y-3 px-4">
         <SectionHeader title="Popular Around You" />
         <div className="grid gap-3">
           {popularRestaurants.map((restaurant) => (
@@ -473,7 +505,8 @@ function App() {
             />
           ))}
         </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="mt-6 space-y-3 px-4">
         <SectionHeader title="Saved Places" action="Open saved" />
@@ -492,10 +525,16 @@ function App() {
       <section className="mt-6 px-4">
         <Card className="rounded-xl">
           <CardHeader>
-            <CardTitle>Quick Maps search</CardTitle>
-            <CardDescription className="break-words">{quickMapsUrl}</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Navigation className="size-5 text-primary" aria-hidden="true" />
+              Quick Maps Search
+            </CardTitle>
+            <CardDescription>Food results on Google Maps</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <p className="rounded-lg bg-secondary p-3 text-xs leading-5 text-muted-foreground break-words">
+              {quickMapsUrl}
+            </p>
             <Button
               variant="outline"
               className="w-full rounded-lg"
@@ -529,6 +568,36 @@ function App() {
   )
 }
 
+function StatusChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-secondary px-2 py-2">
+      <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 truncate text-sm font-bold text-primary">{value}</p>
+    </div>
+  )
+}
+
+function EmptyResults({ query, onClear }: { query: string; onClear: () => void }) {
+  return (
+    <section className="px-4 pt-5">
+      <div className="rounded-xl border border-border/70 bg-card p-6 text-center shadow-sm">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-secondary">
+          <Search className="size-6 text-primary" aria-hidden="true" />
+        </div>
+        <h2 className="mt-4 text-xl font-bold">No matching places</h2>
+        <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
+          {query ? `No picks for "${query}" right now.` : 'No picks available right now.'}
+        </p>
+        <Button onClick={onClear} className="mt-4 rounded-lg">
+          Reset Search
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 function SectionHeader({ title, action }: { title: string; action?: string }) {
   return (
     <div className="flex min-w-0 items-end justify-between gap-3 pr-4">
@@ -538,6 +607,22 @@ function SectionHeader({ title, action }: { title: string; action?: string }) {
           {action}
         </button>
       ) : null}
+    </div>
+  )
+}
+
+function RecommendedSkeleton() {
+  return (
+    <div className="w-72 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
+      <div className="h-40 animate-pulse bg-secondary" />
+      <div className="space-y-3 p-4">
+        <div className="h-5 w-44 animate-pulse rounded bg-secondary" />
+        <div className="h-4 w-32 animate-pulse rounded bg-secondary" />
+        <div className="flex gap-3">
+          <div className="h-4 w-16 animate-pulse rounded bg-secondary" />
+          <div className="h-4 w-24 animate-pulse rounded bg-secondary" />
+        </div>
+      </div>
     </div>
   )
 }
