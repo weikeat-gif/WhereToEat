@@ -8,8 +8,6 @@ import {
 } from 'react'
 import {
   Bookmark,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   Compass,
   Filter,
@@ -76,7 +74,7 @@ const defaultPreferences: Preferences = {
   groupFriendly: true,
 }
 
-type ActiveView = 'discover' | 'saved' | 'activity' | 'profile'
+type ActiveView = 'discover' | 'search' | 'saved' | 'activity' | 'profile' | 'settings'
 
 const categories = [
   { label: 'Open Now', query: '' },
@@ -168,6 +166,16 @@ function App() {
   function selectCategory(category: (typeof categories)[number]) {
     setActiveCategory(category.label)
     setFoodQuery(category.query)
+  }
+
+  function updateFoodQuery(value: string) {
+    setFoodQuery(value)
+    setActiveCategory('')
+  }
+
+  function updateManualLocation(value: string) {
+    setManualLocation(value)
+    setUserLocation(null)
   }
 
   function clearSearch() {
@@ -270,13 +278,23 @@ function App() {
     <main className="relative mx-auto min-h-svh w-full max-w-xl overflow-x-hidden bg-background pb-28 text-foreground shadow-[0_0_0_1px_rgba(190,200,202,0.35)]">
       <header className="sticky top-0 z-30 w-full overflow-hidden border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur">
         <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
-          <Button variant="ghost" size="icon" aria-label="Food discovery">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Open food search"
+            onClick={() => setActiveView('search')}
+          >
             <img src="/pwa-icon.svg" alt="" className="size-8" />
           </Button>
           <h1 className="truncate text-center text-3xl font-bold tracking-tight text-primary">
             WhereToEat
           </h1>
-          <Button variant="ghost" size="icon" aria-label="Settings">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Open settings"
+            onClick={() => setActiveView('settings')}
+          >
             <Settings className="size-6" aria-hidden="true" />
           </Button>
         </div>
@@ -294,10 +312,7 @@ function App() {
             <Input
               aria-label="Search food"
               value={foodQuery}
-              onChange={(event) => {
-                setFoodQuery(event.target.value)
-                setActiveCategory('')
-              }}
+              onChange={(event) => updateFoodQuery(event.target.value)}
               placeholder="Search food, cafe, restaurant..."
               className="h-14 rounded-xl border-border/60 bg-card pl-11 text-base shadow-sm"
             />
@@ -432,10 +447,7 @@ function App() {
             <Input
               aria-label="Location fallback"
               value={manualLocation}
-              onChange={(event) => {
-                setManualLocation(event.target.value)
-                setUserLocation(null)
-              }}
+              onChange={(event) => updateManualLocation(event.target.value)}
               placeholder="Type area or venue if GPS is off"
               className="h-11 rounded-lg bg-background"
             />
@@ -481,7 +493,7 @@ function App() {
       {hasResults ? (
         <section className="mt-4 space-y-3 overflow-hidden pl-4">
         <SectionHeader title="Recommended Nearby" action="See All" />
-        <div className="flex w-full max-w-full gap-4 overflow-x-auto pb-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <DragScrollArea className="flex w-full max-w-full gap-4 overflow-x-auto pb-4 pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {isLoadingPlaces
             ? [1, 2].map((item) => <RecommendedSkeleton key={item} />)
             : recommendedRestaurants.map((restaurant) => (
@@ -491,7 +503,7 @@ function App() {
                   onSelect={() => setSelectedRestaurant(restaurant)}
                 />
               ))}
-        </div>
+        </DragScrollArea>
         </section>
       ) : null}
 
@@ -551,6 +563,23 @@ function App() {
         </>
       ) : null}
 
+      {activeView === 'search' ? (
+        <SearchView
+          activeCategory={activeCategory}
+          foodQuery={foodQuery}
+          isLoadingPlaces={isLoadingPlaces}
+          manualLocation={manualLocation}
+          permissionState={permissionState}
+          restaurants={visibleRestaurants}
+          statusLabel={statusLabel}
+          onFoodQueryChange={updateFoodQuery}
+          onManualLocationChange={updateManualLocation}
+          onSearchNearby={searchNearbyFood}
+          onSelectCategory={selectCategory}
+          onSelectRestaurant={setSelectedRestaurant}
+        />
+      ) : null}
+
       {activeView === 'saved' ? (
         <SavedView
           restaurants={savedRestaurants}
@@ -571,6 +600,10 @@ function App() {
 
       {activeView === 'profile' ? (
         <ProfileView preferences={preferences} statusLabel={statusLabel} />
+      ) : null}
+
+      {activeView === 'settings' ? (
+        <SettingsView preferences={preferences} onUpdatePreferences={updatePreferences} />
       ) : null}
 
       <RestaurantDetailSheet
@@ -644,12 +677,12 @@ function EmptyResults({ query, onClear }: { query: string; onClear: () => void }
   )
 }
 
-function CategoryScroller({
-  activeCategory,
-  onSelectCategory,
+function DragScrollArea({
+  children,
+  className,
 }: {
-  activeCategory: string
-  onSelectCategory: (category: (typeof categories)[number]) => void
+  children: ReactNode
+  className: string
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const dragState = useRef({
@@ -658,10 +691,6 @@ function CategoryScroller({
     scrollLeft: 0,
     startX: 0,
   })
-
-  function scrollByAmount(amount: number) {
-    scrollRef.current?.scrollBy({ left: amount, behavior: 'smooth' })
-  }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     const scroller = scrollRef.current
@@ -702,38 +731,43 @@ function CategoryScroller({
     }
     window.setTimeout(() => {
       dragState.current.moved = false
-    }, 0)
+    }, 120)
   }
 
   return (
-    <div className="grid grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        className="size-9 rounded-full bg-card"
-        onClick={() => scrollByAmount(-160)}
-        aria-label="Previous food categories"
-      >
-        <ChevronLeft className="size-4" aria-hidden="true" />
-      </Button>
-      <div
-        ref={scrollRef}
-        className="flex min-w-0 cursor-grab touch-pan-x select-none gap-2 overflow-x-auto pb-1 active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-      >
+    <div
+      ref={scrollRef}
+      className={className}
+      onClickCapture={(event) => {
+        if (dragState.current.moved) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+    >
+      {children}
+    </div>
+  )
+}
+
+function CategoryScroller({
+  activeCategory,
+  onSelectCategory,
+}: {
+  activeCategory: string
+  onSelectCategory: (category: (typeof categories)[number]) => void
+}) {
+  return (
+    <DragScrollArea className="flex max-w-full cursor-grab touch-pan-x select-none gap-2 overflow-x-auto pb-1 active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {categories.map((category) => (
           <button
             key={category.label}
             type="button"
-            onClick={() => {
-              if (!dragState.current.moved) {
-                onSelectCategory(category)
-              }
-            }}
+            onClick={() => onSelectCategory(category)}
             className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
               activeCategory === category.label
                 ? 'border-[#ffba27] bg-[#ffdea9] text-[#271900]'
@@ -743,18 +777,108 @@ function CategoryScroller({
             {category.label}
           </button>
         ))}
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        className="size-9 rounded-full bg-card"
-        onClick={() => scrollByAmount(160)}
-        aria-label="More food categories"
-      >
-        <ChevronRight className="size-4" aria-hidden="true" />
-      </Button>
-    </div>
+    </DragScrollArea>
+  )
+}
+
+function SearchView({
+  activeCategory,
+  foodQuery,
+  isLoadingPlaces,
+  manualLocation,
+  permissionState,
+  restaurants,
+  statusLabel,
+  onFoodQueryChange,
+  onManualLocationChange,
+  onSearchNearby,
+  onSelectCategory,
+  onSelectRestaurant,
+}: {
+  activeCategory: string
+  foodQuery: string
+  isLoadingPlaces: boolean
+  manualLocation: string
+  permissionState: LocationPermissionState
+  restaurants: Restaurant[]
+  statusLabel: string
+  onFoodQueryChange: (value: string) => void
+  onManualLocationChange: (value: string) => void
+  onSearchNearby: () => void
+  onSelectCategory: (category: (typeof categories)[number]) => void
+  onSelectRestaurant: (restaurant: Restaurant) => void
+}) {
+  const isSearching = permissionState === 'requesting' || isLoadingPlaces
+
+  return (
+    <section className="space-y-5 px-4 py-5">
+      <PageTitle title="Search Food" subtitle="Find food, cafes, and chill spots" />
+
+      <Card className="rounded-xl border-border/70">
+        <CardContent className="space-y-3 p-4">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              aria-label="Search food page"
+              value={foodQuery}
+              onChange={(event) => onFoodQueryChange(event.target.value)}
+              placeholder="Search food, cafe, dessert..."
+              className="h-14 rounded-xl border-border/60 bg-background pl-11 text-base"
+            />
+          </div>
+          <CategoryScroller
+            activeCategory={activeCategory}
+            onSelectCategory={onSelectCategory}
+          />
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <Input
+              aria-label="Search page location"
+              value={manualLocation}
+              onChange={(event) => onManualLocationChange(event.target.value)}
+              placeholder="Type area or use GPS"
+              className="h-11 rounded-lg bg-background"
+            />
+            <Button
+              onClick={onSearchNearby}
+              disabled={isSearching}
+              className="h-11 rounded-lg px-3"
+            >
+              <LocateFixed className="size-4" aria-hidden="true" />
+              {isSearching ? 'Searching' : 'Find'}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="size-3.5" aria-hidden="true" />
+              {statusLabel}
+            </span>
+            <span>{restaurants.length} matches</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="space-y-3">
+        <SectionHeader title="Search Results" />
+        <div className="grid gap-3">
+          {restaurants.length > 0 ? (
+            restaurants.map((restaurant) => (
+              <PopularCard
+                key={`${restaurant.id}-search`}
+                restaurant={restaurant}
+                onSelect={() => onSelectRestaurant(restaurant)}
+              />
+            ))
+          ) : (
+            <div className="rounded-xl border border-border/70 bg-card p-5 text-center text-sm text-muted-foreground">
+              No matching food places right now.
+            </div>
+          )}
+        </div>
+      </section>
+    </section>
   )
 }
 
@@ -902,6 +1026,117 @@ function ProfileView({
         </CardContent>
       </Card>
     </section>
+  )
+}
+
+function SettingsView({
+  preferences,
+  onUpdatePreferences,
+}: {
+  preferences: Preferences
+  onUpdatePreferences: (nextPreferences: Partial<Preferences>) => void
+}) {
+  return (
+    <section className="space-y-5 px-4 py-5">
+      <PageTitle title="Settings" subtitle="Adjust your food finder defaults" />
+
+      <Card className="rounded-xl border-border/70">
+        <CardHeader>
+          <CardTitle>Search Distance</CardTitle>
+          <CardDescription>{preferences.radiusKm} km around your area</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Slider
+            value={[preferences.radiusKm]}
+            min={1}
+            max={20}
+            step={1}
+            onValueChange={([radiusKm]) => onUpdatePreferences({ radiusKm })}
+            aria-label="Settings distance range"
+          />
+          <div className="grid grid-cols-4 gap-2">
+            {[1, 3, 5, 10].map((radius) => (
+              <Button
+                key={radius}
+                variant={preferences.radiusKm === radius ? 'default' : 'outline'}
+                onClick={() => onUpdatePreferences({ radiusKm: radius })}
+                className="rounded-lg"
+              >
+                {radius} km
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-xl border-border/70">
+        <CardHeader>
+          <CardTitle>Price Range</CardTitle>
+          <CardDescription>Default budget level for food searches</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 overflow-hidden rounded-lg border bg-card">
+            {(['$', '$$', '$$$', '$$$$'] as const).map((price) => (
+              <button
+                key={price}
+                type="button"
+                onClick={() => onUpdatePreferences({ priceLevel: price })}
+                className={`h-12 border-r text-base font-bold last:border-r-0 ${
+                  preferences.priceLevel === price
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-foreground'
+                }`}
+              >
+                {price}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-xl border-border/70">
+        <CardHeader>
+          <CardTitle>Food Preferences</CardTitle>
+          <CardDescription>Quick filters for your searches</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <SettingToggle
+            checked={preferences.halalOnly}
+            label="Halal"
+            onChange={(checked) => onUpdatePreferences({ halalOnly: checked })}
+          />
+          <SettingToggle
+            checked={preferences.groupFriendly}
+            label="Group Friendly"
+            onChange={(checked) =>
+              onUpdatePreferences({ groupFriendly: checked })
+            }
+          />
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+
+function SettingToggle({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean
+  label: string
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex items-center justify-between rounded-lg bg-secondary px-4 py-3">
+      <span className="font-semibold">{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-5"
+      />
+    </label>
   )
 }
 
@@ -1294,8 +1529,10 @@ function NavItem({
       type="button"
       onClick={onClick}
       aria-label={`${label} tab`}
-      className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-sm ${
-        active ? 'bg-[#dceff1] text-primary' : 'text-foreground'
+      className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-sm transition duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-[0_10px_24px_rgba(0,83,91,0.18)] ${
+        active
+          ? 'bg-[#dceff1] text-primary shadow-[0_8px_18px_rgba(0,83,91,0.14)]'
+          : 'text-foreground'
       }`}
     >
       {icon}

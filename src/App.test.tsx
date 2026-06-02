@@ -118,4 +118,19 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument()
     expect(screen.getByText('Food finder preferences')).toBeInTheDocument()
   })
+
+  it('opens search and settings from the header actions', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /open food search/i }))
+    expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/search food page/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /open settings/i }))
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByText('Adjust your food finder defaults')).toBeInTheDocument()
+  })
 })
