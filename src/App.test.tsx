@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -132,6 +132,21 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /open settings/i }))
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByText('Adjust your food finder defaults')).toBeInTheDocument()
+  })
+
+  it('selects food type chips from the horizontal row', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(
+      within(screen.getByLabelText('Food type filters')).getByRole('button', {
+        name: 'Cafe',
+      }),
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Mode' })).toHaveValue('Cafe')
   })
 
   it('saves and removes a restaurant from the saved page', async () => {

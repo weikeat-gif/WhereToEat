@@ -1193,14 +1193,17 @@ function CategoryScroller({
   onSelectCategory: (category: (typeof categories)[number]) => void
 }) {
   return (
-    <DragScrollArea className="flex max-w-full cursor-grab touch-pan-x select-none gap-2 overflow-x-auto pb-1 active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      aria-label="Food type filters"
+      className="flex max-w-full touch-pan-x gap-2 overflow-x-auto pb-1 pr-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
         {categories.map((category) => (
           <button
             key={category.label}
             type="button"
             onClick={() => onSelectCategory(category)}
             aria-pressed={activeCategory === category.label}
-            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
+            className={`min-h-10 shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition hover:border-primary hover:shadow-sm ${
               activeCategory === category.label
                 ? 'border-[#ffba27] bg-[#ffdea9] text-[#271900]'
                 : 'border-border/70 bg-card text-primary'
@@ -1209,7 +1212,7 @@ function CategoryScroller({
             {category.label}
           </button>
         ))}
-    </DragScrollArea>
+    </div>
   )
 }
 
