@@ -1,6 +1,15 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
 import {
   Bookmark,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Compass,
   Filter,
@@ -67,6 +76,8 @@ const defaultPreferences: Preferences = {
   groupFriendly: true,
 }
 
+type ActiveView = 'discover' | 'saved' | 'activity' | 'profile'
+
 const categories = [
   { label: 'Open Now', query: '' },
   { label: 'Halal', query: 'halal' },
@@ -104,6 +115,7 @@ function readPreferences(): Preferences {
 
 function App() {
   const [preferences, setPreferences] = useState<Preferences>(() => readPreferences())
+  const [activeView, setActiveView] = useState<ActiveView>('discover')
   const [foodQuery, setFoodQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('Open Now')
   const [manualLocation, setManualLocation] = useState('')
@@ -270,6 +282,8 @@ function App() {
         </div>
       </header>
 
+      {activeView === 'discover' ? (
+        <>
       <section className="space-y-3 overflow-hidden px-4 py-4">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] gap-3">
           <div className="relative min-w-0">
@@ -408,22 +422,10 @@ function App() {
           </Sheet>
         </div>
 
-        <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {categories.map((category) => (
-            <button
-              key={category.label}
-              type="button"
-              onClick={() => selectCategory(category)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
-                activeCategory === category.label
-                  ? 'border-[#ffba27] bg-[#ffdea9] text-[#271900]'
-                  : 'border-border/70 bg-card text-primary'
-              }`}
-            >
-              {category.label}
-            </button>
-          ))}
-        </div>
+        <CategoryScroller
+          activeCategory={activeCategory}
+          onSelectCategory={selectCategory}
+        />
 
         <div className="space-y-2 overflow-hidden rounded-xl border bg-card p-3 shadow-sm">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -546,6 +548,30 @@ function App() {
           </CardContent>
         </Card>
       </section>
+        </>
+      ) : null}
+
+      {activeView === 'saved' ? (
+        <SavedView
+          restaurants={savedRestaurants}
+          onOpenMaps={openRestaurantMaps}
+          onShare={(restaurant) => void shareRestaurant(restaurant)}
+        />
+      ) : null}
+
+      {activeView === 'activity' ? (
+        <ActivityView
+          activeCategory={activeCategory || 'Custom'}
+          preferences={preferences}
+          statusLabel={statusLabel}
+          restaurants={popularRestaurants}
+          onSelectRestaurant={setSelectedRestaurant}
+        />
+      ) : null}
+
+      {activeView === 'profile' ? (
+        <ProfileView preferences={preferences} statusLabel={statusLabel} />
+      ) : null}
 
       <RestaurantDetailSheet
         restaurant={selectedRestaurant}
@@ -556,10 +582,30 @@ function App() {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-4 py-2 backdrop-blur">
         <div className="grid grid-cols-4 gap-2">
-          <NavItem active icon={<Compass className="size-6" />} label="Discover" />
-          <NavItem icon={<Bookmark className="size-6" />} label="Saved" />
-          <NavItem icon={<History className="size-6" />} label="Activity" />
-          <NavItem icon={<UserRound className="size-6" />} label="Profile" />
+          <NavItem
+            active={activeView === 'discover'}
+            icon={<Compass className="size-6" />}
+            label="Discover"
+            onClick={() => setActiveView('discover')}
+          />
+          <NavItem
+            active={activeView === 'saved'}
+            icon={<Bookmark className="size-6" />}
+            label="Saved"
+            onClick={() => setActiveView('saved')}
+          />
+          <NavItem
+            active={activeView === 'activity'}
+            icon={<History className="size-6" />}
+            label="Activity"
+            onClick={() => setActiveView('activity')}
+          />
+          <NavItem
+            active={activeView === 'profile'}
+            icon={<UserRound className="size-6" />}
+            label="Profile"
+            onClick={() => setActiveView('profile')}
+          />
         </div>
       </nav>
 
@@ -595,6 +641,320 @@ function EmptyResults({ query, onClear }: { query: string; onClear: () => void }
         </Button>
       </div>
     </section>
+  )
+}
+
+function CategoryScroller({
+  activeCategory,
+  onSelectCategory,
+}: {
+  activeCategory: string
+  onSelectCategory: (category: (typeof categories)[number]) => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const dragState = useRef({
+    active: false,
+    moved: false,
+    scrollLeft: 0,
+    startX: 0,
+  })
+
+  function scrollByAmount(amount: number) {
+    scrollRef.current?.scrollBy({ left: amount, behavior: 'smooth' })
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    const scroller = scrollRef.current
+
+    if (!scroller) {
+      return
+    }
+
+    dragState.current = {
+      active: true,
+      moved: false,
+      scrollLeft: scroller.scrollLeft,
+      startX: event.clientX,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    const scroller = scrollRef.current
+
+    if (!scroller || !dragState.current.active) {
+      return
+    }
+
+    const distance = event.clientX - dragState.current.startX
+
+    if (Math.abs(distance) > 4) {
+      dragState.current.moved = true
+    }
+
+    scroller.scrollLeft = dragState.current.scrollLeft - distance
+  }
+
+  function handlePointerEnd(event: PointerEvent<HTMLDivElement>) {
+    dragState.current.active = false
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    window.setTimeout(() => {
+      dragState.current.moved = false
+    }, 0)
+  }
+
+  return (
+    <div className="grid grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="size-9 rounded-full bg-card"
+        onClick={() => scrollByAmount(-160)}
+        aria-label="Previous food categories"
+      >
+        <ChevronLeft className="size-4" aria-hidden="true" />
+      </Button>
+      <div
+        ref={scrollRef}
+        className="flex min-w-0 cursor-grab touch-pan-x select-none gap-2 overflow-x-auto pb-1 active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+      >
+        {categories.map((category) => (
+          <button
+            key={category.label}
+            type="button"
+            onClick={() => {
+              if (!dragState.current.moved) {
+                onSelectCategory(category)
+              }
+            }}
+            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
+              activeCategory === category.label
+                ? 'border-[#ffba27] bg-[#ffdea9] text-[#271900]'
+                : 'border-border/70 bg-card text-primary'
+            }`}
+          >
+            {category.label}
+          </button>
+        ))}
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="size-9 rounded-full bg-card"
+        onClick={() => scrollByAmount(160)}
+        aria-label="More food categories"
+      >
+        <ChevronRight className="size-4" aria-hidden="true" />
+      </Button>
+    </div>
+  )
+}
+
+function SavedView({
+  restaurants,
+  onOpenMaps,
+  onShare,
+}: {
+  restaurants: Restaurant[]
+  onOpenMaps: (restaurant: Restaurant) => void
+  onShare: (restaurant: Restaurant) => void
+}) {
+  return (
+    <section className="space-y-5 px-4 py-5">
+      <PageTitle
+        title="Saved Places"
+        subtitle={`${restaurants.length} ready picks`}
+      />
+      <div className="grid gap-3">
+        {restaurants.map((restaurant) => (
+          <SavedCard
+            key={restaurant.id}
+            restaurant={restaurant}
+            onOpenMaps={() => onOpenMaps(restaurant)}
+            onShare={() => onShare(restaurant)}
+          />
+        ))}
+      </div>
+      <Card className="rounded-xl border-border/70">
+        <CardHeader>
+          <CardTitle>Shortcut List</CardTitle>
+          <CardDescription>Quick food picks for repeat decisions</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          {restaurants.map((restaurant) => (
+            <button
+              key={`${restaurant.id}-shortcut`}
+              type="button"
+              onClick={() => onOpenMaps(restaurant)}
+              className="flex items-center justify-between rounded-lg bg-secondary p-3 text-left"
+            >
+              <span className="truncate font-semibold">{restaurant.name}</span>
+              <Navigation className="size-4 text-primary" aria-hidden="true" />
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+
+function ActivityView({
+  activeCategory,
+  preferences,
+  restaurants,
+  statusLabel,
+  onSelectRestaurant,
+}: {
+  activeCategory: string
+  preferences: Preferences
+  restaurants: Restaurant[]
+  statusLabel: string
+  onSelectRestaurant: (restaurant: Restaurant) => void
+}) {
+  const recentPicks = restaurants.slice(0, 3)
+
+  return (
+    <section className="space-y-5 px-4 py-5">
+      <PageTitle title="Activity" subtitle="Recent food decisions" />
+      <div className="grid gap-3">
+        <ActivityRow
+          icon={<Search className="size-5 text-primary" />}
+          title={activeCategory}
+          detail={`Mode selected · ${preferences.radiusKm} km · ${preferences.priceLevel}`}
+        />
+        <ActivityRow
+          icon={<MapPin className="size-5 text-primary" />}
+          title={statusLabel}
+          detail="Location search status"
+        />
+        <ActivityRow
+          icon={<Clock3 className="size-5 text-primary" />}
+          title="Live Maps handoff"
+          detail="Reviews, directions, and opening hours stay in Google Maps"
+        />
+      </div>
+      <section className="space-y-3">
+        <SectionHeader title="Recently Viewed" />
+        <div className="grid gap-3">
+          {recentPicks.map((restaurant) => (
+            <PopularCard
+              key={`${restaurant.id}-activity`}
+              restaurant={restaurant}
+              onSelect={() => onSelectRestaurant(restaurant)}
+            />
+          ))}
+        </div>
+      </section>
+    </section>
+  )
+}
+
+function ProfileView({
+  preferences,
+  statusLabel,
+}: {
+  preferences: Preferences
+  statusLabel: string
+}) {
+  return (
+    <section className="space-y-5 px-4 py-5">
+      <PageTitle title="Profile" subtitle="Food finder preferences" />
+      <Card className="rounded-xl border-border/70">
+        <CardContent className="flex items-center gap-4 p-4">
+          <div className="flex size-16 items-center justify-center rounded-2xl bg-primary">
+            <img src="/pwa-icon.svg" alt="" className="size-12" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-bold">WhereToEat</h2>
+            <p className="text-sm text-muted-foreground">Mobile food finder</p>
+          </div>
+        </CardContent>
+      </Card>
+      <div className="grid grid-cols-2 gap-3">
+        <StatusCard label="Radius" value={`${preferences.radiusKm} km`} />
+        <StatusCard label="Price" value={preferences.priceLevel} />
+        <StatusCard label="Halal" value={preferences.halalOnly ? 'On' : 'Off'} />
+        <StatusCard
+          label="Group"
+          value={preferences.groupFriendly ? 'Friendly' : 'Any'}
+        />
+      </div>
+      <Card className="rounded-xl border-border/70">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="size-5 text-primary" aria-hidden="true" />
+            App Status
+          </CardTitle>
+          <CardDescription>{statusLabel}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <ProfileLine label="GPS history" value="Not stored" />
+          <ProfileLine label="Accounts" value="Not required" />
+          <ProfileLine label="Restaurant data" value="Google Maps handoff" />
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+
+function PageTitle({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      <h2 className="text-3xl font-bold tracking-tight text-primary">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+    </div>
+  )
+}
+
+function ActivityRow({
+  detail,
+  icon,
+  title,
+}: {
+  detail: string
+  icon: ReactNode
+  title: string
+}) {
+  return (
+    <Card className="rounded-xl border-border/70">
+      <CardContent className="grid grid-cols-[44px_minmax(0,1fr)] gap-3 p-4">
+        <div className="flex size-11 items-center justify-center rounded-xl bg-secondary">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <h3 className="truncate font-bold">{title}</h3>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">{detail}</p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function StatusCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="rounded-xl border-border/70">
+      <CardContent className="p-4">
+        <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
+        <p className="mt-1 text-xl font-bold text-primary">{value}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProfileLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary px-3 py-2">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-bold text-primary">{value}</span>
+    </div>
   )
 }
 
@@ -921,15 +1281,19 @@ function DetailRow({ icon, text }: { icon: ReactNode; text: string }) {
 function NavItem({
   icon,
   label,
+  onClick,
   active = false,
 }: {
   icon: ReactNode
   label: string
+  onClick: () => void
   active?: boolean
 }) {
   return (
     <button
       type="button"
+      onClick={onClick}
+      aria-label={`${label} tab`}
       className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-sm ${
         active ? 'bg-[#dceff1] text-primary' : 'text-foreground'
       }`}

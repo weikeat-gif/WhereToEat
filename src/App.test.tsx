@@ -99,4 +99,23 @@ describe('App', () => {
 
     expect(await screen.findByText('Type location')).toBeInTheDocument()
   })
+
+  it('opens the saved, activity, and profile sections from bottom navigation', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /saved tab/i }))
+    expect(screen.getByRole('heading', { name: 'Saved Places' })).toBeInTheDocument()
+    expect(screen.getByText('Shortcut List')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /activity tab/i }))
+    expect(screen.getByRole('heading', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByText('Recent food decisions')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+    expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument()
+    expect(screen.getByText('Food finder preferences')).toBeInTheDocument()
+  })
 })
