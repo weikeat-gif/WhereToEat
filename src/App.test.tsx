@@ -83,7 +83,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /search nearby food/i }))
 
     expect(screen.getByText(/near\+Bukit\+Jalil/)).toBeInTheDocument()
-    expect(screen.getAllByText('Neighborhood Mamak')).not.toHaveLength(0)
+    expect(screen.getAllByText('Restoran Nasi Kandar Pelita KLCC')).not.toHaveLength(0)
   })
 
   it('asks for typed location when geolocation is denied', async () => {

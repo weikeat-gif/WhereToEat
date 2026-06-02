@@ -22,7 +22,6 @@ import {
   SlidersHorizontal,
   Star,
   UserRound,
-  X,
 } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
 
@@ -66,6 +65,9 @@ type Preferences = {
   halalOnly: boolean
   groupFriendly: boolean
 }
+
+const radiusOptions = [1, 3, 5, 10, 20] as const
+const priceLevels = ['$', '$$', '$$$', '$$$$'] as const
 
 const defaultPreferences: Preferences = {
   radiusKm: 3,
@@ -122,6 +124,7 @@ function App() {
     useState<LocationPermissionState>('idle')
   const [restaurants, setRestaurants] = useState<Restaurant[]>(sampleRestaurants)
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(
     null,
   )
@@ -166,6 +169,11 @@ function App() {
   function selectCategory(category: (typeof categories)[number]) {
     setActiveCategory(category.label)
     setFoodQuery(category.query)
+  }
+
+  function selectCuisine(cuisine: string) {
+    setActiveCategory(cuisine)
+    setFoodQuery(cuisine.toLowerCase())
   }
 
   function updateFoodQuery(value: string) {
@@ -318,7 +326,7 @@ function App() {
             />
           </div>
 
-          <Sheet>
+          <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
@@ -338,6 +346,22 @@ function App() {
               </SheetHeader>
 
               <div className="space-y-7">
+                <section className="space-y-3">
+                  <h3 className="text-base font-semibold">Mode</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {categories.map((category) => (
+                      <Button
+                        key={category.label}
+                        variant={activeCategory === category.label ? 'default' : 'outline'}
+                        onClick={() => selectCategory(category)}
+                        className="justify-start rounded-lg"
+                      >
+                        {category.label}
+                      </Button>
+                    ))}
+                  </div>
+                </section>
+
                 <section className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-semibold">Distance</h3>
@@ -353,7 +377,7 @@ function App() {
                       aria-label="Distance range"
                     />
                     <div className="mt-4 grid grid-cols-4 gap-2">
-                      {[1, 3, 5, 10].map((radius) => (
+                      {radiusOptions.slice(0, 4).map((radius) => (
                         <Button
                           key={radius}
                           variant={preferences.radiusKm === radius ? 'default' : 'outline'}
@@ -370,7 +394,7 @@ function App() {
                 <section className="space-y-3">
                   <h3 className="text-base font-semibold">Price Range</h3>
                   <div className="grid grid-cols-4 overflow-hidden rounded-lg border bg-card">
-                    {(['$', '$$', '$$$', '$$$$'] as const).map((price) => (
+                    {priceLevels.map((price) => (
                       <button
                         key={price}
                         type="button"
@@ -396,9 +420,18 @@ function App() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {cuisineFilters.map((cuisine) => (
-                      <Badge key={cuisine} variant="outline" className="rounded-full px-4 py-2">
+                      <button
+                        key={cuisine}
+                        type="button"
+                        onClick={() => selectCuisine(cuisine)}
+                        className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                          activeCategory === cuisine
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border/70 bg-card text-primary'
+                        }`}
+                      >
                         {cuisine}
-                      </Badge>
+                      </button>
                     ))}
                   </div>
                 </section>
@@ -431,7 +464,12 @@ function App() {
                   </div>
                 </section>
 
-                <Button className="h-12 w-full rounded-lg">Show Results</Button>
+                <Button
+                  className="h-12 w-full rounded-lg"
+                  onClick={() => setIsFilterOpen(false)}
+                >
+                  Show Results
+                </Button>
               </div>
             </SheetContent>
           </Sheet>
@@ -479,11 +517,13 @@ function App() {
       </section>
 
       <section className="px-4">
-        <div className="grid grid-cols-3 gap-2 rounded-xl border border-border/70 bg-card p-2 text-center shadow-sm">
-          <StatusChip label="Mode" value={activeCategory || 'Custom'} />
-          <StatusChip label="Radius" value={`${preferences.radiusKm} km`} />
-          <StatusChip label="Price" value={preferences.priceLevel} />
-        </div>
+        <StatusControls
+          activeCategory={activeCategory}
+          preferences={preferences}
+          onSelectCategory={selectCategory}
+          onSelectCuisine={selectCuisine}
+          onUpdatePreferences={updatePreferences}
+        />
       </section>
 
       {!hasResults ? (
@@ -647,14 +687,97 @@ function App() {
   )
 }
 
-function StatusChip({ label, value }: { label: string; value: string }) {
+function StatusControls({
+  activeCategory,
+  preferences,
+  onSelectCategory,
+  onSelectCuisine,
+  onUpdatePreferences,
+}: {
+  activeCategory: string
+  preferences: Preferences
+  onSelectCategory: (category: (typeof categories)[number]) => void
+  onSelectCuisine: (cuisine: string) => void
+  onUpdatePreferences: (nextPreferences: Partial<Preferences>) => void
+}) {
+  const modeOptions = [
+    ...categories.map((category) => category.label),
+    ...cuisineFilters,
+  ]
+  const modeValue = modeOptions.includes(activeCategory) ? activeCategory : 'Custom'
+
+  function handleModeChange(value: string) {
+    const category = categories.find((item) => item.label === value)
+
+    if (category) {
+      onSelectCategory(category)
+      return
+    }
+
+    if (cuisineFilters.includes(value)) {
+      onSelectCuisine(value)
+    }
+  }
+
   return (
-    <div className="rounded-lg bg-secondary px-2 py-2">
-      <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-0.5 truncate text-sm font-bold text-primary">{value}</p>
+    <div className="grid grid-cols-3 gap-2 rounded-xl border border-border/70 bg-card p-2 text-center shadow-sm">
+      <StatusSelect
+        label="Mode"
+        value={modeValue}
+        options={modeValue === 'Custom' ? ['Custom', ...modeOptions] : modeOptions}
+        onChange={handleModeChange}
+      />
+      <StatusSelect
+        label="Radius"
+        value={String(preferences.radiusKm)}
+        options={radiusOptions.map(String)}
+        suffix=" km"
+        onChange={(value) => onUpdatePreferences({ radiusKm: Number(value) })}
+      />
+      <StatusSelect
+        label="Price"
+        value={preferences.priceLevel}
+        options={[...priceLevels]}
+        onChange={(value) =>
+          onUpdatePreferences({ priceLevel: value as Preferences['priceLevel'] })
+        }
+      />
     </div>
+  )
+}
+
+function StatusSelect({
+  label,
+  value,
+  options,
+  suffix = '',
+  onChange,
+}: {
+  label: string
+  value: string
+  options: string[]
+  suffix?: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="rounded-lg bg-secondary px-2 py-2">
+      <span className="block text-[11px] font-semibold uppercase text-muted-foreground">
+        {label}
+      </span>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-0.5 w-full min-w-0 appearance-none truncate bg-transparent text-center text-sm font-bold text-primary outline-none"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+            {suffix}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
@@ -717,7 +840,7 @@ function DragScrollArea({
 
     const distance = event.clientX - dragState.current.startX
 
-    if (Math.abs(distance) > 4) {
+    if (Math.abs(distance) > 14) {
       dragState.current.moved = true
     }
 
@@ -768,6 +891,7 @@ function CategoryScroller({
             key={category.label}
             type="button"
             onClick={() => onSelectCategory(category)}
+            aria-pressed={activeCategory === category.label}
             className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
               activeCategory === category.label
                 ? 'border-[#ffba27] bg-[#ffdea9] text-[#271900]'
@@ -1260,7 +1384,7 @@ function RecommendedCard({
     <button
       type="button"
       onClick={onSelect}
-      className="w-72 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-card text-left shadow-sm transition hover:border-primary"
+      className="w-72 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border/50 bg-card text-left shadow-sm transition hover:border-primary hover:shadow-md"
     >
       <div className="relative h-40">
         <FoodImage
@@ -1313,7 +1437,7 @@ function PopularCard({
     <button
       type="button"
       onClick={onSelect}
-      className="grid w-full min-w-0 grid-cols-[104px_minmax(0,1fr)] gap-4 rounded-xl border border-border/50 bg-card p-3 text-left shadow-sm transition hover:border-primary sm:grid-cols-[112px_minmax(0,1fr)]"
+      className="grid w-full min-w-0 cursor-pointer grid-cols-[104px_minmax(0,1fr)] gap-4 rounded-xl border border-border/50 bg-card p-3 text-left shadow-sm transition hover:border-primary hover:shadow-md sm:grid-cols-[112px_minmax(0,1fr)]"
     >
       <FoodImage
         src={restaurant.imageUrl}
@@ -1419,15 +1543,6 @@ function RestaurantDetailSheet({
                 alt={`${restaurant.name} detail`}
                 className="h-56 w-full"
               />
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={onClose}
-                className="absolute right-3 top-3 rounded-full bg-card/90"
-                aria-label="Close"
-              >
-                <X className="size-5" aria-hidden="true" />
-              </Button>
             </div>
 
             <SheetHeader className="mb-0 pr-0">
