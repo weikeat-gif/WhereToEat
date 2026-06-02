@@ -79,6 +79,7 @@ const defaultPreferences: Preferences = {
 }
 
 type ActiveView = 'discover' | 'search' | 'saved' | 'activity' | 'profile' | 'settings'
+type SortOption = 'nearest' | 'cheapest' | 'rating' | 'group'
 
 const categories = [
   { label: 'Open Now', query: '' },
@@ -91,6 +92,12 @@ const categories = [
 ] as const
 
 const cuisineFilters = ['Malay', 'Chinese', 'Indian', 'Western', 'Japanese', 'Korean', 'Thai']
+const sortOptions: Array<{ label: string; value: SortOption }> = [
+  { label: 'Nearest', value: 'nearest' },
+  { label: 'Cheapest', value: 'cheapest' },
+  { label: 'Top rated', value: 'rating' },
+  { label: 'Group', value: 'group' },
+]
 
 function readPreferences(): Preferences {
   try {
@@ -154,6 +161,7 @@ function App() {
   const [activeView, setActiveView] = useState<ActiveView>('discover')
   const [foodQuery, setFoodQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('Open Now')
+  const [sortOption, setSortOption] = useState<SortOption>('nearest')
   const [manualLocation, setManualLocation] = useState('')
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null)
   const [permissionState, setPermissionState] =
@@ -177,8 +185,8 @@ function App() {
   }, [savedRestaurants])
 
   const visibleRestaurants = useMemo(
-    () => filterRestaurants(restaurants, foodQuery),
-    [foodQuery, restaurants],
+    () => sortRestaurants(filterRestaurants(restaurants, foodQuery), sortOption),
+    [foodQuery, restaurants, sortOption],
   )
 
   const recommendedRestaurants = visibleRestaurants.slice(0, 4)
@@ -235,6 +243,11 @@ function App() {
   function clearSearch() {
     setFoodQuery('')
     setActiveCategory('Open Now')
+  }
+
+  function increaseRadiusForResults() {
+    updatePreferences({ radiusKm: Math.min(20, preferences.radiusKm + 5) })
+    toast.info('Radius increased')
   }
 
   function pickRestaurantForGroup() {
@@ -347,18 +360,24 @@ function App() {
 
   async function shareRestaurant(restaurant: Restaurant) {
     const url = buildGoogleMapsRestaurantUrl(restaurant)
+    const planText = [
+      `Jom makan at ${restaurant.name}`,
+      `Food: ${restaurant.menuHighlights.slice(0, 3).join(', ')}`,
+      `Price: ${restaurant.price}`,
+      `Why: ${restaurant.vibe}`,
+    ].join('\n')
 
     if (navigator.share) {
       await navigator.share({
         title: restaurant.name,
-        text: `Food idea: ${restaurant.name}`,
+        text: planText,
         url,
       })
       return
     }
 
-    await navigator.clipboard.writeText(url)
-    toast.success('Restaurant link copied')
+    await navigator.clipboard.writeText(`${planText}\nMaps: ${url}`)
+    toast.success('Food plan copied')
   }
 
   return (
@@ -610,8 +629,20 @@ function App() {
         onSelectCategory={selectCategory}
       />
 
+      <SortControls value={sortOption} onChange={setSortOption} />
+
       {!hasResults ? (
-        <EmptyResults query={foodQuery} onClear={clearSearch} />
+        <EmptyResults
+          query={foodQuery}
+          onClear={clearSearch}
+          onIncreaseRadius={increaseRadiusForResults}
+          onOpenMaps={() =>
+            window.open(quickMapsUrl, '_blank', 'noopener,noreferrer')
+          }
+          onTryCafe={() =>
+            selectCategory(categories.find((item) => item.label === 'Cafe') ?? categories[0])
+          }
+        />
       ) : null}
 
       {hasResults ? (
@@ -709,6 +740,7 @@ function App() {
           permissionState={permissionState}
           restaurants={visibleRestaurants}
           savedRestaurantIds={savedRestaurantIds}
+          sortOption={sortOption}
           statusLabel={statusLabel}
           onFoodQueryChange={updateFoodQuery}
           onManualLocationChange={updateManualLocation}
@@ -716,6 +748,7 @@ function App() {
           onSearchNearby={searchNearbyFood}
           onSelectCategory={selectCategory}
           onSelectRestaurant={setSelectedRestaurant}
+          onSortChange={setSortOption}
           onShare={(restaurant) => void shareRestaurant(restaurant)}
           onToggleSaved={toggleSavedRestaurant}
         />
@@ -890,7 +923,65 @@ function StatusSelect({
   )
 }
 
-function EmptyResults({ query, onClear }: { query: string; onClear: () => void }) {
+function SortControls({
+  value,
+  onChange,
+}: {
+  value: SortOption
+  onChange: (value: SortOption) => void
+}) {
+  return (
+    <section className="px-4 pt-3">
+      <div className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-bold text-primary">Sort results</p>
+          <select
+            aria-label="Sort results"
+            value={value}
+            onChange={(event) => onChange(event.target.value as SortOption)}
+            className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm font-semibold text-primary outline-none"
+          >
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {sortOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={`min-h-10 rounded-lg px-2 text-xs font-bold transition ${
+                value === option.value
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-primary hover:bg-[#ffdea9] hover:text-[#271900]'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function EmptyResults({
+  query,
+  onClear,
+  onIncreaseRadius,
+  onOpenMaps,
+  onTryCafe,
+}: {
+  query: string
+  onClear: () => void
+  onIncreaseRadius: () => void
+  onOpenMaps: () => void
+  onTryCafe: () => void
+}) {
   return (
     <section className="px-4 pt-5">
       <div className="rounded-xl border border-border/70 bg-card p-6 text-center shadow-sm">
@@ -901,12 +992,72 @@ function EmptyResults({ query, onClear }: { query: string; onClear: () => void }
         <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
           {query ? `No picks for "${query}" right now.` : 'No picks available right now.'}
         </p>
-        <Button onClick={onClear} className="mt-4 rounded-lg">
-          Reset Search
-        </Button>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button onClick={onTryCafe} className="rounded-lg">
+            Try Cafe
+          </Button>
+          <Button variant="outline" onClick={onIncreaseRadius} className="rounded-lg">
+            Wider Radius
+          </Button>
+          <Button variant="outline" onClick={onClear} className="rounded-lg">
+            Reset
+          </Button>
+          <Button variant="outline" onClick={onOpenMaps} className="rounded-lg">
+            Open Maps
+          </Button>
+        </div>
       </div>
     </section>
   )
+}
+
+function sortRestaurants(restaurants: Restaurant[], sortOption: SortOption) {
+  return [...restaurants].sort((first, second) => {
+    if (sortOption === 'cheapest') {
+      return getPriceRank(first.price) - getPriceRank(second.price)
+    }
+
+    if (sortOption === 'rating') {
+      return second.rating - first.rating
+    }
+
+    if (sortOption === 'group') {
+      return getGroupRank(second) - getGroupRank(first)
+    }
+
+    return (first.distanceKm ?? 99) - (second.distanceKm ?? 99)
+  })
+}
+
+function getPriceRank(price: string) {
+  return price.replaceAll('-', '').length || 2
+}
+
+function getGroupRank(restaurant: Restaurant) {
+  const text = [...restaurant.tags, ...restaurant.amenities, restaurant.vibe]
+    .join(' ')
+    .toLowerCase()
+
+  return Number(text.includes('group')) + Number(text.includes('table'))
+}
+
+function getOpenStatusLabel(restaurant: Restaurant) {
+  const status = restaurant.openStatus.toLowerCase()
+  const tags = restaurant.tags.join(' ').toLowerCase()
+
+  if (status.includes('hours listed')) {
+    return 'Hours listed'
+  }
+
+  if (status.includes('late') || tags.includes('late night')) {
+    return 'Late-night friendly'
+  }
+
+  if (status.includes('many choices')) {
+    return 'Many choices'
+  }
+
+  return 'Check live hours'
 }
 
 function QuickDecisionBar({
@@ -1070,6 +1221,7 @@ function SearchView({
   permissionState,
   restaurants,
   savedRestaurantIds,
+  sortOption,
   statusLabel,
   onFoodQueryChange,
   onManualLocationChange,
@@ -1077,6 +1229,7 @@ function SearchView({
   onSearchNearby,
   onSelectCategory,
   onSelectRestaurant,
+  onSortChange,
   onShare,
   onToggleSaved,
 }: {
@@ -1087,6 +1240,7 @@ function SearchView({
   permissionState: LocationPermissionState
   restaurants: Restaurant[]
   savedRestaurantIds: Set<string>
+  sortOption: SortOption
   statusLabel: string
   onFoodQueryChange: (value: string) => void
   onManualLocationChange: (value: string) => void
@@ -1094,6 +1248,7 @@ function SearchView({
   onSearchNearby: () => void
   onSelectCategory: (category: (typeof categories)[number]) => void
   onSelectRestaurant: (restaurant: Restaurant) => void
+  onSortChange: (value: SortOption) => void
   onShare: (restaurant: Restaurant) => void
   onToggleSaved: (restaurant: Restaurant) => void
 }) {
@@ -1151,6 +1306,7 @@ function SearchView({
 
       <section className="space-y-3">
         <SectionHeader title="Search Results" />
+        <SortControls value={sortOption} onChange={onSortChange} />
         <div className="grid gap-3">
           {restaurants.length > 0 ? (
             restaurants.map((restaurant) => (
@@ -1644,39 +1800,39 @@ function RecommendedCard({
           </p>
         </div>
       </button>
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 pb-4">
+      <div className="grid grid-cols-2 gap-2 px-4 pb-4">
         <Button onClick={onSelect} className="h-10 rounded-lg">
           View
         </Button>
         <Button
           variant={isSaved ? 'default' : 'outline'}
-          size="icon"
           onClick={onToggleSaved}
           aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
-          className="size-10 rounded-lg"
+          className="h-10 rounded-lg"
         >
           <Heart
             className={`size-4 ${isSaved ? 'fill-current' : ''}`}
             aria-hidden="true"
           />
+          {isSaved ? 'Saved' : 'Save'}
         </Button>
         <Button
           variant="outline"
-          size="icon"
           onClick={onOpenMaps}
           aria-label={`Open ${restaurant.name} in Maps`}
-          className="size-10 rounded-lg"
+          className="h-10 rounded-lg"
         >
           <Navigation className="size-4" aria-hidden="true" />
+          Maps
         </Button>
         <Button
           variant="outline"
-          size="icon"
           onClick={onShare}
           aria-label={`Share ${restaurant.name}`}
-          className="size-10 rounded-lg"
+          className="h-10 rounded-lg"
         >
           <Share2 className="size-4" aria-hidden="true" />
+          Share
         </Button>
       </div>
     </article>
@@ -1747,50 +1903,50 @@ function PopularCard({
             </span>
             <span className="inline-flex items-center gap-1 font-semibold text-[#b07800]">
               <Clock3 className="size-4" aria-hidden="true" />
-              {restaurant.openStatus}
+              {getOpenStatusLabel(restaurant)}
             </span>
           </div>
         </div>
       </button>
       {onOpenMaps || onShare || onToggleSaved ? (
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 pb-3">
+        <div className="grid grid-cols-2 gap-2 px-3 pb-3">
           <Button onClick={onSelect} className="h-10 rounded-lg">
             View details
           </Button>
           {onToggleSaved ? (
             <Button
               variant={isSaved ? 'default' : 'outline'}
-              size="icon"
               onClick={onToggleSaved}
               aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
-              className="size-10 rounded-lg"
+              className="h-10 rounded-lg"
             >
               <Heart
                 className={`size-4 ${isSaved ? 'fill-current' : ''}`}
                 aria-hidden="true"
               />
+              {isSaved ? 'Saved' : 'Save'}
             </Button>
           ) : null}
           {onOpenMaps ? (
             <Button
               variant="outline"
-              size="icon"
               onClick={onOpenMaps}
               aria-label={`Open ${restaurant.name} in Maps`}
-              className="size-10 rounded-lg"
+              className="h-10 rounded-lg"
             >
               <Navigation className="size-4" aria-hidden="true" />
+              Maps
             </Button>
           ) : null}
           {onShare ? (
             <Button
               variant="outline"
-              size="icon"
               onClick={onShare}
               aria-label={`Share ${restaurant.name}`}
-              className="size-10 rounded-lg"
+              className="h-10 rounded-lg"
             >
               <Share2 className="size-4" aria-hidden="true" />
+              Share
             </Button>
           ) : null}
       </div>
@@ -1834,39 +1990,39 @@ function SavedCard({
               </p>
             </div>
             <Badge variant="accent" className="rounded-full">
-              {restaurant.openStatus}
+              {getOpenStatusLabel(restaurant)}
             </Badge>
           </div>
-          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button onClick={onSelect} className="rounded-lg">
               View
             </Button>
             <Button
               variant="outline"
-              size="icon"
               onClick={onOpenMaps}
               aria-label={`Open ${restaurant.name} in Maps`}
               className="rounded-lg"
             >
               <Navigation className="size-4" aria-hidden="true" />
+              Maps
             </Button>
             <Button
               variant="outline"
-              size="icon"
               onClick={onShare}
               aria-label={`Share ${restaurant.name}`}
               className="rounded-lg"
             >
               <Share2 className="size-4" aria-hidden="true" />
+              Share
             </Button>
             <Button
               variant="outline"
-              size="icon"
               onClick={onRemove}
               aria-label={`Remove ${restaurant.name} from saved`}
               className="rounded-lg"
             >
               <Heart className="size-4 fill-primary text-primary" aria-hidden="true" />
+              Remove
             </Button>
           </div>
         </div>
@@ -1922,7 +2078,7 @@ function RestaurantDetailSheet({
               />
             </div>
 
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 className="h-12 rounded-lg"
                 onClick={() => onOpenMaps(restaurant)}
@@ -1932,40 +2088,40 @@ function RestaurantDetailSheet({
               </Button>
               <Button
                 variant={isSaved ? 'default' : 'outline'}
-                size="icon"
                 onClick={() => onToggleSaved(restaurant)}
                 aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
-                className="size-12 rounded-lg"
+                className="h-12 rounded-lg"
               >
                 <Heart
                   className={`size-5 ${isSaved ? 'fill-current' : ''}`}
                   aria-hidden="true"
                 />
+                {isSaved ? 'Saved' : 'Save'}
               </Button>
               <Button
                 variant="outline"
-                size="icon"
                 onClick={() => onShare(restaurant)}
                 aria-label={`Share ${restaurant.name}`}
-                className="size-12 rounded-lg"
+                className="h-12 rounded-lg"
               >
                 <Share2 className="size-5" aria-hidden="true" />
+                Share
               </Button>
               <Button
                 variant="outline"
-                size="icon"
                 onClick={() => onCopy(restaurant)}
                 aria-label={`Copy ${restaurant.name} link`}
-                className="size-12 rounded-lg"
+                className="h-12 rounded-lg"
               >
                 <Copy className="size-5" aria-hidden="true" />
+                Copy
               </Button>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Badge variant="accent" className="rounded-full px-3 py-2">
                 <Clock3 className="size-4" aria-hidden="true" />
-                {restaurant.openStatus}
+                {getOpenStatusLabel(restaurant)}
               </Badge>
               <Badge variant="outline" className="rounded-full px-3 py-2">
                 {restaurant.price}
