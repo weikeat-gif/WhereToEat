@@ -1,6 +1,6 @@
-# WhereToEat
+# MakanMana
 
-WhereToEat is a mobile-first food finder app. It helps users quickly search for nearby restaurants, cafes, and chill places, then open the selected place in Google Maps for directions, reviews, opening hours, and live shop details.
+MakanMana is a mobile-first food finder app. In Malaysia, "makan mana" means "where to eat." The app helps users quickly search for nearby restaurants, cafes, and chill places, then open the selected place in Google Maps for directions, reviews, opening hours, and live shop details.
 
 The app supports GPS search, manual location input, food/category filtering, restaurant cards, restaurant detail sheets, and shareable Maps links.
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wheretoeat-v1'
+const CACHE_NAME = 'makanmana-v1'
 const APP_SHELL = ['/', '/manifest.webmanifest', '/pwa-icon.svg']
 
 self.addEventListener('install', (event) => {

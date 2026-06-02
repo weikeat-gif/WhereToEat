@@ -58,7 +58,7 @@ import {
   type Restaurant,
 } from '@/lib/restaurants'
 
-const preferenceKey = 'wheretoeat.preferences'
+const preferenceKey = 'makanmana.preferences'
 
 type Preferences = {
   radiusKm: number
@@ -287,7 +287,7 @@ function App() {
             <img src="/pwa-icon.svg" alt="" className="size-8" />
           </Button>
           <h1 className="truncate text-center text-3xl font-bold tracking-tight text-primary">
-            WhereToEat
+            MakanMana
           </h1>
           <Button
             variant="ghost"
@@ -997,7 +997,7 @@ function ProfileView({
             <img src="/pwa-icon.svg" alt="" className="size-12" />
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-xl font-bold">WhereToEat</h2>
+            <h2 className="truncate text-xl font-bold">MakanMana</h2>
             <p className="text-sm text-muted-foreground">Mobile food finder</p>
           </div>
         </CardContent>

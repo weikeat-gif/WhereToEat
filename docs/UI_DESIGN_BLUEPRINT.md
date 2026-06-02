@@ -1,8 +1,8 @@
-# WhereToEat UI Design Blueprint
+# MakanMana UI Design Blueprint
 
 ## Product Feel
 
-WhereToEat should feel like a fast nearby-food decision board. Users are hungry, deciding quickly, and usually on their phones, so the interface should help them search, compare, select, and move quickly.
+MakanMana should feel like a fast nearby-food decision board. Users are hungry, deciding quickly, and usually on their phones, so the interface should help them search, compare, select, and move quickly.
 
 The UI should be:
 
@@ -30,7 +30,7 @@ Purpose: show identity and location status.
 
 Content:
 
-- App name: `WhereToEat`
+- App name: `MakanMana`
 - Main title: `Pick food nearby`
 - Status badge:
   - `Ready`
@@ -244,7 +244,7 @@ When user taps a restaurant:
 
 ```text
 ┌────────────────────────────────────┐
-│ WhereToEat                  Ready  │
+│ MakanMana                   Ready  │
 │ Pick food nearby                   │
 └────────────────────────────────────┘
 

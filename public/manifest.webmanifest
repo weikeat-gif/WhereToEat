@@ -1,6 +1,6 @@
 {
-  "name": "WhereToEat",
-  "short_name": "WhereToEat",
+  "name": "MakanMana",
+  "short_name": "MakanMana",
   "description": "Find open nearby food, cafes, and chill spots.",
   "start_url": "/",
   "display": "standalone",
