@@ -10,6 +10,7 @@ import {
   Bookmark,
   Clock3,
   Compass,
+  Copy,
   Filter,
   Heart,
   History,
@@ -189,6 +190,18 @@ function App() {
   function clearSearch() {
     setFoodQuery('')
     setActiveCategory('Open Now')
+  }
+
+  function pickRestaurantForGroup() {
+    if (!hasResults) {
+      toast.info('Try a wider radius or another food type first.')
+      return
+    }
+
+    const pick =
+      visibleRestaurants[Math.floor(Math.random() * visibleRestaurants.length)]
+    setSelectedRestaurant(pick)
+    toast.success(`Picked ${pick.name}`)
   }
 
   async function loadRestaurantResults(coordinates: Coordinates | null) {
@@ -526,6 +539,11 @@ function App() {
         />
       </section>
 
+      <QuickDecisionBar
+        onPick={pickRestaurantForGroup}
+        onSelectCategory={selectCategory}
+      />
+
       {!hasResults ? (
         <EmptyResults query={foodQuery} onClear={clearSearch} />
       ) : null}
@@ -540,7 +558,9 @@ function App() {
                 <RecommendedCard
                   key={restaurant.id}
                   restaurant={restaurant}
+                  onOpenMaps={() => openRestaurantMaps(restaurant)}
                   onSelect={() => setSelectedRestaurant(restaurant)}
+                  onShare={() => void shareRestaurant(restaurant)}
                 />
               ))}
         </DragScrollArea>
@@ -555,7 +575,9 @@ function App() {
             <PopularCard
               key={restaurant.id}
               restaurant={restaurant}
+              onOpenMaps={() => openRestaurantMaps(restaurant)}
               onSelect={() => setSelectedRestaurant(restaurant)}
+              onShare={() => void shareRestaurant(restaurant)}
             />
           ))}
         </div>
@@ -651,6 +673,7 @@ function App() {
         onClose={() => setSelectedRestaurant(null)}
         onOpenMaps={openRestaurantMaps}
         onCopy={(restaurant) => void copyRestaurantLink(restaurant)}
+        onShare={(restaurant) => void shareRestaurant(restaurant)}
       />
 
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-4 py-2 backdrop-blur">
@@ -795,6 +818,54 @@ function EmptyResults({ query, onClear }: { query: string; onClear: () => void }
         <Button onClick={onClear} className="mt-4 rounded-lg">
           Reset Search
         </Button>
+      </div>
+    </section>
+  )
+}
+
+function QuickDecisionBar({
+  onPick,
+  onSelectCategory,
+}: {
+  onPick: () => void
+  onSelectCategory: (category: (typeof categories)[number]) => void
+}) {
+  const cheapCategory =
+    categories.find((item) => item.label === 'Cheap Eats') ?? categories[0]
+  const cafeCategory =
+    categories.find((item) => item.label === 'Cafe') ?? categories[0]
+  const lateNightCategory =
+    categories.find((item) => item.label === 'Late Night') ?? categories[0]
+
+  const quickModes = [
+    { label: 'Pick for us', action: onPick },
+    {
+      label: 'Cheap',
+      action: () => onSelectCategory(cheapCategory),
+    },
+    {
+      label: 'Cafe',
+      action: () => onSelectCategory(cafeCategory),
+    },
+    {
+      label: 'Late',
+      action: () => onSelectCategory(lateNightCategory),
+    },
+  ]
+
+  return (
+    <section className="px-4 pt-3">
+      <div className="grid grid-cols-4 gap-2 rounded-xl border border-border/70 bg-card p-2 shadow-sm">
+        {quickModes.map((mode) => (
+          <button
+            key={mode.label}
+            type="button"
+            onClick={mode.action}
+            className="min-h-12 rounded-lg bg-secondary px-2 text-xs font-bold text-primary transition hover:bg-[#ffdea9] hover:text-[#271900]"
+          >
+            {mode.label}
+          </button>
+        ))}
       </div>
     </section>
   )
@@ -1375,99 +1446,178 @@ function FoodImage({
 
 function RecommendedCard({
   restaurant,
+  onOpenMaps,
   onSelect,
+  onShare,
 }: {
   restaurant: Restaurant
+  onOpenMaps: () => void
   onSelect: () => void
+  onShare: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="w-72 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border/50 bg-card text-left shadow-sm transition hover:border-primary hover:shadow-md"
-    >
-      <div className="relative h-40">
-        <FoodImage
-          src={restaurant.imageUrl}
-          alt={`${restaurant.name} preview`}
-          className="h-full w-full"
-        />
-        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-lg bg-card/95 px-2 py-1 text-sm font-semibold shadow-sm">
-          <Star className="size-4 fill-accent text-accent" aria-hidden="true" />
-          {restaurant.rating}
-        </span>
-      </div>
-      <div className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="truncate text-xl font-bold">{restaurant.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {restaurant.cuisine} · {restaurant.price}
-            </p>
+    <article className="w-72 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-card text-left shadow-sm transition hover:border-primary hover:shadow-md">
+      <button type="button" onClick={onSelect} className="block w-full text-left">
+        <div className="relative h-40">
+          <FoodImage
+            src={restaurant.imageUrl}
+            alt={`${restaurant.name} preview`}
+            className="h-full w-full"
+          />
+          <span className="absolute left-3 top-3 rounded-lg bg-primary px-2 py-1 text-xs font-bold text-primary-foreground shadow-sm">
+            {restaurant.source === 'live' ? 'Live nearby' : 'Demo spot'}
+          </span>
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-lg bg-card/95 px-2 py-1 text-sm font-semibold shadow-sm">
+            <Star className="size-4 fill-accent text-accent" aria-hidden="true" />
+            {restaurant.rating}
+          </span>
+        </div>
+        <div className="space-y-3 p-4 pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate text-xl font-bold">{restaurant.name}</h3>
+              <p className="text-sm text-muted-foreground">
+                {restaurant.cuisine} · {restaurant.price}
+              </p>
+            </div>
+            <Heart className="size-6 text-border" aria-hidden="true" />
           </div>
-          <Heart className="size-6 text-border" aria-hidden="true" />
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <MiniStat label="Distance" value={`${restaurant.distanceKm ?? '-'} km`} />
+            <MiniStat label="Price" value={restaurant.price} />
+            <MiniStat label="Time" value={restaurant.travelTime} />
+          </div>
+          <div className="rounded-lg border border-border/40 bg-secondary p-2 text-sm text-muted-foreground">
+            <span className="font-bold text-primary">Popular:</span>{' '}
+            {restaurant.menuHighlights.slice(0, 2).join(', ')}
+          </div>
+          <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
+            {restaurant.vibe}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <MapPin className="size-4" aria-hidden="true" />
-            {restaurant.distanceKm ?? '-'} km
-          </span>
-          <span className="inline-flex items-center gap-1 font-semibold text-[#b07800]">
-            <Clock3 className="size-4" aria-hidden="true" />
-            {restaurant.openStatus}
-          </span>
-        </div>
-        <div className="rounded-lg border border-border/40 bg-secondary p-2 text-sm text-muted-foreground">
-          <span className="font-bold text-primary">Popular:</span>{' '}
-          {restaurant.menuHighlights.slice(0, 2).join(', ')}
-        </div>
+      </button>
+      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-4 pb-4">
+        <Button onClick={onSelect} className="h-10 rounded-lg">
+          View
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onOpenMaps}
+          aria-label={`Open ${restaurant.name} in Maps`}
+          className="size-10 rounded-lg"
+        >
+          <Navigation className="size-4" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onShare}
+          aria-label={`Share ${restaurant.name}`}
+          className="size-10 rounded-lg"
+        >
+          <Share2 className="size-4" aria-hidden="true" />
+        </Button>
       </div>
-    </button>
+    </article>
+  )
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-secondary px-2 py-2">
+      <p className="truncate text-[10px] font-semibold uppercase text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 truncate text-xs font-bold text-primary">{value}</p>
+    </div>
   )
 }
 
 function PopularCard({
   restaurant,
+  onOpenMaps,
   onSelect,
+  onShare,
 }: {
   restaurant: Restaurant
+  onOpenMaps?: () => void
   onSelect: () => void
+  onShare?: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="grid w-full min-w-0 cursor-pointer grid-cols-[104px_minmax(0,1fr)] gap-4 rounded-xl border border-border/50 bg-card p-3 text-left shadow-sm transition hover:border-primary hover:shadow-md sm:grid-cols-[112px_minmax(0,1fr)]"
-    >
-      <FoodImage
-        src={restaurant.imageUrl}
-        alt={`${restaurant.name} food`}
-        className="size-[104px] rounded-lg sm:size-28"
-      />
-      <div className="min-w-0 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="truncate text-xl font-bold">{restaurant.name}</h3>
-            <p className="truncate text-sm text-muted-foreground">
-              {restaurant.cuisine} · {restaurant.price}
-            </p>
+    <article className="rounded-xl border border-border/50 bg-card shadow-sm transition hover:border-primary hover:shadow-md">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="grid w-full min-w-0 cursor-pointer grid-cols-[104px_minmax(0,1fr)] gap-4 p-3 text-left sm:grid-cols-[112px_minmax(0,1fr)]"
+      >
+        <FoodImage
+          src={restaurant.imageUrl}
+          alt={`${restaurant.name} food`}
+          className="size-[104px] rounded-lg sm:size-28"
+        />
+        <div className="min-w-0 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate text-xl font-bold">{restaurant.name}</h3>
+              <p className="truncate text-sm text-muted-foreground">
+                {restaurant.cuisine} · {restaurant.price}
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1 text-sm">
+              <Star className="size-4 text-accent" aria-hidden="true" />
+              {restaurant.rating}
+            </span>
           </div>
-          <span className="inline-flex items-center gap-1 text-sm">
-            <Star className="size-4 text-accent" aria-hidden="true" />
-            {restaurant.rating}
-          </span>
+          <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
+            {restaurant.vibe}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1 text-sm">
+            <Badge variant="secondary" className="rounded-md">
+              {restaurant.tags[0] ?? 'Popular'}
+            </Badge>
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <MapPin className="size-4" aria-hidden="true" />
+              {restaurant.distanceKm ?? '-'} km
+            </span>
+            <span className="inline-flex items-center gap-1 font-semibold text-[#b07800]">
+              <Clock3 className="size-4" aria-hidden="true" />
+              {restaurant.openStatus}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 pt-3 text-sm">
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
-            <MapPin className="size-4" aria-hidden="true" />
-            {restaurant.travelTime}
-          </span>
-          <Badge variant="secondary" className="rounded-md">
-            {restaurant.tags[0] ?? 'Popular'}
-          </Badge>
-        </div>
+      </button>
+      {onOpenMaps || onShare ? (
+        <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 pb-3">
+          <Button onClick={onSelect} className="h-10 rounded-lg">
+            View details
+          </Button>
+          {onOpenMaps ? (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onOpenMaps}
+              aria-label={`Open ${restaurant.name} in Maps`}
+              className="size-10 rounded-lg"
+            >
+              <Navigation className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
+          {onShare ? (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onShare}
+              aria-label={`Share ${restaurant.name}`}
+              className="size-10 rounded-lg"
+            >
+              <Share2 className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
       </div>
-    </button>
+      ) : null}
+    </article>
   )
 }
 
@@ -1525,11 +1675,13 @@ function RestaurantDetailSheet({
   onClose,
   onOpenMaps,
   onCopy,
+  onShare,
 }: {
   restaurant: Restaurant | null
   onClose: () => void
   onOpenMaps: (restaurant: Restaurant) => void
   onCopy: (restaurant: Restaurant) => void
+  onShare: (restaurant: Restaurant) => void
 }) {
   return (
     <Sheet open={restaurant !== null} onOpenChange={(open) => !open && onClose()}>
@@ -1552,6 +1704,43 @@ function RestaurantDetailSheet({
               </SheetDescription>
             </SheetHeader>
 
+            <div className="grid grid-cols-3 gap-2">
+              <DecisionStat label="Rating" value={String(restaurant.rating)} />
+              <DecisionStat label="Price" value={restaurant.price} />
+              <DecisionStat
+                label="Distance"
+                value={`${restaurant.distanceKm ?? '-'} km`}
+              />
+            </div>
+
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+              <Button
+                className="h-12 rounded-lg"
+                onClick={() => onOpenMaps(restaurant)}
+              >
+                <Navigation className="size-5" aria-hidden="true" />
+                Go Now
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => onShare(restaurant)}
+                aria-label={`Share ${restaurant.name}`}
+                className="size-12 rounded-lg"
+              >
+                <Share2 className="size-5" aria-hidden="true" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => onCopy(restaurant)}
+                aria-label={`Copy ${restaurant.name} link`}
+                className="size-12 rounded-lg"
+              >
+                <Copy className="size-5" aria-hidden="true" />
+              </Button>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <Badge variant="accent" className="rounded-full px-3 py-2">
                 <Clock3 className="size-4" aria-hidden="true" />
@@ -1571,12 +1760,33 @@ function RestaurantDetailSheet({
             </div>
 
             <section className="space-y-3">
+              <h3 className="text-xl font-bold">Why This Place</h3>
+              <div className="rounded-xl border bg-card p-4 shadow-sm">
+                <p className="text-base leading-6 text-foreground">
+                  {restaurant.vibe}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {restaurant.tags.slice(0, 4).map((tag) => (
+                    <Badge key={tag} variant="secondary" className="rounded-md">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="mt-3 text-sm leading-5 text-muted-foreground">
+                  {restaurant.source === 'live'
+                    ? 'Loaded from nearby map data. Open Maps for live reviews, directions, and exact hours.'
+                    : 'Real demo listing for app preview. Open Maps for live reviews, directions, and exact hours.'}
+                </p>
+              </div>
+            </section>
+
+            <section className="space-y-3">
               <h3 className="text-xl font-bold">What's Inside</h3>
-              <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="grid grid-cols-2 gap-2">
                 {restaurant.menuHighlights.map((item) => (
                   <span
                     key={item}
-                    className="shrink-0 rounded-xl bg-[#9ff0fb] px-4 py-3 text-sm font-bold text-[#001f23]"
+                    className="rounded-xl bg-[#9ff0fb] px-4 py-3 text-sm font-bold text-[#001f23]"
                   >
                     {item}
                   </span>
@@ -1596,26 +1806,29 @@ function RestaurantDetailSheet({
               </div>
             </section>
 
-            <div className="grid grid-cols-[auto_1fr] gap-3">
-              <Button
-                variant="outline"
-                className="h-14 rounded-lg px-5"
-                onClick={() => onCopy(restaurant)}
-              >
-                Copy Link
-              </Button>
-              <Button
-                className="h-14 rounded-lg"
-                onClick={() => onOpenMaps(restaurant)}
-              >
-                <Navigation className="size-5" aria-hidden="true" />
-                Open Maps
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              className="h-12 w-full rounded-lg"
+              onClick={() => onShare(restaurant)}
+            >
+              <Share2 className="size-4" aria-hidden="true" />
+              Share food plan
+            </Button>
           </div>
         ) : null}
       </SheetContent>
     </Sheet>
+  )
+}
+
+function DecisionStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-secondary px-3 py-3 text-center">
+      <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-lg font-bold text-primary">{value}</p>
+    </div>
   )
 }
 
