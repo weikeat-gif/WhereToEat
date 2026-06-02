@@ -59,6 +59,7 @@ import {
 } from '@/lib/restaurants'
 
 const preferenceKey = 'makanmana.preferences'
+const savedRestaurantsKey = 'makanmana.saved-restaurants'
 
 type Preferences = {
   radiusKm: number
@@ -114,8 +115,42 @@ function readPreferences(): Preferences {
   }
 }
 
+function readSavedRestaurants(): Restaurant[] {
+  try {
+    const stored = window.localStorage.getItem(savedRestaurantsKey)
+
+    if (!stored) {
+      return []
+    }
+
+    const parsed = JSON.parse(stored)
+
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed.filter(isStoredRestaurant).slice(0, 30)
+  } catch {
+    return []
+  }
+}
+
+function isStoredRestaurant(value: unknown): value is Restaurant {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'name' in value &&
+    'lat' in value &&
+    'lng' in value
+  )
+}
+
 function App() {
   const [preferences, setPreferences] = useState<Preferences>(() => readPreferences())
+  const [savedRestaurants, setSavedRestaurants] = useState<Restaurant[]>(() =>
+    readSavedRestaurants(),
+  )
   const [activeView, setActiveView] = useState<ActiveView>('discover')
   const [foodQuery, setFoodQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('Open Now')
@@ -134,6 +169,13 @@ function App() {
     window.localStorage.setItem(preferenceKey, JSON.stringify(preferences))
   }, [preferences])
 
+  useEffect(() => {
+    window.localStorage.setItem(
+      savedRestaurantsKey,
+      JSON.stringify(savedRestaurants),
+    )
+  }, [savedRestaurants])
+
   const visibleRestaurants = useMemo(
     () => filterRestaurants(restaurants, foodQuery),
     [foodQuery, restaurants],
@@ -141,7 +183,10 @@ function App() {
 
   const recommendedRestaurants = visibleRestaurants.slice(0, 4)
   const popularRestaurants = visibleRestaurants.slice(0, 6)
-  const savedRestaurants = sampleRestaurants.slice(0, 3)
+  const savedRestaurantIds = useMemo(
+    () => new Set(savedRestaurants.map((restaurant) => restaurant.id)),
+    [savedRestaurants],
+  )
   const hasResults = visibleRestaurants.length > 0
 
   const quickMapsUrl = useMemo(
@@ -202,6 +247,27 @@ function App() {
       visibleRestaurants[Math.floor(Math.random() * visibleRestaurants.length)]
     setSelectedRestaurant(pick)
     toast.success(`Picked ${pick.name}`)
+  }
+
+  function toggleSavedRestaurant(restaurant: Restaurant) {
+    const willSave = !savedRestaurantIds.has(restaurant.id)
+
+    setSavedRestaurants((current) => {
+      if (current.some((savedRestaurant) => savedRestaurant.id === restaurant.id)) {
+        return current.filter(
+          (savedRestaurant) => savedRestaurant.id !== restaurant.id,
+        )
+      }
+
+      return [
+        restaurant,
+        ...current.filter(
+          (savedRestaurant) => savedRestaurant.id !== restaurant.id,
+        ),
+      ].slice(0, 30)
+    })
+
+    toast.success(willSave ? 'Saved to your food list' : 'Removed from saved')
   }
 
   async function loadRestaurantResults(coordinates: Coordinates | null) {
@@ -557,10 +623,12 @@ function App() {
             : recommendedRestaurants.map((restaurant) => (
                 <RecommendedCard
                   key={restaurant.id}
+                  isSaved={savedRestaurantIds.has(restaurant.id)}
                   restaurant={restaurant}
                   onOpenMaps={() => openRestaurantMaps(restaurant)}
                   onSelect={() => setSelectedRestaurant(restaurant)}
                   onShare={() => void shareRestaurant(restaurant)}
+                  onToggleSaved={() => toggleSavedRestaurant(restaurant)}
                 />
               ))}
         </DragScrollArea>
@@ -574,10 +642,12 @@ function App() {
           {popularRestaurants.map((restaurant) => (
             <PopularCard
               key={restaurant.id}
+              isSaved={savedRestaurantIds.has(restaurant.id)}
               restaurant={restaurant}
               onOpenMaps={() => openRestaurantMaps(restaurant)}
               onSelect={() => setSelectedRestaurant(restaurant)}
               onShare={() => void shareRestaurant(restaurant)}
+              onToggleSaved={() => toggleSavedRestaurant(restaurant)}
             />
           ))}
         </div>
@@ -592,9 +662,14 @@ function App() {
               key={restaurant.id}
               restaurant={restaurant}
               onOpenMaps={() => openRestaurantMaps(restaurant)}
+              onRemove={() => toggleSavedRestaurant(restaurant)}
+              onSelect={() => setSelectedRestaurant(restaurant)}
               onShare={() => void shareRestaurant(restaurant)}
             />
           ))}
+          {savedRestaurants.length === 0 ? (
+            <SavedEmptyCard onBrowse={() => setActiveView('discover')} />
+          ) : null}
         </div>
       </section>
 
@@ -633,19 +708,26 @@ function App() {
           manualLocation={manualLocation}
           permissionState={permissionState}
           restaurants={visibleRestaurants}
+          savedRestaurantIds={savedRestaurantIds}
           statusLabel={statusLabel}
           onFoodQueryChange={updateFoodQuery}
           onManualLocationChange={updateManualLocation}
+          onOpenMaps={openRestaurantMaps}
           onSearchNearby={searchNearbyFood}
           onSelectCategory={selectCategory}
           onSelectRestaurant={setSelectedRestaurant}
+          onShare={(restaurant) => void shareRestaurant(restaurant)}
+          onToggleSaved={toggleSavedRestaurant}
         />
       ) : null}
 
       {activeView === 'saved' ? (
         <SavedView
           restaurants={savedRestaurants}
+          onBrowse={() => setActiveView('discover')}
           onOpenMaps={openRestaurantMaps}
+          onRemove={toggleSavedRestaurant}
+          onSelectRestaurant={setSelectedRestaurant}
           onShare={(restaurant) => void shareRestaurant(restaurant)}
         />
       ) : null}
@@ -671,9 +753,13 @@ function App() {
       <RestaurantDetailSheet
         restaurant={selectedRestaurant}
         onClose={() => setSelectedRestaurant(null)}
+        isSaved={
+          selectedRestaurant ? savedRestaurantIds.has(selectedRestaurant.id) : false
+        }
         onOpenMaps={openRestaurantMaps}
         onCopy={(restaurant) => void copyRestaurantLink(restaurant)}
         onShare={(restaurant) => void shareRestaurant(restaurant)}
+        onToggleSaved={(restaurant) => toggleSavedRestaurant(restaurant)}
       />
 
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-4 py-2 backdrop-blur">
@@ -899,7 +985,7 @@ function DragScrollArea({
       scrollLeft: scroller.scrollLeft,
       startX: event.clientX,
     }
-    event.currentTarget.setPointerCapture(event.pointerId)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
@@ -920,7 +1006,7 @@ function DragScrollArea({
 
   function handlePointerEnd(event: PointerEvent<HTMLDivElement>) {
     dragState.current.active = false
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
     window.setTimeout(() => {
@@ -983,12 +1069,16 @@ function SearchView({
   manualLocation,
   permissionState,
   restaurants,
+  savedRestaurantIds,
   statusLabel,
   onFoodQueryChange,
   onManualLocationChange,
+  onOpenMaps,
   onSearchNearby,
   onSelectCategory,
   onSelectRestaurant,
+  onShare,
+  onToggleSaved,
 }: {
   activeCategory: string
   foodQuery: string
@@ -996,12 +1086,16 @@ function SearchView({
   manualLocation: string
   permissionState: LocationPermissionState
   restaurants: Restaurant[]
+  savedRestaurantIds: Set<string>
   statusLabel: string
   onFoodQueryChange: (value: string) => void
   onManualLocationChange: (value: string) => void
+  onOpenMaps: (restaurant: Restaurant) => void
   onSearchNearby: () => void
   onSelectCategory: (category: (typeof categories)[number]) => void
   onSelectRestaurant: (restaurant: Restaurant) => void
+  onShare: (restaurant: Restaurant) => void
+  onToggleSaved: (restaurant: Restaurant) => void
 }) {
   const isSearching = permissionState === 'requesting' || isLoadingPlaces
 
@@ -1062,8 +1156,12 @@ function SearchView({
             restaurants.map((restaurant) => (
               <PopularCard
                 key={`${restaurant.id}-search`}
+                isSaved={savedRestaurantIds.has(restaurant.id)}
                 restaurant={restaurant}
+                onOpenMaps={() => onOpenMaps(restaurant)}
                 onSelect={() => onSelectRestaurant(restaurant)}
+                onShare={() => onShare(restaurant)}
+                onToggleSaved={() => onToggleSaved(restaurant)}
               />
             ))
           ) : (
@@ -1079,11 +1177,17 @@ function SearchView({
 
 function SavedView({
   restaurants,
+  onBrowse,
   onOpenMaps,
+  onRemove,
+  onSelectRestaurant,
   onShare,
 }: {
   restaurants: Restaurant[]
+  onBrowse: () => void
   onOpenMaps: (restaurant: Restaurant) => void
+  onRemove: (restaurant: Restaurant) => void
+  onSelectRestaurant: (restaurant: Restaurant) => void
   onShare: (restaurant: Restaurant) => void
 }) {
   return (
@@ -1093,35 +1197,70 @@ function SavedView({
         subtitle={`${restaurants.length} ready picks`}
       />
       <div className="grid gap-3">
-        {restaurants.map((restaurant) => (
-          <SavedCard
-            key={restaurant.id}
-            restaurant={restaurant}
-            onOpenMaps={() => onOpenMaps(restaurant)}
-            onShare={() => onShare(restaurant)}
-          />
-        ))}
+        {restaurants.length > 0 ? (
+          restaurants.map((restaurant) => (
+            <SavedCard
+              key={restaurant.id}
+              restaurant={restaurant}
+              onOpenMaps={() => onOpenMaps(restaurant)}
+              onRemove={() => onRemove(restaurant)}
+              onSelect={() => onSelectRestaurant(restaurant)}
+              onShare={() => onShare(restaurant)}
+            />
+          ))
+        ) : (
+          <SavedEmptyCard onBrowse={onBrowse} />
+        )}
       </div>
       <Card className="rounded-xl border-border/70">
         <CardHeader>
           <CardTitle>Shortcut List</CardTitle>
-          <CardDescription>Quick food picks for repeat decisions</CardDescription>
+          <CardDescription>
+            {restaurants.length > 0
+              ? 'Quick food picks for repeat decisions'
+              : 'Save restaurants to build your shortcut list'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2">
-          {restaurants.map((restaurant) => (
-            <button
-              key={`${restaurant.id}-shortcut`}
-              type="button"
-              onClick={() => onOpenMaps(restaurant)}
-              className="flex items-center justify-between rounded-lg bg-secondary p-3 text-left"
-            >
-              <span className="truncate font-semibold">{restaurant.name}</span>
-              <Navigation className="size-4 text-primary" aria-hidden="true" />
-            </button>
-          ))}
+          {restaurants.length > 0 ? (
+            restaurants.map((restaurant) => (
+              <button
+                key={`${restaurant.id}-shortcut`}
+                type="button"
+                onClick={() => onOpenMaps(restaurant)}
+                className="flex items-center justify-between rounded-lg bg-secondary p-3 text-left"
+              >
+                <span className="truncate font-semibold">{restaurant.name}</span>
+                <Navigation className="size-4 text-primary" aria-hidden="true" />
+              </button>
+            ))
+          ) : (
+            <p className="rounded-lg bg-secondary p-3 text-sm text-muted-foreground">
+              Your saved places will appear here after you tap a heart.
+            </p>
+          )}
         </CardContent>
       </Card>
     </section>
+  )
+}
+
+function SavedEmptyCard({ onBrowse }: { onBrowse: () => void }) {
+  return (
+    <Card className="rounded-xl border-border/70">
+      <CardContent className="p-5 text-center">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-secondary">
+          <Bookmark className="size-6 text-primary" aria-hidden="true" />
+        </div>
+        <h3 className="mt-4 text-xl font-bold">No saved places yet</h3>
+        <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
+          Tap the heart on any restaurant to keep it here for your next food run.
+        </p>
+        <Button onClick={onBrowse} className="mt-4 rounded-lg">
+          Browse food
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -1445,15 +1584,19 @@ function FoodImage({
 }
 
 function RecommendedCard({
+  isSaved,
   restaurant,
   onOpenMaps,
   onSelect,
   onShare,
+  onToggleSaved,
 }: {
+  isSaved: boolean
   restaurant: Restaurant
   onOpenMaps: () => void
   onSelect: () => void
   onShare: () => void
+  onToggleSaved: () => void
 }) {
   return (
     <article className="w-72 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-card text-left shadow-sm transition hover:border-primary hover:shadow-md">
@@ -1480,7 +1623,12 @@ function RecommendedCard({
                 {restaurant.cuisine} · {restaurant.price}
               </p>
             </div>
-            <Heart className="size-6 text-border" aria-hidden="true" />
+            <Heart
+              className={`size-6 ${
+                isSaved ? 'fill-primary text-primary' : 'text-border'
+              }`}
+              aria-hidden="true"
+            />
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <MiniStat label="Distance" value={`${restaurant.distanceKm ?? '-'} km`} />
@@ -1496,9 +1644,21 @@ function RecommendedCard({
           </p>
         </div>
       </button>
-      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-4 pb-4">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 pb-4">
         <Button onClick={onSelect} className="h-10 rounded-lg">
           View
+        </Button>
+        <Button
+          variant={isSaved ? 'default' : 'outline'}
+          size="icon"
+          onClick={onToggleSaved}
+          aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
+          className="size-10 rounded-lg"
+        >
+          <Heart
+            className={`size-4 ${isSaved ? 'fill-current' : ''}`}
+            aria-hidden="true"
+          />
         </Button>
         <Button
           variant="outline"
@@ -1535,15 +1695,19 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 function PopularCard({
+  isSaved = false,
   restaurant,
   onOpenMaps,
   onSelect,
   onShare,
+  onToggleSaved,
 }: {
+  isSaved?: boolean
   restaurant: Restaurant
   onOpenMaps?: () => void
   onSelect: () => void
   onShare?: () => void
+  onToggleSaved?: () => void
 }) {
   return (
     <article className="rounded-xl border border-border/50 bg-card shadow-sm transition hover:border-primary hover:shadow-md">
@@ -1588,11 +1752,25 @@ function PopularCard({
           </div>
         </div>
       </button>
-      {onOpenMaps || onShare ? (
-        <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 pb-3">
+      {onOpenMaps || onShare || onToggleSaved ? (
+        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 pb-3">
           <Button onClick={onSelect} className="h-10 rounded-lg">
             View details
           </Button>
+          {onToggleSaved ? (
+            <Button
+              variant={isSaved ? 'default' : 'outline'}
+              size="icon"
+              onClick={onToggleSaved}
+              aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
+              className="size-10 rounded-lg"
+            >
+              <Heart
+                className={`size-4 ${isSaved ? 'fill-current' : ''}`}
+                aria-hidden="true"
+              />
+            </Button>
+          ) : null}
           {onOpenMaps ? (
             <Button
               variant="outline"
@@ -1624,10 +1802,14 @@ function PopularCard({
 function SavedCard({
   restaurant,
   onOpenMaps,
+  onRemove,
+  onSelect,
   onShare,
 }: {
   restaurant: Restaurant
   onOpenMaps: () => void
+  onRemove: () => void
+  onSelect: () => void
   onShare: () => void
 }) {
   return (
@@ -1655,13 +1837,36 @@ function SavedCard({
               {restaurant.openStatus}
             </Badge>
           </div>
-          <div className="grid grid-cols-[1fr_auto] gap-2">
-            <Button onClick={onOpenMaps} className="rounded-lg">
-              <Navigation className="size-4" aria-hidden="true" />
-              Open Maps
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2">
+            <Button onClick={onSelect} className="rounded-lg">
+              View
             </Button>
-            <Button variant="outline" size="icon" onClick={onShare} aria-label="Share">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onOpenMaps}
+              aria-label={`Open ${restaurant.name} in Maps`}
+              className="rounded-lg"
+            >
+              <Navigation className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onShare}
+              aria-label={`Share ${restaurant.name}`}
+              className="rounded-lg"
+            >
               <Share2 className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onRemove}
+              aria-label={`Remove ${restaurant.name} from saved`}
+              className="rounded-lg"
+            >
+              <Heart className="size-4 fill-primary text-primary" aria-hidden="true" />
             </Button>
           </div>
         </div>
@@ -1671,17 +1876,21 @@ function SavedCard({
 }
 
 function RestaurantDetailSheet({
+  isSaved,
   restaurant,
   onClose,
   onOpenMaps,
   onCopy,
   onShare,
+  onToggleSaved,
 }: {
+  isSaved: boolean
   restaurant: Restaurant | null
   onClose: () => void
   onOpenMaps: (restaurant: Restaurant) => void
   onCopy: (restaurant: Restaurant) => void
   onShare: (restaurant: Restaurant) => void
+  onToggleSaved: (restaurant: Restaurant) => void
 }) {
   return (
     <Sheet open={restaurant !== null} onOpenChange={(open) => !open && onClose()}>
@@ -1713,13 +1922,25 @@ function RestaurantDetailSheet({
               />
             </div>
 
-            <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2">
               <Button
                 className="h-12 rounded-lg"
                 onClick={() => onOpenMaps(restaurant)}
               >
                 <Navigation className="size-5" aria-hidden="true" />
                 Go Now
+              </Button>
+              <Button
+                variant={isSaved ? 'default' : 'outline'}
+                size="icon"
+                onClick={() => onToggleSaved(restaurant)}
+                aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
+                className="size-12 rounded-lg"
+              >
+                <Heart
+                  className={`size-5 ${isSaved ? 'fill-current' : ''}`}
+                  aria-hidden="true"
+                />
               </Button>
               <Button
                 variant="outline"

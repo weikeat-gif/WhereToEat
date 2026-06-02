@@ -133,4 +133,30 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByText('Adjust your food finder defaults')).toBeInTheDocument()
   })
+
+  it('saves and removes a restaurant from the saved page', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(
+      screen.getAllByRole('button', {
+        name: /save restoran nasi kandar pelita klcc/i,
+      })[0],
+    )
+
+    await user.click(screen.getByRole('button', { name: /saved tab/i }))
+    expect(
+      screen.getAllByText('Restoran Nasi Kandar Pelita KLCC'),
+    ).not.toHaveLength(0)
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /remove restoran nasi kandar pelita klcc from saved/i,
+      }),
+    )
+
+    expect(screen.getByText('No saved places yet')).toBeInTheDocument()
+  })
 })
