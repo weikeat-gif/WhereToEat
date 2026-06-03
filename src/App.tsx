@@ -7,22 +7,32 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  Bell,
   Bookmark,
+  CalendarDays,
   ChevronDown,
   Clock3,
   Compass,
   Copy,
+  CreditCard,
+  Edit3,
   Filter,
   Heart,
   History,
+  Lock,
+  LogOut,
   LocateFixed,
+  Mail,
   MapPin,
   Navigation,
+  Plus,
   Search,
-  Settings,
   Share2,
   Star,
+  Trophy,
+  Utensils,
   UserRound,
+  Users,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast, Toaster } from 'sonner'
@@ -563,8 +573,6 @@ function App() {
           activeCategory={activeCategory || 'Custom'}
           preferences={preferences}
           statusLabel={statusLabel}
-          restaurants={popularRestaurants}
-          onSelectRestaurant={setSelectedRestaurant}
         />
       ) : null}
 
@@ -1293,51 +1301,228 @@ function SavedEmptyCard({ onBrowse }: { onBrowse: () => void }) {
 function ActivityView({
   activeCategory,
   preferences,
-  restaurants,
   statusLabel,
-  onSelectRestaurant,
 }: {
   activeCategory: string
   preferences: Preferences
-  restaurants: Restaurant[]
   statusLabel: string
-  onSelectRestaurant: (restaurant: Restaurant) => void
 }) {
-  const recentPicks = restaurants.slice(0, 3)
-
   return (
-    <section className="space-y-5 px-4 py-5">
-      <PageTitle title="Activity" subtitle="Recent food decisions" />
-      <div className="grid gap-3">
-        <ActivityRow
-          icon={<Search className="size-5 text-primary" />}
-          title={activeCategory}
-          detail={`Mode selected · ${preferences.radiusKm} km · ${preferences.priceLevel}`}
-        />
-        <ActivityRow
-          icon={<MapPin className="size-5 text-primary" />}
-          title={statusLabel}
-          detail="Location search status"
-        />
-        <ActivityRow
-          icon={<Clock3 className="size-5 text-primary" />}
-          title="Live Maps handoff"
-          detail="Reviews, directions, and opening hours stay in Google Maps"
-        />
+    <section className="space-y-5 px-4 py-5 pb-28">
+      <PageTitle
+        title="Team Activity"
+        subtitle="Vote on active polls or review past decisions."
+      />
+
+      <div className="grid grid-cols-3 gap-2 rounded-xl border border-border/70 bg-card p-2 shadow-sm">
+        <DecisionStat label="Mode" value={activeCategory} />
+        <DecisionStat label="Radius" value={`${preferences.radiusKm} km`} />
+        <DecisionStat label="Status" value={statusLabel} />
       </div>
+
       <section className="space-y-3">
-        <SectionHeader title="Recently Viewed" />
-        <div className="grid gap-3">
-          {recentPicks.map((restaurant) => (
-            <PopularCard
-              key={`${restaurant.id}-activity`}
-              restaurant={restaurant}
-              onSelect={() => onSelectRestaurant(restaurant)}
-            />
-          ))}
+        <h3 className="flex items-center gap-2 text-xl font-semibold">
+          <Clock3 className="size-5 text-accent" aria-hidden="true" />
+          Active Polls
+        </h3>
+        <PollCard
+          badge="Ends in 2h"
+          badgeIcon={<Clock3 className="size-3.5" aria-hidden="true" />}
+          title="Friday Lunch Walk"
+          organizer="Organized by Sarah M."
+          voters={['SM', 'DK', '+3']}
+          options={[
+            { label: 'Nasi Kandar', votes: 5, percent: 62 },
+            { label: 'Cafe Bowls', votes: 2, percent: 28 },
+          ]}
+          actionLabel="Vote Now"
+          actionIcon={<Trophy className="size-4" aria-hidden="true" />}
+        />
+        <PollCard
+          badge="Tomorrow, 12:30 PM"
+          badgeIcon={<CalendarDays className="size-3.5" aria-hidden="true" />}
+          title="Client Meeting Lunch"
+          organizer="Organized by David K."
+          note="Where should we take the new client?"
+          options={[]}
+          actionLabel="Join Poll"
+          actionIcon={<Users className="size-4" aria-hidden="true" />}
+          outline
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="flex items-center gap-2 text-xl font-semibold">
+          <History className="size-5 text-muted-foreground" aria-hidden="true" />
+          Completed Polls
+        </h3>
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+          <CompletedPollItem
+            icon={<Trophy className="size-5" aria-hidden="true" />}
+            title="Team Building Dinner"
+            winner="Sushi Zen"
+            time="Yesterday"
+            highlighted
+          />
+          <CompletedPollItem
+            icon={<Utensils className="size-5" aria-hidden="true" />}
+            title="Quick Bite"
+            winner="Burger Joint"
+            time="Mon"
+          />
+          <CompletedPollItem
+            icon={<Clock3 className="size-5" aria-hidden="true" />}
+            title="Coffee Run"
+            winner="Bean Roasters"
+            time="Last Week"
+          />
         </div>
       </section>
+
+      <Button
+        aria-label="Start poll"
+        className="fixed bottom-24 right-4 z-30 size-14 rounded-full p-0 shadow-xl min-[640px]:right-[calc(50%-17rem)]"
+      >
+        <Plus className="size-7" aria-hidden="true" />
+      </Button>
     </section>
+  )
+}
+
+function PollCard({
+  actionIcon,
+  actionLabel,
+  badge,
+  badgeIcon,
+  note,
+  options,
+  organizer,
+  outline = false,
+  title,
+  voters = [],
+}: {
+  actionIcon: ReactNode
+  actionLabel: string
+  badge: string
+  badgeIcon: ReactNode
+  note?: string
+  options: Array<{ label: string; votes: number; percent: number }>
+  organizer: string
+  outline?: boolean
+  title: string
+  voters?: string[]
+}) {
+  return (
+    <Card className="rounded-xl border-border/70 shadow-sm">
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Badge
+              variant={outline ? 'secondary' : 'accent'}
+              className="mb-2 rounded-full"
+            >
+              {badgeIcon}
+              {badge}
+            </Badge>
+            <h4 className="text-lg font-semibold">{title}</h4>
+            <p className="mt-1 text-sm text-muted-foreground">{organizer}</p>
+          </div>
+          {voters.length > 0 ? (
+            <div className="flex shrink-0 -space-x-2">
+              {voters.map((voter) => (
+                <span
+                  key={voter}
+                  className="flex size-8 items-center justify-center rounded-full border-2 border-card bg-secondary text-xs font-semibold text-primary"
+                >
+                  {voter}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {note ? (
+          <p className="rounded-lg bg-secondary px-3 py-2 text-sm italic text-muted-foreground">
+            "{note}"
+          </p>
+        ) : null}
+
+        {options.length > 0 ? (
+          <div className="space-y-2">
+            {options.map((option) => (
+              <VoteBar key={option.label} {...option} />
+            ))}
+          </div>
+        ) : null}
+
+        <Button
+          variant={outline ? 'outline' : 'default'}
+          className="h-12 w-full rounded-lg"
+        >
+          {actionIcon}
+          {actionLabel}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function VoteBar({
+  label,
+  percent,
+  votes,
+}: {
+  label: string
+  percent: number
+  votes: number
+}) {
+  return (
+    <div className="relative flex h-9 items-center overflow-hidden rounded-full bg-secondary px-3">
+      <div
+        className="absolute inset-y-0 left-0 rounded-full bg-primary/10"
+        style={{ width: `${percent}%` }}
+      />
+      <span className="relative z-10 text-sm">{label}</span>
+      <span className="relative z-10 ml-auto text-xs font-semibold text-muted-foreground">
+        {votes} votes
+      </span>
+    </div>
+  )
+}
+
+function CompletedPollItem({
+  highlighted = false,
+  icon,
+  time,
+  title,
+  winner,
+}: {
+  highlighted?: boolean
+  icon: ReactNode
+  time: string
+  title: string
+  winner: string
+}) {
+  return (
+    <button
+      type="button"
+      className="grid w-full grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 p-4 text-left transition last:border-b-0 hover:bg-secondary/70"
+    >
+      <span
+        className={`flex size-10 items-center justify-center rounded-full ${
+          highlighted ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{title}</span>
+        <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+          Winner: <span className="font-semibold text-primary">{winner}</span>
+        </span>
+      </span>
+      <span className="text-xs font-semibold text-muted-foreground">{time}</span>
+    </button>
   )
 }
 
@@ -1350,42 +1535,152 @@ function ProfileView({
 }) {
   return (
     <section className="space-y-5 px-4 py-5">
-      <PageTitle title="Profile" subtitle="Food finder preferences" />
-      <Card className="rounded-xl border-border/70">
-        <CardContent className="flex items-center gap-4 p-4">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-primary">
-            <img src="/pwa-icon.svg" alt="" className="size-12" />
+      <Card className="rounded-xl border-border/70 shadow-sm">
+        <CardContent className="flex flex-col items-center gap-4 p-5 text-center sm:flex-row sm:text-left">
+          <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary bg-secondary">
+            <UserRound className="size-12 text-primary" aria-hidden="true" />
           </div>
-          <div className="min-w-0">
-            <h2 className="truncate text-xl font-semibold">MakanMana</h2>
-            <p className="text-sm text-muted-foreground">Mobile food finder</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-3xl font-semibold text-primary">Alex Chen</h2>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <Badge variant="accent" className="rounded-full">
+                <Star className="size-3.5" aria-hidden="true" />
+                Team Captain
+              </Badge>
+              <span className="text-sm text-muted-foreground">Joined 2023</span>
+            </div>
           </div>
+          <Button variant="secondary" size="icon" aria-label="Edit profile">
+            <Edit3 className="size-5" aria-hidden="true" />
+          </Button>
         </CardContent>
       </Card>
-      <div className="grid grid-cols-2 gap-3">
-        <StatusCard label="Radius" value={`${preferences.radiusKm} km`} />
-        <StatusCard label="Price" value={preferences.priceLevel} />
-        <StatusCard label="Halal" value={preferences.halalOnly ? 'On' : 'Off'} />
-        <StatusCard
-          label="Group"
-          value={preferences.groupFriendly ? 'Friendly' : 'Any'}
-        />
-      </div>
-      <Card className="rounded-xl border-border/70">
-        <CardHeader>
+
+      <Card className="rounded-xl border-border/70 shadow-sm">
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
-            <Settings className="size-5 text-primary" aria-hidden="true" />
-            App Status
+            <Utensils className="size-5 text-primary" aria-hidden="true" />
+            Dietary Requirements
           </CardTitle>
-          <CardDescription>{statusLabel}</CardDescription>
+          <CardDescription>
+            Used to shape restaurant recommendations.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <ProfileLine label="GPS history" value="Not stored" />
-          <ProfileLine label="Accounts" value="Not required" />
-          <ProfileLine label="Restaurant data" value="Google Maps handoff" />
+          <div className="flex flex-wrap gap-2">
+            <Badge className="rounded-lg bg-[#e0f2f1] px-3 py-1.5 text-[#00695c]">
+              Halal
+            </Badge>
+            <Badge className="rounded-lg bg-[#e0f2f1] px-3 py-1.5 text-[#00695c]">
+              Vegetarian
+            </Badge>
+            <Badge variant="outline" className="rounded-lg border-dashed px-3 py-1.5">
+              <Plus className="size-3.5" aria-hidden="true" />
+              Add
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <DecisionStat label="Radius" value={`${preferences.radiusKm} km`} />
+            <DecisionStat label="Price" value={preferences.priceLevel} />
+            <DecisionStat label="Halal" value={preferences.halalOnly ? 'On' : 'Off'} />
+            <DecisionStat
+              label="Group"
+              value={preferences.groupFriendly ? 'Friendly' : 'Any'}
+            />
+          </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="rounded-xl border-border/70 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <UserRound className="size-5 text-primary" aria-hidden="true" />
+              Account Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-border/70">
+            <ProfileMenuItem icon={<Mail className="size-5" />} label="Email Address" />
+            <ProfileMenuItem icon={<Lock className="size-5" />} label="Password" />
+            <ProfileMenuItem
+              icon={<CreditCard className="size-5" />}
+              label="Payment Methods"
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border-border/70 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="size-5 text-primary" aria-hidden="true" />
+              Notification Preferences
+            </CardTitle>
+            <CardDescription>{statusLabel}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ProfileToggle
+              checked
+              title="Push Notifications"
+              subtitle="Updates on group votes"
+            />
+            <ProfileToggle
+              title="Email Newsletters"
+              subtitle="Weekly top spots"
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Button
+        variant="outline"
+        className="h-12 w-full rounded-lg border-[#d56b6b] text-[#b42323] hover:bg-[#fff0f0]"
+      >
+        <LogOut className="size-5" aria-hidden="true" />
+        Log Out
+      </Button>
     </section>
+  )
+}
+
+function ProfileMenuItem({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-3 py-3 text-left transition hover:text-primary"
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="text-muted-foreground">{icon}</span>
+        <span className="truncate text-sm">{label}</span>
+      </span>
+      <ChevronDown
+        className="size-4 -rotate-90 text-muted-foreground"
+        aria-hidden="true"
+      />
+    </button>
+  )
+}
+
+function ProfileToggle({
+  checked = false,
+  subtitle,
+  title,
+}: {
+  checked?: boolean
+  subtitle: string
+  title: string
+}) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3">
+      <span className="min-w-0">
+        <span className="block text-sm">{title}</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{subtitle}</span>
+      </span>
+      <input
+        type="checkbox"
+        defaultChecked={checked}
+        className="h-5 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-border bg-secondary transition checked:border-primary checked:bg-primary"
+      />
+    </label>
   )
 }
 
@@ -1505,50 +1800,6 @@ function PageTitle({ title, subtitle }: { title: string; subtitle: string }) {
     <div>
       <h2 className="text-3xl font-semibold text-primary">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-    </div>
-  )
-}
-
-function ActivityRow({
-  detail,
-  icon,
-  title,
-}: {
-  detail: string
-  icon: ReactNode
-  title: string
-}) {
-  return (
-    <Card className="rounded-xl border-border/70">
-      <CardContent className="grid grid-cols-[44px_minmax(0,1fr)] gap-3 p-4">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-secondary">
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <h3 className="truncate font-semibold">{title}</h3>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">{detail}</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function StatusCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="rounded-xl border-border/70">
-      <CardContent className="p-4">
-        <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
-        <p className="mt-1 text-xl font-semibold text-primary">{value}</p>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ProfileLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary px-3 py-2">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold text-primary">{value}</span>
     </div>
   )
 }

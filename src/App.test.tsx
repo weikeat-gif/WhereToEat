@@ -164,12 +164,16 @@ describe('App', () => {
     expect(screen.getByText('Shortcut List')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /activity tab/i }))
-    expect(screen.getByRole('heading', { name: 'Activity' })).toBeInTheDocument()
-    expect(screen.getByText('Recent food decisions')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Team Activity' })).toBeInTheDocument()
+    expect(screen.getByText('Active Polls')).toBeInTheDocument()
+    expect(screen.getByText('Completed Polls')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start poll' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /profile tab/i }))
-    expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument()
-    expect(screen.getByText('Food finder preferences')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Alex Chen' })).toBeInTheDocument()
+    expect(screen.getByText('Team Captain')).toBeInTheDocument()
+    expect(screen.getByText('Dietary Requirements')).toBeInTheDocument()
+    expect(screen.getByText('Notification Preferences')).toBeInTheDocument()
   })
 
   it('opens search from the header actions', async () => {
