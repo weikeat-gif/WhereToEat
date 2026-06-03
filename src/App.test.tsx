@@ -171,6 +171,18 @@ describe('App', () => {
     expect(screen.getByRole('combobox', { name: 'Price' })).toBeInTheDocument()
   })
 
+  it('lets the whole status control area change a dropdown value', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Radius' }), '10')
+
+    expect(screen.getByRole('combobox', { name: 'Radius' })).toHaveValue('10')
+    expect(screen.getAllByText('10 km')).not.toHaveLength(0)
+  })
+
   it('saves and removes a restaurant from the saved page', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)

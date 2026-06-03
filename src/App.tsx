@@ -697,16 +697,24 @@ function StatusSelect({
   suffix?: string
   onChange: (value: string) => void
 }) {
+  const displayValue = `${value}${suffix}`
+
   return (
-    <label className="relative block cursor-pointer rounded-lg border border-border/50 bg-secondary px-2 py-2 pr-7 transition hover:border-primary focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
-      <span className="block text-[11px] font-semibold uppercase text-muted-foreground">
+    <label className="relative block min-h-[58px] cursor-pointer rounded-lg border border-border/50 bg-secondary px-2 py-2 pr-7 transition hover:border-primary focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
+      <span className="pointer-events-none block text-[11px] font-semibold uppercase text-muted-foreground">
         {label}
+      </span>
+      <span
+        className="pointer-events-none mt-0.5 block truncate text-center text-sm font-bold text-primary"
+        aria-hidden="true"
+      >
+        {displayValue}
       </span>
       <select
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-0.5 w-full min-w-0 cursor-pointer appearance-none truncate bg-transparent text-center text-sm font-bold text-primary outline-none"
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       >
         {options.map((option) => (
           <option key={option} value={option}>
