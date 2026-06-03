@@ -1305,6 +1305,7 @@ function ActivityView({ restaurants }: { restaurants: Restaurant[] }) {
       title: 'Friday Lunch Walk',
       organizer: 'Organized by Sarah M.',
       voters: ['SM', 'DK', '+3'],
+      isJoined: true,
       options: [
         { id: 'nasi-kandar', label: 'Nasi Kandar', votes: 5 },
         { id: 'cafe-bowls', label: 'Cafe Bowls', votes: 2 },
@@ -1322,6 +1323,7 @@ function ActivityView({ restaurants }: { restaurants: Restaurant[] }) {
         { id: 'village-park', label: 'Village Park Restaurant', votes: 0 },
       ],
       outline: true,
+      isJoined: false,
     },
   ])
   const [selectedPollId, setSelectedPollId] = useState<string | null>(null)
@@ -1355,23 +1357,42 @@ function ActivityView({ restaurants }: { restaurants: Restaurant[] }) {
     },
   ].slice(0, 3)
 
-  function submitVote(pollId: string, optionId: string) {
+  function handlePollAction(pollId: string) {
+    const poll = activePolls.find((item) => item.id === pollId)
+
+    if (!poll) {
+      return
+    }
+
+    if (!poll.isJoined) {
+      setActivePolls((currentPolls) =>
+        currentPolls.map((currentPoll) =>
+          currentPoll.id === pollId
+            ? {
+                ...currentPoll,
+                isJoined: true,
+                voters: currentPoll.voters?.includes('You')
+                  ? currentPoll.voters
+                  : [...(currentPoll.voters ?? []), 'You'],
+              }
+            : currentPoll,
+        ),
+      )
+      toast.success('Joined poll')
+      return
+    }
+
+    setSelectedPollId(pollId)
+  }
+
+  function submitVote(pollId: string, optionId: string | null) {
     setActivePolls((currentPolls) =>
       currentPolls.map((poll) =>
-        poll.id === pollId
-          ? {
-              ...poll,
-              options: poll.options.map((option) =>
-                option.id === optionId
-                  ? { ...option, votes: option.votes + 1 }
-                  : option,
-              ),
-            }
-          : poll,
+        poll.id === pollId ? updatePollVote(poll, optionId) : poll,
       ),
     )
     setSelectedPollId(null)
-    toast.success('Vote added')
+    toast.success(optionId ? 'Vote updated' : 'Vote removed')
   }
 
   function createPoll(poll: Poll) {
@@ -1396,7 +1417,7 @@ function ActivityView({ restaurants }: { restaurants: Restaurant[] }) {
           <PollCard
             key={poll.id}
             poll={poll}
-            onAction={() => setSelectedPollId(poll.id)}
+            onAction={() => handlePollAction(poll.id)}
           />
         ))}
       </section>
@@ -1451,11 +1472,17 @@ type Poll = {
   options: PollOption[]
   outline?: boolean
   voters?: string[]
+  isJoined: boolean
+  userVoteOptionId?: string
 }
 
 function PollCard({ poll, onAction }: { poll: Poll; onAction: () => void }) {
   const totalVotes = poll.options.reduce((total, option) => total + option.votes, 0)
-  const actionLabel = poll.outline ? 'Join Poll' : 'Vote Now'
+  const actionLabel = !poll.isJoined
+    ? 'Join Poll'
+    : poll.userVoteOptionId
+      ? 'Update Vote'
+      : 'Vote Now'
 
   return (
     <Card className="rounded-xl border-border/70 shadow-sm">
@@ -1510,11 +1537,11 @@ function PollCard({ poll, onAction }: { poll: Poll; onAction: () => void }) {
         ) : null}
 
         <Button
-          variant={poll.outline ? 'outline' : 'default'}
+          variant={!poll.isJoined ? 'outline' : 'default'}
           onClick={onAction}
           className="h-12 w-full rounded-lg"
         >
-          {poll.outline ? (
+          {!poll.isJoined ? (
             <Users className="size-4" aria-hidden="true" />
           ) : (
             <Trophy className="size-4" aria-hidden="true" />
@@ -1526,21 +1553,55 @@ function PollCard({ poll, onAction }: { poll: Poll; onAction: () => void }) {
   )
 }
 
+function updatePollVote(poll: Poll, nextOptionId: string | null): Poll {
+  const previousOptionId = poll.userVoteOptionId
+
+  return {
+    ...poll,
+    isJoined: true,
+    userVoteOptionId: nextOptionId ?? undefined,
+    options: poll.options.map((option) => {
+      let nextVotes = option.votes
+
+      if (previousOptionId === option.id) {
+        nextVotes = Math.max(0, nextVotes - 1)
+      }
+
+      if (nextOptionId === option.id) {
+        nextVotes += 1
+      }
+
+      return { ...option, votes: nextVotes }
+    }),
+  }
+}
+
 function VotePollDialog({
   onClose,
   onSubmit,
   poll,
 }: {
   onClose: () => void
-  onSubmit: (pollId: string, optionId: string) => void
+  onSubmit: (pollId: string, optionId: string | null) => void
   poll: Poll | null
 }) {
+  const noVoteSelection = '__no_vote__'
   const [selectedOptionId, setSelectedOptionId] = useState('')
   const selectedOptionExists =
     poll?.options.some((option) => option.id === selectedOptionId) ?? false
-  const submittedOptionId = selectedOptionExists
-    ? selectedOptionId
-    : poll?.options[0]?.id || ''
+  const currentSelectionId =
+    selectedOptionId === noVoteSelection
+      ? ''
+      : selectedOptionExists
+        ? selectedOptionId
+        : poll?.userVoteOptionId || ''
+  const canSubmit = Boolean(currentSelectionId || poll?.userVoteOptionId)
+  const submitLabel =
+    poll?.userVoteOptionId && !currentSelectionId
+      ? 'Remove Vote'
+      : poll?.userVoteOptionId
+        ? 'Update Vote'
+        : 'Submit Vote'
 
   return (
     <AnimatePresence>
@@ -1581,10 +1642,14 @@ function VotePollDialog({
                 <button
                   key={option.id}
                   type="button"
-                  aria-pressed={selectedOptionId === option.id}
-                  onClick={() => setSelectedOptionId(option.id)}
+                  aria-pressed={currentSelectionId === option.id}
+                  onClick={() =>
+                    setSelectedOptionId(() =>
+                      currentSelectionId === option.id ? noVoteSelection : option.id,
+                    )
+                  }
                   className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition ${
-                    selectedOptionId === option.id
+                    currentSelectionId === option.id
                       ? 'border-primary bg-secondary text-primary'
                       : 'border-border/70 bg-card hover:bg-secondary'
                   }`}
@@ -1597,10 +1662,10 @@ function VotePollDialog({
 
             <Button
               className="mt-4 h-12 w-full rounded-lg"
-              disabled={!submittedOptionId}
-              onClick={() => submittedOptionId && onSubmit(poll.id, submittedOptionId)}
+              disabled={!canSubmit}
+              onClick={() => onSubmit(poll.id, currentSelectionId || null)}
             >
-              Submit Vote
+              {submitLabel}
             </Button>
           </motion.div>
         </motion.div>
@@ -1673,6 +1738,7 @@ function CreatePollDialog({
         votes: 0,
       })),
       outline: true,
+      isJoined: true,
       voters: ['You'],
     })
     resetForm()

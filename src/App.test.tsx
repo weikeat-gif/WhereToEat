@@ -212,6 +212,38 @@ describe('App', () => {
       screen.queryByRole('dialog', { name: 'Friday Lunch Walk' }),
     )
     expect(screen.getByText('3 votes')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Update Vote' }))
+    const updateDialog = screen.getByRole('dialog', { name: 'Friday Lunch Walk' })
+    await user.click(within(updateDialog).getByRole('button', { name: /Cafe Bowls/ }))
+    await user.click(within(updateDialog).getByRole('button', { name: 'Remove Vote' }))
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: 'Friday Lunch Walk' }),
+    )
+    expect(screen.getByText('2 votes')).toBeInTheDocument()
+  })
+
+  it('requires joining a poll before voting', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /activity tab/i }))
+
+    await user.click(screen.getByRole('button', { name: 'Join Poll' }))
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Client Meeting Lunch' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Join Poll' })).not.toBeInTheDocument()
+    expect(screen.getByText('You')).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: 'Vote Now' })[1])
+
+    expect(
+      screen.getByRole('dialog', { name: 'Client Meeting Lunch' }),
+    ).toBeInTheDocument()
   })
 
   it('starts a poll with selected places', async () => {
