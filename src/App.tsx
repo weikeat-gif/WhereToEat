@@ -400,7 +400,7 @@ function App() {
           >
             <img src="/pwa-icon.svg" alt="" className="size-8" />
           </Button>
-          <h1 className="truncate text-center text-3xl font-bold tracking-tight text-primary">
+          <h1 className="truncate text-center text-3xl font-semibold text-primary">
             MakanMana
           </h1>
           <Button
@@ -749,7 +749,7 @@ function StatusSelect({
         <span className="block text-[11px] font-semibold uppercase text-muted-foreground">
           {label}
         </span>
-        <span className="mt-0.5 block truncate text-center text-sm font-bold text-primary">
+        <span className="mt-0.5 block truncate text-center text-sm font-semibold text-primary">
           {displayValue}
         </span>
         <motion.span
@@ -811,7 +811,7 @@ function SortControls({
   return (
     <div className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-base font-bold text-primary">Sort results</p>
+        <p className="text-base font-semibold text-primary">Sort results</p>
       </div>
       <div className="mt-3 grid grid-cols-4 gap-2">
         {sortOptions.map((option) => (
@@ -820,7 +820,7 @@ function SortControls({
             type="button"
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
-            className={`min-h-10 rounded-lg px-2 text-xs font-bold transition ${
+            className={`min-h-10 rounded-lg px-2 text-xs font-semibold transition ${
               value === option.value
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-secondary text-primary hover:bg-[#ffdea9] hover:text-[#271900]'
@@ -853,7 +853,7 @@ function EmptyResults({
         <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-secondary">
           <Search className="size-6 text-primary" aria-hidden="true" />
         </div>
-        <h2 className="mt-4 text-xl font-bold">No matching places</h2>
+        <h2 className="mt-4 text-xl font-semibold">No matching places</h2>
         <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
           {query ? `No picks for "${query}" right now.` : 'No picks available right now.'}
         </p>
@@ -973,7 +973,7 @@ function QuickDecisionBar({
               key={mode.label}
               type="button"
               onClick={mode.action}
-              className="min-h-12 rounded-lg bg-secondary px-2 text-xs font-bold text-primary transition hover:bg-[#ffdea9] hover:text-[#271900]"
+              className="min-h-12 rounded-lg bg-secondary px-2 text-xs font-semibold text-primary transition hover:bg-[#ffdea9] hover:text-[#271900]"
             >
               {mode.label}
             </button>
@@ -1157,7 +1157,7 @@ function SearchView({
             <Button
               onClick={() => onSearchNearby(foodQuery)}
               disabled={isSearching}
-              className="h-14 rounded-xl px-4 text-base font-bold"
+              className="h-14 rounded-xl px-4 text-base font-semibold"
             >
               <LocateFixed className="size-4" aria-hidden="true" />
               {isSearching ? 'Searching' : 'Find'}
@@ -1285,7 +1285,7 @@ function SavedEmptyCard({ onBrowse }: { onBrowse: () => void }) {
         <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-secondary">
           <Bookmark className="size-6 text-primary" aria-hidden="true" />
         </div>
-        <h3 className="mt-4 text-xl font-bold">No saved places yet</h3>
+        <h3 className="mt-4 text-xl font-semibold">No saved places yet</h3>
         <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
           Tap the heart on any restaurant to keep it here for your next food run.
         </p>
@@ -1364,7 +1364,7 @@ function ProfileView({
             <img src="/pwa-icon.svg" alt="" className="size-12" />
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-xl font-bold">MakanMana</h2>
+            <h2 className="truncate text-xl font-semibold">MakanMana</h2>
             <p className="text-sm text-muted-foreground">Mobile food finder</p>
           </div>
         </CardContent>
@@ -1448,7 +1448,7 @@ function SettingsView({
                 key={price}
                 type="button"
                 onClick={() => onUpdatePreferences({ priceLevel: price })}
-                className={`h-12 border-r text-base font-bold last:border-r-0 ${
+                className={`h-12 border-r text-base font-semibold last:border-r-0 ${
                   preferences.priceLevel === price
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-card text-foreground'
@@ -1510,7 +1510,7 @@ function SettingToggle({
 function PageTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div>
-      <h2 className="text-3xl font-bold tracking-tight text-primary">{title}</h2>
+      <h2 className="text-3xl font-semibold text-primary">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
     </div>
   )
@@ -1532,7 +1532,7 @@ function ActivityRow({
           {icon}
         </div>
         <div className="min-w-0">
-          <h3 className="truncate font-bold">{title}</h3>
+          <h3 className="truncate font-semibold">{title}</h3>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">{detail}</p>
         </div>
       </CardContent>
@@ -1545,7 +1545,7 @@ function StatusCard({ label, value }: { label: string; value: string }) {
     <Card className="rounded-xl border-border/70">
       <CardContent className="p-4">
         <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
-        <p className="mt-1 text-xl font-bold text-primary">{value}</p>
+        <p className="mt-1 text-xl font-semibold text-primary">{value}</p>
       </CardContent>
     </Card>
   )
@@ -1555,7 +1555,7 @@ function ProfileLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary px-3 py-2">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-bold text-primary">{value}</span>
+      <span className="text-sm font-semibold text-primary">{value}</span>
     </div>
   )
 }
@@ -1563,9 +1563,9 @@ function ProfileLine({ label, value }: { label: string; value: string }) {
 function SectionHeader({ title, action }: { title: string; action?: string }) {
   return (
     <div className="flex min-w-0 items-end justify-between gap-3 pr-4">
-      <h2 className="min-w-0 truncate text-2xl font-bold tracking-tight">{title}</h2>
+      <h2 className="min-w-0 truncate text-2xl font-semibold">{title}</h2>
       {action ? (
-        <button type="button" className="shrink-0 text-sm font-bold text-primary">
+        <button type="button" className="shrink-0 text-sm font-semibold text-primary">
           {action}
         </button>
       ) : null}
@@ -1640,7 +1640,7 @@ function RecommendedCard({
             alt={`${restaurant.name} preview`}
             className="h-full w-full"
           />
-          <span className="absolute left-3 top-3 rounded-lg bg-primary px-2 py-1 text-xs font-bold text-primary-foreground shadow-sm">
+          <span className="absolute left-3 top-3 rounded-lg bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground shadow-sm">
             {restaurant.source === 'live' ? 'Live nearby' : 'Demo spot'}
           </span>
           <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-lg bg-card/95 px-2 py-1 text-sm font-semibold shadow-sm">
@@ -1651,7 +1651,7 @@ function RecommendedCard({
         <div className="space-y-3 p-4 pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-xl font-bold">{restaurant.name}</h3>
+              <h3 className="truncate text-xl font-semibold">{restaurant.name}</h3>
               <p className="text-sm text-muted-foreground">
                 {restaurant.cuisine} · {restaurant.price}
               </p>
@@ -1669,7 +1669,7 @@ function RecommendedCard({
             <MiniStat label="Time" value={restaurant.travelTime} />
           </div>
           <div className="rounded-lg border border-border/40 bg-secondary p-2 text-sm text-muted-foreground">
-            <span className="font-bold text-primary">Popular:</span>{' '}
+            <span className="font-semibold text-primary">Popular:</span>{' '}
             {restaurant.menuHighlights.slice(0, 2).join(', ')}
           </div>
           <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
@@ -1722,7 +1722,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
       <p className="truncate text-[10px] font-semibold uppercase text-muted-foreground">
         {label}
       </p>
-      <p className="mt-0.5 truncate text-xs font-bold text-primary">{value}</p>
+      <p className="mt-0.5 truncate text-xs font-semibold text-primary">{value}</p>
     </div>
   )
 }
@@ -1757,7 +1757,7 @@ function PopularCard({
         <div className="min-w-0 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-xl font-bold">{restaurant.name}</h3>
+              <h3 className="truncate text-xl font-semibold">{restaurant.name}</h3>
               <p className="truncate text-sm text-muted-foreground">
                 {restaurant.cuisine} · {restaurant.price}
               </p>
@@ -1861,7 +1861,7 @@ function SavedCard({
         <div className="min-w-0 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-lg font-bold">{restaurant.name}</h3>
+              <h3 className="truncate text-lg font-semibold">{restaurant.name}</h3>
               <p className="truncate text-sm text-muted-foreground">
                 {restaurant.cuisine} · {restaurant.distanceKm} km · {restaurant.rating}
               </p>
@@ -1940,7 +1940,7 @@ function RestaurantDetailSheet({
             </div>
 
             <SheetHeader className="mb-0 pr-0">
-              <SheetTitle className="text-3xl font-bold">{restaurant.name}</SheetTitle>
+              <SheetTitle className="text-3xl font-semibold">{restaurant.name}</SheetTitle>
               <SheetDescription className="text-base">
                 {restaurant.cuisine} · {restaurant.vibe}
               </SheetDescription>
@@ -2014,7 +2014,7 @@ function RestaurantDetailSheet({
             </div>
 
             <section className="space-y-3">
-              <h3 className="text-xl font-bold">Why This Place</h3>
+              <h3 className="text-xl font-semibold">Why This Place</h3>
               <div className="rounded-xl border bg-card p-4 shadow-sm">
                 <p className="text-base leading-6 text-foreground">
                   {restaurant.vibe}
@@ -2035,12 +2035,12 @@ function RestaurantDetailSheet({
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-xl font-bold">What's Inside</h3>
+              <h3 className="text-xl font-semibold">What's Inside</h3>
               <div className="grid grid-cols-2 gap-2">
                 {restaurant.menuHighlights.map((item) => (
                   <span
                     key={item}
-                    className="rounded-xl bg-[#9ff0fb] px-4 py-3 text-sm font-bold text-[#001f23]"
+                    className="rounded-xl bg-[#9ff0fb] px-4 py-3 text-sm font-semibold text-[#001f23]"
                   >
                     {item}
                   </span>
@@ -2049,7 +2049,7 @@ function RestaurantDetailSheet({
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-xl font-bold">Place Details</h3>
+              <h3 className="text-xl font-semibold">Place Details</h3>
               <div className="divide-y rounded-xl border bg-card">
                 <DetailRow icon={<MapPin className="size-6 text-primary" />} text={restaurant.address} />
                 <DetailRow icon={<Clock3 className="size-6 text-muted-foreground" />} text={restaurant.hours} />
@@ -2081,7 +2081,7 @@ function DecisionStat({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 truncate text-lg font-bold text-primary">{value}</p>
+      <p className="mt-1 truncate text-lg font-semibold text-primary">{value}</p>
     </div>
   )
 }
