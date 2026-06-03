@@ -108,6 +108,32 @@ describe('App', () => {
     expect(screen.getAllByText('Restoran Nasi Kandar Pelita KLCC')).not.toHaveLength(0)
   })
 
+  it('sorts search results when sort buttons are pressed', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Open search' }))
+    await user.type(screen.getByLabelText(/search food page/i), 'cafe')
+    await user.click(screen.getByRole('button', { name: 'Find' }))
+
+    const searchResults = screen.getByRole('region', { name: 'Search Results' })
+    expect(await within(searchResults).findByText('Inside Scoop Bangsar')).toBeInTheDocument()
+    expect(within(searchResults).getAllByRole('heading', { level: 3 })[0]).toHaveTextContent(
+      'Inside Scoop Bangsar',
+    )
+
+    await user.click(within(searchResults).getByRole('button', { name: 'Top rated' }))
+
+    expect(within(searchResults).getByRole('button', { name: 'Top rated' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(within(searchResults).getAllByRole('heading', { level: 3 })[0]).toHaveTextContent(
+      'ZUS Coffee Pavilion Bukit Jalil',
+    )
+  })
+
   it('asks for typed location when geolocation is denied', async () => {
     const user = userEvent.setup()
     setGeolocation(

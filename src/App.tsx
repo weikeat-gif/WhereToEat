@@ -748,41 +748,40 @@ function SortControls({
   onChange: (value: SortOption) => void
 }) {
   return (
-    <section className="px-4 pt-3">
-      <div className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-bold text-primary">Sort results</p>
-          <select
-            aria-label="Sort results"
-            value={value}
-            onChange={(event) => onChange(event.target.value as SortOption)}
-            className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm font-semibold text-primary outline-none"
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-2">
+    <div className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-bold text-primary">Sort results</p>
+        <select
+          aria-label="Sort results"
+          value={value}
+          onChange={(event) => onChange(event.target.value as SortOption)}
+          className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm font-semibold text-primary outline-none"
+        >
           {sortOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onChange(option.value)}
-              className={`min-h-10 rounded-lg px-2 text-xs font-bold transition ${
-                value === option.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-primary hover:bg-[#ffdea9] hover:text-[#271900]'
-              }`}
-            >
+            <option key={option.value} value={option.value}>
               {option.label}
-            </button>
+            </option>
           ))}
-        </div>
+        </select>
       </div>
-    </section>
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {sortOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={value === option.value}
+            onClick={() => onChange(option.value)}
+            className={`min-h-10 rounded-lg px-2 text-xs font-bold transition ${
+              value === option.value
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-primary hover:bg-[#ffdea9] hover:text-[#271900]'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -1140,7 +1139,7 @@ function SearchView({
         </CardContent>
       </Card>
 
-      <section className="space-y-3">
+      <section className="space-y-3" aria-label="Search Results">
         <SectionHeader title="Search Results" />
         <SortControls value={sortOption} onChange={onSortChange} />
         <div className="grid gap-3">
