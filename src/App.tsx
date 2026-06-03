@@ -398,10 +398,10 @@ function App() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Open settings"
-            onClick={() => setActiveView('settings')}
+            aria-label="Open search"
+            onClick={() => setActiveView('search')}
           >
-            <Settings className="size-6" aria-hidden="true" />
+            <Search className="size-6" aria-hidden="true" />
           </Button>
         </div>
       </header>

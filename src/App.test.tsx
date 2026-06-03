@@ -119,7 +119,7 @@ describe('App', () => {
     expect(screen.getByText('Food finder preferences')).toBeInTheDocument()
   })
 
-  it('opens search and settings from the header actions', async () => {
+  it('opens search from the header actions', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)
 
@@ -129,9 +129,9 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
     expect(screen.getByLabelText(/search food page/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /open settings/i }))
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
-    expect(screen.getByText('Adjust your food finder defaults')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /discover tab/i }))
+    await user.click(screen.getByRole('button', { name: /open search/i }))
+    expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
   })
 
   it('selects food type chips from the horizontal row', async () => {
