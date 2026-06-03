@@ -20,7 +20,6 @@ import {
   Search,
   Settings,
   Share2,
-  SlidersHorizontal,
   Star,
   UserRound,
 } from 'lucide-react'
@@ -42,7 +41,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -168,7 +166,6 @@ function App() {
     useState<LocationPermissionState>('idle')
   const [restaurants, setRestaurants] = useState<Restaurant[]>(sampleRestaurants)
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(
     null,
   )
@@ -408,213 +405,7 @@ function App() {
 
       {activeView === 'discover' ? (
         <>
-      <section className="space-y-3 overflow-hidden px-4 py-4">
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] gap-3">
-          <div className="relative min-w-0">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              aria-label="Search food"
-              value={foodQuery}
-              onChange={(event) => updateFoodQuery(event.target.value)}
-              placeholder="Search food, cafe, restaurant..."
-              className="h-14 rounded-xl border-border/60 bg-card pl-11 text-base shadow-sm"
-            />
-          </div>
-
-          <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-14 rounded-xl bg-card"
-                aria-label="Filters"
-              >
-                <SlidersHorizontal className="size-6 text-primary" aria-hidden="true" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="max-h-[92svh] overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Filters</SheetTitle>
-                <SheetDescription>
-                  Tune distance, price, cuisine, and suitability.
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-7">
-                <section className="space-y-3">
-                  <h3 className="text-base font-semibold">Mode</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {categories.map((category) => (
-                      <Button
-                        key={category.label}
-                        variant={activeCategory === category.label ? 'default' : 'outline'}
-                        onClick={() => selectCategory(category)}
-                        className="justify-start rounded-lg"
-                      >
-                        {category.label}
-                      </Button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold">Distance</h3>
-                    <span className="font-bold text-primary">{preferences.radiusKm} km</span>
-                  </div>
-                  <Card className="rounded-xl border-border/50 p-4 shadow-sm">
-                    <Slider
-                      value={[preferences.radiusKm]}
-                      min={1}
-                      max={20}
-                      step={1}
-                      onValueChange={([radiusKm]) => updatePreferences({ radiusKm })}
-                      aria-label="Distance range"
-                    />
-                    <div className="mt-4 grid grid-cols-4 gap-2">
-                      {radiusOptions.slice(0, 4).map((radius) => (
-                        <Button
-                          key={radius}
-                          variant={preferences.radiusKm === radius ? 'default' : 'outline'}
-                          onClick={() => updatePreferences({ radiusKm: radius })}
-                          className="rounded-md"
-                        >
-                          {radius} km
-                        </Button>
-                      ))}
-                    </div>
-                  </Card>
-                </section>
-
-                <section className="space-y-3">
-                  <h3 className="text-base font-semibold">Price Range</h3>
-                  <div className="grid grid-cols-4 overflow-hidden rounded-lg border bg-card">
-                    {priceLevels.map((price) => (
-                      <button
-                        key={price}
-                        type="button"
-                        onClick={() => updatePreferences({ priceLevel: price })}
-                        className={`h-12 border-r text-base font-bold last:border-r-0 ${
-                          preferences.priceLevel === price
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-card text-foreground'
-                        }`}
-                      >
-                        {price}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold">Cuisine</h3>
-                    <button className="text-sm font-semibold text-primary" type="button">
-                      View All
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {cuisineFilters.map((cuisine) => (
-                      <button
-                        key={cuisine}
-                        type="button"
-                        onClick={() => selectCuisine(cuisine)}
-                        className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                          activeCategory === cuisine
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border/70 bg-card text-primary'
-                        }`}
-                      >
-                        {cuisine}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="space-y-3">
-                  <h3 className="text-base font-semibold">Dietary and amenities</h3>
-                  <div className="rounded-xl border bg-card shadow-sm">
-                    <label className="flex items-center justify-between border-b p-4">
-                      <span>Halal</span>
-                      <input
-                        type="checkbox"
-                        checked={preferences.halalOnly}
-                        onChange={(event) =>
-                          updatePreferences({ halalOnly: event.target.checked })
-                        }
-                        className="size-5"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between p-4">
-                      <span>Group Friendly</span>
-                      <input
-                        type="checkbox"
-                        checked={preferences.groupFriendly}
-                        onChange={(event) =>
-                          updatePreferences({ groupFriendly: event.target.checked })
-                        }
-                        className="size-5"
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <Button
-                  className="h-12 w-full rounded-lg"
-                  onClick={() => setIsFilterOpen(false)}
-                >
-                  Show Results
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-
-        <CategoryScroller
-          activeCategory={activeCategory}
-          onSelectCategory={selectCategory}
-        />
-
-        <div className="space-y-2 overflow-hidden rounded-xl border bg-card p-3 shadow-sm">
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <Input
-              aria-label="Location fallback"
-              value={manualLocation}
-              onChange={(event) => updateManualLocation(event.target.value)}
-              placeholder="Type area or venue if GPS is off"
-              className="h-11 rounded-lg bg-background"
-            />
-            <Button
-              onClick={searchNearbyFood}
-              disabled={permissionState === 'requesting' || isLoadingPlaces}
-              className="h-11 min-w-20 rounded-lg px-3"
-              aria-label="Search nearby food"
-            >
-              <LocateFixed className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">
-                {permissionState === 'requesting' || isLoadingPlaces
-                  ? 'Searching...'
-                  : 'Search nearby food'}
-              </span>
-              <span className="sm:hidden">
-                {permissionState === 'requesting' || isLoadingPlaces ? 'Searching' : 'Search'}
-              </span>
-            </Button>
-          </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="size-3.5" aria-hidden="true" />
-              {statusLabel}
-            </span>
-            <span>{visibleRestaurants.length} options found</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4">
+      <section className="px-4 pt-4">
         <StatusControls
           activeCategory={activeCategory}
           preferences={preferences}

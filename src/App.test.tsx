@@ -67,10 +67,10 @@ describe('App', () => {
     )
 
     render(<App />)
-    await user.click(screen.getByRole('button', { name: /search nearby food/i }))
+    await user.click(screen.getByRole('button', { name: /open search/i }))
+    await user.click(screen.getByRole('button', { name: 'Find' }))
 
     expect(await screen.findByText('GPS ready')).toBeInTheDocument()
-    expect(screen.getByText(/@3\.139,101\.6869,15z/)).toBeInTheDocument()
     expect(await screen.findAllByText('Stadium Cafe')).not.toHaveLength(0)
   })
 
@@ -79,10 +79,10 @@ describe('App', () => {
     setGeolocation(undefined)
 
     render(<App />)
-    await user.type(screen.getByLabelText(/location fallback/i), 'Bukit Jalil')
-    await user.click(screen.getByRole('button', { name: /search nearby food/i }))
+    await user.click(screen.getByRole('button', { name: /open search/i }))
+    await user.type(screen.getByLabelText(/search page location/i), 'Bukit Jalil')
+    await user.click(screen.getByRole('button', { name: 'Find' }))
 
-    expect(screen.getByText(/near\+Bukit\+Jalil/)).toBeInTheDocument()
     expect(screen.getAllByText('Restoran Nasi Kandar Pelita KLCC')).not.toHaveLength(0)
   })
 
@@ -95,7 +95,8 @@ describe('App', () => {
     )
 
     render(<App />)
-    await user.click(screen.getByRole('button', { name: /search nearby food/i }))
+    await user.click(screen.getByRole('button', { name: /open search/i }))
+    await user.click(screen.getByRole('button', { name: 'Find' }))
 
     expect(await screen.findByText('Type location')).toBeInTheDocument()
   })
@@ -139,6 +140,7 @@ describe('App', () => {
     setGeolocation(undefined)
 
     render(<App />)
+    await user.click(screen.getByRole('button', { name: /open search/i }))
 
     await user.click(
       within(screen.getByLabelText('Food type filters')).getByRole('button', {
@@ -146,7 +148,7 @@ describe('App', () => {
       }),
     )
 
-    expect(screen.getByRole('combobox', { name: 'Mode' })).toHaveValue('Cafe')
+    expect(screen.getByLabelText(/search food page/i)).toHaveValue('cafe')
   })
 
   it('saves and removes a restaurant from the saved page', async () => {
