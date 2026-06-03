@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FormEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react'
@@ -62,6 +63,7 @@ import {
 } from '@/lib/restaurants'
 
 const preferenceKey = 'makanmana.preferences'
+const dietaryPreferencesKey = 'makanmana.dietary-preferences'
 const savedRestaurantsKey = 'makanmana.saved-restaurants'
 
 type Preferences = {
@@ -145,6 +147,26 @@ function readSavedRestaurants(): Restaurant[] {
   }
 }
 
+function readDietaryPreferences() {
+  try {
+    const stored = window.localStorage.getItem(dietaryPreferencesKey)
+
+    if (!stored) {
+      return ['Halal', 'Vegetarian']
+    }
+
+    const parsed = JSON.parse(stored)
+
+    if (!Array.isArray(parsed)) {
+      return ['Halal', 'Vegetarian']
+    }
+
+    return parsed.filter((item): item is string => typeof item === 'string')
+  } catch {
+    return ['Halal', 'Vegetarian']
+  }
+}
+
 function isStoredRestaurant(value: unknown): value is Restaurant {
   return (
     typeof value === 'object' &&
@@ -158,6 +180,9 @@ function isStoredRestaurant(value: unknown): value is Restaurant {
 
 function App() {
   const [preferences, setPreferences] = useState<Preferences>(() => readPreferences())
+  const [dietaryPreferences, setDietaryPreferences] = useState<string[]>(() =>
+    readDietaryPreferences(),
+  )
   const [savedRestaurants, setSavedRestaurants] = useState<Restaurant[]>(() =>
     readSavedRestaurants(),
   )
@@ -182,14 +207,25 @@ function App() {
 
   useEffect(() => {
     window.localStorage.setItem(
+      dietaryPreferencesKey,
+      JSON.stringify(dietaryPreferences),
+    )
+  }, [dietaryPreferences])
+
+  useEffect(() => {
+    window.localStorage.setItem(
       savedRestaurantsKey,
       JSON.stringify(savedRestaurants),
     )
   }, [savedRestaurants])
 
   const visibleRestaurants = useMemo(
-    () => sortRestaurants(filterRestaurants(restaurants, foodQuery), sortOption),
-    [foodQuery, restaurants, sortOption],
+    () =>
+      prioritizeRestaurantsByPreferences(
+        sortRestaurants(filterRestaurants(restaurants, foodQuery), sortOption),
+        dietaryPreferences,
+      ),
+    [dietaryPreferences, foodQuery, restaurants, sortOption],
   )
 
   const recommendedRestaurants = visibleRestaurants.slice(0, 4)
@@ -221,6 +257,28 @@ function App() {
 
   function updatePreferences(nextPreferences: Partial<Preferences>) {
     setPreferences((current) => ({ ...current, ...nextPreferences }))
+  }
+
+  function addDietaryPreference(preference: string) {
+    const normalizedPreference = preference.trim()
+
+    if (!normalizedPreference) {
+      return
+    }
+
+    setDietaryPreferences((current) =>
+      current.some(
+        (item) => item.toLowerCase() === normalizedPreference.toLowerCase(),
+      )
+        ? current
+        : [...current, normalizedPreference],
+    )
+  }
+
+  function removeDietaryPreference(preference: string) {
+    setDietaryPreferences((current) =>
+      current.filter((item) => item !== preference),
+    )
   }
 
   function selectCategory(category: (typeof categories)[number]) {
@@ -575,7 +633,12 @@ function App() {
       ) : null}
 
       {activeView === 'profile' ? (
-        <ProfileView preferences={preferences} statusLabel={statusLabel} />
+        <ProfileView
+          dietaryPreferences={dietaryPreferences}
+          statusLabel={statusLabel}
+          onAddPreference={addDietaryPreference}
+          onRemovePreference={removeDietaryPreference}
+        />
       ) : null}
 
       {activeView === 'settings' ? (
@@ -891,6 +954,44 @@ function sortRestaurants(restaurants: Restaurant[], sortOption: SortOption) {
 
     return (first.distanceKm ?? 99) - (second.distanceKm ?? 99)
   })
+}
+
+function prioritizeRestaurantsByPreferences(
+  restaurants: Restaurant[],
+  preferences: string[],
+) {
+  const normalizedPreferences = preferences
+    .map((preference) => preference.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (normalizedPreferences.length === 0) {
+    return restaurants
+  }
+
+  return [...restaurants].sort(
+    (first, second) =>
+      getPreferenceScore(second, normalizedPreferences) -
+      getPreferenceScore(first, normalizedPreferences),
+  )
+}
+
+function getPreferenceScore(restaurant: Restaurant, preferences: string[]) {
+  const searchableText = [
+    restaurant.name,
+    restaurant.cuisine,
+    restaurant.vibe,
+    restaurant.address,
+    ...restaurant.menuHighlights,
+    ...restaurant.amenities,
+    ...restaurant.tags,
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return preferences.reduce(
+    (score, preference) => score + Number(searchableText.includes(preference)),
+    0,
+  )
 }
 
 function getPriceRank(price: string) {
@@ -1901,12 +2002,29 @@ function CompletedPollItem({
 }
 
 function ProfileView({
-  preferences,
+  dietaryPreferences,
+  onAddPreference,
+  onRemovePreference,
   statusLabel,
 }: {
-  preferences: Preferences
+  dietaryPreferences: string[]
+  onAddPreference: (preference: string) => void
+  onRemovePreference: (preference: string) => void
   statusLabel: string
 }) {
+  const [isPreferenceDialogOpen, setIsPreferenceDialogOpen] = useState(false)
+  const [editingAccountField, setEditingAccountField] =
+    useState<AccountField | null>(null)
+  const [accountDetails, setAccountDetails] = useState<Record<AccountField, string>>({
+    email: '',
+    password: '',
+    payment: '',
+  })
+
+  function updateAccountField(field: AccountField, value: string) {
+    setAccountDetails((current) => ({ ...current, [field]: value }))
+  }
+
   return (
     <section className="space-y-5 px-4 py-5">
       <Card className="rounded-xl border-border/70 shadow-sm">
@@ -1942,25 +2060,28 @@ function ProfileView({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Badge className="rounded-lg bg-[#e0f2f1] px-3 py-1.5 text-[#00695c]">
-              Halal
-            </Badge>
-            <Badge className="rounded-lg bg-[#e0f2f1] px-3 py-1.5 text-[#00695c]">
-              Vegetarian
-            </Badge>
-            <Badge variant="outline" className="rounded-lg border-dashed px-3 py-1.5">
+            {dietaryPreferences.map((preference) => (
+              <button
+                key={preference}
+                type="button"
+                onClick={() => onRemovePreference(preference)}
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#e0f2f1] px-3 py-1.5 text-sm font-semibold text-[#00695c] transition hover:bg-[#c7e8e5]"
+                aria-label={`Remove ${preference} preference`}
+              >
+                {preference}
+                <span className="text-xs" aria-hidden="true">
+                  x
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setIsPreferenceDialogOpen(true)}
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-dashed border-border bg-card px-3 py-1.5 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary"
+            >
               <Plus className="size-3.5" aria-hidden="true" />
               Add
-            </Badge>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <DecisionStat label="Radius" value={`${preferences.radiusKm} km`} />
-            <DecisionStat label="Price" value={preferences.priceLevel} />
-            <DecisionStat label="Halal" value={preferences.halalOnly ? 'On' : 'Off'} />
-            <DecisionStat
-              label="Group"
-              value={preferences.groupFriendly ? 'Friendly' : 'Any'}
-            />
+            </button>
           </div>
         </CardContent>
       </Card>
@@ -1974,11 +2095,23 @@ function ProfileView({
             </CardTitle>
           </CardHeader>
           <CardContent className="divide-y divide-border/70">
-            <ProfileMenuItem icon={<Mail className="size-5" />} label="Email Address" />
-            <ProfileMenuItem icon={<Lock className="size-5" />} label="Password" />
+            <ProfileMenuItem
+              icon={<Mail className="size-5" />}
+              label="Email Address"
+              value={accountDetails.email}
+              onClick={() => setEditingAccountField('email')}
+            />
+            <ProfileMenuItem
+              icon={<Lock className="size-5" />}
+              label="Password"
+              value={accountDetails.password ? 'Saved password' : ''}
+              onClick={() => setEditingAccountField('password')}
+            />
             <ProfileMenuItem
               icon={<CreditCard className="size-5" />}
               label="Payment Methods"
+              value={accountDetails.payment}
+              onClick={() => setEditingAccountField('payment')}
             />
           </CardContent>
         </Card>
@@ -2012,19 +2145,75 @@ function ProfileView({
         <LogOut className="size-5" aria-hidden="true" />
         Log Out
       </Button>
+
+      <PreferenceDialog
+        isOpen={isPreferenceDialogOpen}
+        onClose={() => setIsPreferenceDialogOpen(false)}
+        onAddPreference={onAddPreference}
+      />
+      {editingAccountField ? (
+        <AccountInputDialog
+          key={editingAccountField}
+          field={editingAccountField}
+          value={accountDetails[editingAccountField]}
+          onClose={() => setEditingAccountField(null)}
+          onSave={updateAccountField}
+        />
+      ) : null}
     </section>
   )
 }
 
-function ProfileMenuItem({ icon, label }: { icon: ReactNode; label: string }) {
+type AccountField = 'email' | 'password' | 'payment'
+
+const accountFieldCopy: Record<
+  AccountField,
+  { label: string; placeholder: string; type: string }
+> = {
+  email: {
+    label: 'Email Address',
+    placeholder: 'alex@example.com',
+    type: 'email',
+  },
+  password: {
+    label: 'Password',
+    placeholder: 'Enter a new password',
+    type: 'password',
+  },
+  payment: {
+    label: 'Payment Methods',
+    placeholder: 'Visa ending 4242',
+    type: 'text',
+  },
+}
+
+function ProfileMenuItem({
+  icon,
+  label,
+  onClick,
+  value,
+}: {
+  icon: ReactNode
+  label: string
+  onClick: () => void
+  value?: string
+}) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex w-full items-center justify-between gap-3 py-3 text-left transition hover:text-primary"
     >
       <span className="flex min-w-0 items-center gap-3">
         <span className="text-muted-foreground">{icon}</span>
-        <span className="truncate text-sm">{label}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm">{label}</span>
+          {value ? (
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {value}
+            </span>
+          ) : null}
+        </span>
       </span>
       <ChevronDown
         className="size-4 -rotate-90 text-muted-foreground"
@@ -2043,18 +2232,175 @@ function ProfileToggle({
   subtitle: string
   title: string
 }) {
+  const [isChecked, setIsChecked] = useState(checked)
+
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3">
+    <div className="flex items-center justify-between gap-3">
       <span className="min-w-0">
         <span className="block text-sm">{title}</span>
         <span className="mt-0.5 block text-xs text-muted-foreground">{subtitle}</span>
       </span>
-      <input
-        type="checkbox"
-        defaultChecked={checked}
-        className="h-5 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-border bg-secondary transition checked:border-primary checked:bg-primary"
-      />
-    </label>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isChecked}
+        aria-label={title}
+        onClick={() => setIsChecked((current) => !current)}
+        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+          isChecked
+            ? 'border-primary bg-primary'
+            : 'border-border bg-secondary'
+        }`}
+      >
+        <motion.span
+          className="absolute top-0.5 size-5 rounded-full bg-white shadow-sm"
+          animate={{ x: isChecked ? 20 : 2 }}
+          transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+        />
+      </button>
+    </div>
+  )
+}
+
+function PreferenceDialog({
+  isOpen,
+  onAddPreference,
+  onClose,
+}: {
+  isOpen: boolean
+  onAddPreference: (preference: string) => void
+  onClose: () => void
+}) {
+  const [preference, setPreference] = useState('')
+
+  function submitPreference(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    onAddPreference(preference)
+    setPreference('')
+    onClose()
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-end bg-black/35 px-4 pb-4 sm:items-center sm:justify-center sm:p-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          role="presentation"
+        >
+          <motion.form
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add preference"
+            onSubmit={submitPreference}
+            className="w-full max-w-md rounded-xl border border-border bg-card p-4 shadow-xl"
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+          >
+            <div className="space-y-1">
+              <h3 className="text-xl font-semibold text-primary">Add preference</h3>
+              <p className="text-sm text-muted-foreground">
+                Recommendations will rank matching shops higher.
+              </p>
+            </div>
+            <div className="mt-4 space-y-2">
+              <label className="text-sm font-semibold" htmlFor="profile-preference">
+                Preference
+              </label>
+              <Input
+                id="profile-preference"
+                value={preference}
+                onChange={(event) => setPreference(event.target.value)}
+                placeholder="Halal, vegan, spicy, cafe..."
+                className="h-12 rounded-lg"
+              />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit">Add Preference</Button>
+            </div>
+          </motion.form>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  )
+}
+
+function AccountInputDialog({
+  field,
+  onClose,
+  onSave,
+  value,
+}: {
+  field: AccountField
+  onClose: () => void
+  onSave: (field: AccountField, value: string) => void
+  value: string
+}) {
+  const [inputValue, setInputValue] = useState(value)
+
+  const copy = accountFieldCopy[field]
+
+  function submitAccountField(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    onSave(field, inputValue.trim())
+    onClose()
+  }
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-end bg-black/35 px-4 pb-4 sm:items-center sm:justify-center sm:p-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        role="presentation"
+      >
+        <motion.form
+          role="dialog"
+          aria-modal="true"
+          aria-label={copy.label}
+          onSubmit={submitAccountField}
+          className="w-full max-w-md rounded-xl border border-border bg-card p-4 shadow-xl"
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 24, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        >
+          <div className="space-y-1">
+            <h3 className="text-xl font-semibold text-primary">{copy.label}</h3>
+            <p className="text-sm text-muted-foreground">
+              Update your account information for this profile.
+            </p>
+          </div>
+          <div className="mt-4 space-y-2">
+            <label className="text-sm font-semibold" htmlFor={`account-${field}`}>
+              {copy.label}
+            </label>
+            <Input
+              id={`account-${field}`}
+              type={copy.type}
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              placeholder={copy.placeholder}
+              className="h-12 rounded-lg"
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit">Save</Button>
+          </div>
+        </motion.form>
+      </motion.div>
+    </AnimatePresence>
   )
 }
 

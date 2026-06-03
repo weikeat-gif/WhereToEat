@@ -176,6 +176,65 @@ describe('App', () => {
     expect(screen.getByText('Notification Preferences')).toBeInTheDocument()
   })
 
+  it('adds profile preferences and keeps recommendations visible', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Add preference' })
+    await user.type(within(dialog).getByLabelText('Preference'), 'Dessert')
+    await user.click(within(dialog).getByRole('button', { name: 'Add Preference' }))
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: 'Add preference' }),
+    )
+    expect(
+      screen.getByRole('button', { name: 'Remove Dessert preference' }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /discover tab/i }))
+
+    expect(screen.getByText('Recommended Nearby')).toBeInTheDocument()
+    expect(screen.getAllByText('Inside Scoop Bangsar')).not.toHaveLength(0)
+  })
+
+  it('lets profile account fields be entered', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+    await user.click(screen.getByRole('button', { name: 'Email Address' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Email Address' })
+    await user.type(within(dialog).getByLabelText('Email Address'), 'alex@test.com')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Email Address' })).not.toBeInTheDocument()
+    expect(screen.getByText('alex@test.com')).toBeInTheDocument()
+  })
+
+  it('toggles profile notifications with switch controls', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+
+    const pushSwitch = screen.getByRole('switch', { name: 'Push Notifications' })
+    expect(pushSwitch).toHaveAttribute('aria-checked', 'true')
+
+    await user.click(pushSwitch)
+
+    expect(pushSwitch).toHaveAttribute('aria-checked', 'false')
+  })
+
   it('opens search from the header actions', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)
