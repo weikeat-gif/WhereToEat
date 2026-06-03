@@ -24,6 +24,7 @@ import {
   Star,
   UserRound,
 } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import { toast, Toaster } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -705,37 +706,98 @@ function StatusSelect({
   suffix?: string
   onChange: (value: string) => void
 }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const displayValue = `${value}${suffix}`
+  const menuId = `${label.toLowerCase()}-status-menu`
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    function handlePointerDown(event: globalThis.PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !menuRef.current?.contains(event.target)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [isOpen])
+
+  function handleSelect(nextValue: string) {
+    onChange(nextValue)
+    setIsOpen(false)
+  }
 
   return (
-    <label className="relative block min-h-[58px] cursor-pointer rounded-lg border border-border/50 bg-secondary px-2 py-2 pr-7 transition hover:border-primary focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
-      <span className="pointer-events-none block text-[11px] font-semibold uppercase text-muted-foreground">
-        {label}
-      </span>
-      <span
-        className="pointer-events-none mt-0.5 block truncate text-center text-sm font-bold text-primary"
-        aria-hidden="true"
-      >
-        {displayValue}
-      </span>
-      <select
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={menuId}
+        aria-haspopup="listbox"
         aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        onClick={() => setIsOpen((current) => !current)}
+        className="relative block min-h-[58px] w-full cursor-pointer rounded-lg border border-border/50 bg-secondary px-2 py-2 pr-7 text-center transition hover:border-primary hover:shadow-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-            {suffix}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-primary"
-        aria-hidden="true"
-      />
-    </label>
+        <span className="block text-[11px] font-semibold uppercase text-muted-foreground">
+          {label}
+        </span>
+        <span className="mt-0.5 block truncate text-center text-sm font-bold text-primary">
+          {displayValue}
+        </span>
+        <motion.span
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-primary"
+          aria-hidden="true"
+        >
+          <ChevronDown className="size-3.5" />
+        </motion.span>
+      </button>
+      <AnimatePresence>
+        {isOpen ? (
+          <motion.div
+            id={menuId}
+            role="listbox"
+            aria-label={`${label} options`}
+            initial={{ opacity: 0, scale: 0.96, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -6 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            className="absolute inset-x-0 top-[calc(100%+8px)] z-50 max-h-64 overflow-y-auto rounded-lg border border-border/70 bg-card p-1.5 text-left shadow-xl"
+          >
+            {options.map((option) => {
+              const selected = option === value
+
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => handleSelect(option)}
+                  className={`w-full rounded-md px-3 py-2 text-left text-sm font-semibold transition ${
+                    selected
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-primary hover:bg-secondary'
+                  }`}
+                >
+                  {option}
+                  {suffix}
+                </button>
+              )
+            })}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   )
 }
 

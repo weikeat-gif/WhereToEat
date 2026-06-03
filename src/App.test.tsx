@@ -218,9 +218,18 @@ describe('App', () => {
     render(<App />)
 
     expect(screen.getByText('Tap Mode, Radius, or Price to choose.')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Mode' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Radius' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Price' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mode' })).toHaveAttribute(
+      'aria-haspopup',
+      'listbox',
+    )
+    expect(screen.getByRole('button', { name: 'Radius' })).toHaveAttribute(
+      'aria-haspopup',
+      'listbox',
+    )
+    expect(screen.getByRole('button', { name: 'Price' })).toHaveAttribute(
+      'aria-haspopup',
+      'listbox',
+    )
   })
 
   it('lets the whole status control area change a dropdown value', async () => {
@@ -229,9 +238,13 @@ describe('App', () => {
 
     render(<App />)
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Radius' }), '10')
+    await user.click(screen.getByRole('button', { name: 'Radius' }))
+    await user.click(screen.getByRole('option', { name: '10 km' }))
 
-    expect(screen.getByRole('combobox', { name: 'Radius' })).toHaveValue('10')
+    expect(screen.getByRole('button', { name: 'Radius' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
     expect(screen.getAllByText('10 km')).not.toHaveLength(0)
   })
 
