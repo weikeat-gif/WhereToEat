@@ -8,6 +8,7 @@ import {
 } from 'react'
 import {
   Bookmark,
+  ChevronDown,
   Clock3,
   Compass,
   Copy,
@@ -652,28 +653,33 @@ function StatusControls({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2 rounded-xl border border-border/70 bg-card p-2 text-center shadow-sm">
-      <StatusSelect
-        label="Mode"
-        value={modeValue}
-        options={modeValue === 'Custom' ? ['Custom', ...modeOptions] : modeOptions}
-        onChange={handleModeChange}
-      />
-      <StatusSelect
-        label="Radius"
-        value={String(preferences.radiusKm)}
-        options={radiusOptions.map(String)}
-        suffix=" km"
-        onChange={(value) => onUpdatePreferences({ radiusKm: Number(value) })}
-      />
-      <StatusSelect
-        label="Price"
-        value={preferences.priceLevel}
-        options={[...priceLevels]}
-        onChange={(value) =>
-          onUpdatePreferences({ priceLevel: value as Preferences['priceLevel'] })
-        }
-      />
+    <div className="rounded-xl border border-border/70 bg-card p-2 text-center shadow-sm">
+      <div className="grid grid-cols-3 gap-2">
+        <StatusSelect
+          label="Mode"
+          value={modeValue}
+          options={modeValue === 'Custom' ? ['Custom', ...modeOptions] : modeOptions}
+          onChange={handleModeChange}
+        />
+        <StatusSelect
+          label="Radius"
+          value={String(preferences.radiusKm)}
+          options={radiusOptions.map(String)}
+          suffix=" km"
+          onChange={(value) => onUpdatePreferences({ radiusKm: Number(value) })}
+        />
+        <StatusSelect
+          label="Price"
+          value={preferences.priceLevel}
+          options={[...priceLevels]}
+          onChange={(value) =>
+            onUpdatePreferences({ priceLevel: value as Preferences['priceLevel'] })
+          }
+        />
+      </div>
+      <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+        Tap Mode, Radius, or Price to choose.
+      </p>
     </div>
   )
 }
@@ -692,7 +698,7 @@ function StatusSelect({
   onChange: (value: string) => void
 }) {
   return (
-    <label className="rounded-lg bg-secondary px-2 py-2">
+    <label className="relative block cursor-pointer rounded-lg border border-border/50 bg-secondary px-2 py-2 pr-7 transition hover:border-primary focus-within:border-primary focus-within:ring-2 focus-within:ring-ring">
       <span className="block text-[11px] font-semibold uppercase text-muted-foreground">
         {label}
       </span>
@@ -700,7 +706,7 @@ function StatusSelect({
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-0.5 w-full min-w-0 appearance-none truncate bg-transparent text-center text-sm font-bold text-primary outline-none"
+        className="mt-0.5 w-full min-w-0 cursor-pointer appearance-none truncate bg-transparent text-center text-sm font-bold text-primary outline-none"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -709,6 +715,10 @@ function StatusSelect({
           </option>
         ))}
       </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-primary"
+        aria-hidden="true"
+      />
     </label>
   )
 }

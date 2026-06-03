@@ -160,6 +160,17 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Cheap' })).toBeInTheDocument()
   })
 
+  it('shows that status controls are selectable dropdowns', () => {
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    expect(screen.getByText('Tap Mode, Radius, or Price to choose.')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Mode' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Radius' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Price' })).toBeInTheDocument()
+  })
+
   it('saves and removes a restaurant from the saved page', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)
