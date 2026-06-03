@@ -416,6 +416,7 @@ function App() {
       </section>
 
       <QuickDecisionBar
+        onNearest={() => setSortOption('nearest')}
         onPick={pickRestaurantForGroup}
         onSelectCategory={selectCategory}
       />
@@ -850,9 +851,11 @@ function getOpenStatusLabel(restaurant: Restaurant) {
 }
 
 function QuickDecisionBar({
+  onNearest,
   onPick,
   onSelectCategory,
 }: {
+  onNearest: () => void
   onPick: () => void
   onSelectCategory: (category: (typeof categories)[number]) => void
 }) {
@@ -864,6 +867,10 @@ function QuickDecisionBar({
     categories.find((item) => item.label === 'Late Night') ?? categories[0]
 
   const quickModes = [
+    {
+      label: 'Nearest',
+      action: onNearest,
+    },
     {
       label: 'Cheap',
       action: () => onSelectCategory(cheapCategory),
@@ -885,17 +892,17 @@ function QuickDecisionBar({
           <Search className="size-4" aria-hidden="true" />
           Pick for us
         </Button>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-        {quickModes.map((mode) => (
-          <button
-            key={mode.label}
-            type="button"
-            onClick={mode.action}
-            className="min-h-12 rounded-lg bg-secondary px-2 text-xs font-bold text-primary transition hover:bg-[#ffdea9] hover:text-[#271900]"
-          >
-            {mode.label}
-          </button>
-        ))}
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          {quickModes.map((mode) => (
+            <button
+              key={mode.label}
+              type="button"
+              onClick={mode.action}
+              className="min-h-12 rounded-lg bg-secondary px-2 text-xs font-bold text-primary transition hover:bg-[#ffdea9] hover:text-[#271900]"
+            >
+              {mode.label}
+            </button>
+          ))}
         </div>
       </div>
     </section>

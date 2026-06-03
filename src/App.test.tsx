@@ -151,6 +151,15 @@ describe('App', () => {
     expect(screen.getByLabelText(/search food page/i)).toHaveValue('cafe')
   })
 
+  it('shows nearest beside the discover quick food buttons', () => {
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: 'Nearest' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cheap' })).toBeInTheDocument()
+  })
+
   it('saves and removes a restaurant from the saved page', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)
