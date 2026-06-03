@@ -67,7 +67,7 @@ describe('App', () => {
     )
 
     render(<App />)
-    await user.click(screen.getByRole('button', { name: /open search/i }))
+    await user.click(screen.getByRole('button', { name: 'Open search' }))
     await user.click(screen.getByRole('button', { name: 'Find' }))
 
     expect(await screen.findByText('GPS ready')).toBeInTheDocument()
@@ -79,7 +79,7 @@ describe('App', () => {
     setGeolocation(undefined)
 
     render(<App />)
-    await user.click(screen.getByRole('button', { name: /open search/i }))
+    await user.click(screen.getByRole('button', { name: 'Open search' }))
     await user.type(screen.getByLabelText(/search page location/i), 'Bukit Jalil')
     await user.click(screen.getByRole('button', { name: 'Find' }))
 
@@ -95,7 +95,7 @@ describe('App', () => {
     )
 
     render(<App />)
-    await user.click(screen.getByRole('button', { name: /open search/i }))
+    await user.click(screen.getByRole('button', { name: 'Open search' }))
     await user.click(screen.getByRole('button', { name: 'Find' }))
 
     expect(await screen.findByText('Type location')).toBeInTheDocument()
@@ -131,7 +131,7 @@ describe('App', () => {
     expect(screen.getByLabelText(/search food page/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /discover tab/i }))
-    await user.click(screen.getByRole('button', { name: /open search/i }))
+    await user.click(screen.getByRole('button', { name: 'Open search' }))
     expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
   })
 

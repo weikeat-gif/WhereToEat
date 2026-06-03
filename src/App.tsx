@@ -420,8 +420,6 @@ function App() {
         onSelectCategory={selectCategory}
       />
 
-      <SortControls value={sortOption} onChange={setSortOption} />
-
       {!hasResults ? (
         <EmptyResults
           query={foodQuery}
@@ -866,7 +864,6 @@ function QuickDecisionBar({
     categories.find((item) => item.label === 'Late Night') ?? categories[0]
 
   const quickModes = [
-    { label: 'Pick for us', action: onPick },
     {
       label: 'Cheap',
       action: () => onSelectCategory(cheapCategory),
@@ -883,7 +880,12 @@ function QuickDecisionBar({
 
   return (
     <section className="px-4 pt-3">
-      <div className="grid grid-cols-4 gap-2 rounded-xl border border-border/70 bg-card p-2 shadow-sm">
+      <div className="rounded-xl border border-border/70 bg-card p-2 shadow-sm">
+        <Button onClick={onPick} className="h-12 w-full rounded-lg">
+          <Search className="size-4" aria-hidden="true" />
+          Pick for us
+        </Button>
+        <div className="mt-2 grid grid-cols-3 gap-2">
         {quickModes.map((mode) => (
           <button
             key={mode.label}
@@ -894,6 +896,7 @@ function QuickDecisionBar({
             {mode.label}
           </button>
         ))}
+        </div>
       </div>
     </section>
   )
