@@ -260,6 +260,7 @@ export function filterRestaurants(restaurants: Restaurant[], query: string) {
       restaurant.name,
       restaurant.cuisine,
       restaurant.vibe,
+      restaurant.address,
       ...restaurant.menuHighlights,
       ...restaurant.amenities,
       ...restaurant.tags,

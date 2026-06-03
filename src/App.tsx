@@ -222,30 +222,28 @@ function App() {
   function selectCategory(category: (typeof categories)[number]) {
     setActiveCategory(category.label)
     setFoodQuery(category.query)
+    setManualLocation('')
     setHasSearchSubmitted(false)
   }
 
   function selectCuisine(cuisine: string) {
     setActiveCategory(cuisine)
     setFoodQuery(cuisine.toLowerCase())
+    setManualLocation('')
     setHasSearchSubmitted(false)
   }
 
   function updateFoodQuery(value: string) {
     setFoodQuery(value)
     setActiveCategory('')
-    setHasSearchSubmitted(false)
-  }
-
-  function updateManualLocation(value: string) {
-    setManualLocation(value)
-    setUserLocation(null)
+    setManualLocation('')
     setHasSearchSubmitted(false)
   }
 
   function clearSearch() {
     setFoodQuery('')
     setActiveCategory('Open Now')
+    setManualLocation('')
     setHasSearchSubmitted(false)
   }
 
@@ -312,10 +310,13 @@ function App() {
     }
   }
 
-  function searchNearbyFood() {
+  function searchNearbyFood(searchText = '') {
     setHasSearchSubmitted(true)
 
-    if (manualLocation.trim()) {
+    const typedLocation = manualLocation.trim() || searchText.trim()
+
+    if (typedLocation) {
+      setManualLocation(typedLocation)
       setPermissionState((current) => (current === 'requesting' ? 'idle' : current))
       void loadRestaurantResults(null)
       return
@@ -536,14 +537,12 @@ function App() {
           foodQuery={foodQuery}
           hasSearched={hasSearchSubmitted}
           isLoadingPlaces={isLoadingPlaces}
-          manualLocation={manualLocation}
           permissionState={permissionState}
           restaurants={visibleRestaurants}
           savedRestaurantIds={savedRestaurantIds}
           sortOption={sortOption}
           statusLabel={statusLabel}
           onFoodQueryChange={updateFoodQuery}
-          onManualLocationChange={updateManualLocation}
           onOpenMaps={openRestaurantMaps}
           onSearchNearby={searchNearbyFood}
           onSelectCategory={selectCategory}
@@ -750,19 +749,7 @@ function SortControls({
   return (
     <div className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-bold text-primary">Sort results</p>
-        <select
-          aria-label="Sort results"
-          value={value}
-          onChange={(event) => onChange(event.target.value as SortOption)}
-          className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm font-semibold text-primary outline-none"
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <p className="text-base font-bold text-primary">Sort results</p>
       </div>
       <div className="mt-3 grid grid-cols-4 gap-2">
         {sortOptions.map((option) => (
@@ -1051,14 +1038,12 @@ function SearchView({
   foodQuery,
   hasSearched,
   isLoadingPlaces,
-  manualLocation,
   permissionState,
   restaurants,
   savedRestaurantIds,
   sortOption,
   statusLabel,
   onFoodQueryChange,
-  onManualLocationChange,
   onOpenMaps,
   onSearchNearby,
   onSelectCategory,
@@ -1071,16 +1056,14 @@ function SearchView({
   foodQuery: string
   hasSearched: boolean
   isLoadingPlaces: boolean
-  manualLocation: string
   permissionState: LocationPermissionState
   restaurants: Restaurant[]
   savedRestaurantIds: Set<string>
   sortOption: SortOption
   statusLabel: string
   onFoodQueryChange: (value: string) => void
-  onManualLocationChange: (value: string) => void
   onOpenMaps: (restaurant: Restaurant) => void
-  onSearchNearby: () => void
+  onSearchNearby: (searchText?: string) => void
   onSelectCategory: (category: (typeof categories)[number]) => void
   onSelectRestaurant: (restaurant: Restaurant) => void
   onSortChange: (value: SortOption) => void
@@ -1095,40 +1078,33 @@ function SearchView({
 
       <Card className="rounded-xl border-border/70">
         <CardContent className="space-y-3 p-4">
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              aria-label="Search food page"
-              value={foodQuery}
-              onChange={(event) => onFoodQueryChange(event.target.value)}
-              placeholder="Search food, cafe, dessert..."
-              className="h-14 rounded-xl border-border/60 bg-background pl-11 text-base"
-            />
-          </div>
-          <CategoryScroller
-            activeCategory={activeCategory}
-            onSelectCategory={onSelectCategory}
-          />
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <Input
-              aria-label="Search page location"
-              value={manualLocation}
-              onChange={(event) => onManualLocationChange(event.target.value)}
-              placeholder="Type area or use GPS"
-              className="h-11 rounded-lg bg-background"
-            />
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_112px] gap-2">
+            <div className="relative min-w-0">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                aria-label="Search food page"
+                value={foodQuery}
+                onChange={(event) => onFoodQueryChange(event.target.value)}
+                placeholder="Search food, cafe, area..."
+                className="h-14 rounded-xl border-border/60 bg-background pl-11 text-base"
+              />
+            </div>
             <Button
-              onClick={onSearchNearby}
+              onClick={() => onSearchNearby(foodQuery)}
               disabled={isSearching}
-              className="h-11 rounded-lg px-3"
+              className="h-14 rounded-xl px-4 text-base font-bold"
             >
               <LocateFixed className="size-4" aria-hidden="true" />
               {isSearching ? 'Searching' : 'Find'}
             </Button>
           </div>
+          <CategoryScroller
+            activeCategory={activeCategory}
+            onSelectCategory={onSelectCategory}
+          />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <MapPin className="size-3.5" aria-hidden="true" />

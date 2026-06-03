@@ -80,10 +80,10 @@ describe('App', () => {
 
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Open search' }))
-    await user.type(screen.getByLabelText(/search page location/i), 'Bukit Jalil')
+    await user.type(screen.getByLabelText(/search food page/i), 'Bukit Jalil')
     await user.click(screen.getByRole('button', { name: 'Find' }))
 
-    expect(screen.getAllByText('Restoran Nasi Kandar Pelita KLCC')).not.toHaveLength(0)
+    expect(screen.getAllByText('ZUS Coffee Pavilion Bukit Jalil')).not.toHaveLength(0)
   })
 
   it('keeps search results empty until Find is pressed', async () => {
@@ -94,6 +94,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Open search' }))
 
     expect(screen.getByText('Sort results')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/search page location/i)).not.toBeInTheDocument()
     expect(
       screen.getByText('Type food or location, then press Find to show matches.'),
     ).toBeInTheDocument()
@@ -119,6 +120,9 @@ describe('App', () => {
 
     const searchResults = screen.getByRole('region', { name: 'Search Results' })
     expect(await within(searchResults).findByText('Inside Scoop Bangsar')).toBeInTheDocument()
+    expect(
+      within(searchResults).queryByRole('combobox', { name: 'Sort results' }),
+    ).not.toBeInTheDocument()
     expect(within(searchResults).getAllByRole('heading', { level: 3 })[0]).toHaveTextContent(
       'Inside Scoop Bangsar',
     )
