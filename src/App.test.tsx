@@ -86,6 +86,28 @@ describe('App', () => {
     expect(screen.getAllByText('Restoran Nasi Kandar Pelita KLCC')).not.toHaveLength(0)
   })
 
+  it('keeps search results empty until Find is pressed', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Open search' }))
+
+    expect(screen.getByText('Sort results')).toBeInTheDocument()
+    expect(
+      screen.getByText('Type food or location, then press Find to show matches.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('0 matches')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Restoran Nasi Kandar Pelita KLCC'),
+    ).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/search food page/i), 'nasi')
+    await user.click(screen.getByRole('button', { name: 'Find' }))
+
+    expect(screen.getAllByText('Restoran Nasi Kandar Pelita KLCC')).not.toHaveLength(0)
+  })
+
   it('asks for typed location when geolocation is denied', async () => {
     const user = userEvent.setup()
     setGeolocation(

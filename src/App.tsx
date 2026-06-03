@@ -159,6 +159,7 @@ function App() {
   )
   const [activeView, setActiveView] = useState<ActiveView>('discover')
   const [foodQuery, setFoodQuery] = useState('')
+  const [hasSearchSubmitted, setHasSearchSubmitted] = useState(false)
   const [activeCategory, setActiveCategory] = useState('Open Now')
   const [sortOption, setSortOption] = useState<SortOption>('nearest')
   const [manualLocation, setManualLocation] = useState('')
@@ -221,26 +222,31 @@ function App() {
   function selectCategory(category: (typeof categories)[number]) {
     setActiveCategory(category.label)
     setFoodQuery(category.query)
+    setHasSearchSubmitted(false)
   }
 
   function selectCuisine(cuisine: string) {
     setActiveCategory(cuisine)
     setFoodQuery(cuisine.toLowerCase())
+    setHasSearchSubmitted(false)
   }
 
   function updateFoodQuery(value: string) {
     setFoodQuery(value)
     setActiveCategory('')
+    setHasSearchSubmitted(false)
   }
 
   function updateManualLocation(value: string) {
     setManualLocation(value)
     setUserLocation(null)
+    setHasSearchSubmitted(false)
   }
 
   function clearSearch() {
     setFoodQuery('')
     setActiveCategory('Open Now')
+    setHasSearchSubmitted(false)
   }
 
   function increaseRadiusForResults() {
@@ -307,13 +313,15 @@ function App() {
   }
 
   function searchNearbyFood() {
+    setHasSearchSubmitted(true)
+
     if (manualLocation.trim()) {
       setPermissionState((current) => (current === 'requesting' ? 'idle' : current))
       void loadRestaurantResults(null)
       return
     }
 
-    if (!('geolocation' in navigator)) {
+    if (!navigator.geolocation?.getCurrentPosition) {
       setPermissionState('unavailable')
       void loadRestaurantResults(null)
       return
@@ -526,6 +534,7 @@ function App() {
         <SearchView
           activeCategory={activeCategory}
           foodQuery={foodQuery}
+          hasSearched={hasSearchSubmitted}
           isLoadingPlaces={isLoadingPlaces}
           manualLocation={manualLocation}
           permissionState={permissionState}
@@ -1041,6 +1050,7 @@ function CategoryScroller({
 function SearchView({
   activeCategory,
   foodQuery,
+  hasSearched,
   isLoadingPlaces,
   manualLocation,
   permissionState,
@@ -1060,6 +1070,7 @@ function SearchView({
 }: {
   activeCategory: string
   foodQuery: string
+  hasSearched: boolean
   isLoadingPlaces: boolean
   manualLocation: string
   permissionState: LocationPermissionState
@@ -1124,7 +1135,7 @@ function SearchView({
               <MapPin className="size-3.5" aria-hidden="true" />
               {statusLabel}
             </span>
-            <span>{restaurants.length} matches</span>
+            <span>{hasSearched ? restaurants.length : 0} matches</span>
           </div>
         </CardContent>
       </Card>
@@ -1133,7 +1144,11 @@ function SearchView({
         <SectionHeader title="Search Results" />
         <SortControls value={sortOption} onChange={onSortChange} />
         <div className="grid gap-3">
-          {restaurants.length > 0 ? (
+          {!hasSearched ? (
+            <div className="rounded-xl border border-border/70 bg-card p-5 text-center text-sm text-muted-foreground">
+              Type food or location, then press Find to show matches.
+            </div>
+          ) : restaurants.length > 0 ? (
             restaurants.map((restaurant) => (
               <PopularCard
                 key={`${restaurant.id}-search`}
