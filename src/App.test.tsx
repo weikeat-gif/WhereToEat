@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitForElementToBeRemoved, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -246,6 +246,29 @@ describe('App', () => {
       'false',
     )
     expect(screen.getAllByText('10 km')).not.toHaveLength(0)
+  })
+
+  it('opens shop details as a popup dialog', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getAllByRole('button', { name: 'View' })[0])
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Restoran Nasi Kandar Pelita KLCC',
+    })
+    expect(within(dialog).getByText('Shop details')).toBeInTheDocument()
+    expect(within(dialog).getByText("What's Inside")).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', {
+        name: 'Restoran Nasi Kandar Pelita KLCC',
+      }),
+    )
   })
 
   it('saves and removes a restaurant from the saved page', async () => {

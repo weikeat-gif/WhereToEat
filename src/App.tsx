@@ -37,13 +37,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
 import {
   buildGoogleMapsSearchUrl,
@@ -583,7 +576,7 @@ function App() {
         <SettingsView preferences={preferences} onUpdatePreferences={updatePreferences} />
       ) : null}
 
-      <RestaurantDetailSheet
+      <RestaurantDetailPopup
         restaurant={selectedRestaurant}
         onClose={() => setSelectedRestaurant(null)}
         isSaved={
@@ -1908,7 +1901,7 @@ function SavedCard({
   )
 }
 
-function RestaurantDetailSheet({
+function RestaurantDetailPopup({
   isSaved,
   restaurant,
   onClose,
@@ -1925,153 +1918,207 @@ function RestaurantDetailSheet({
   onShare: (restaurant: Restaurant) => void
   onToggleSaved: (restaurant: Restaurant) => void
 }) {
+  useEffect(() => {
+    if (!restaurant) {
+      return
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose, restaurant])
+
   return (
-    <Sheet open={restaurant !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="max-h-[94svh] overflow-y-auto px-0 pb-28">
-        {restaurant ? (
-          <div className="space-y-6 px-6">
-            <div className="mx-auto h-1.5 w-12 rounded-full bg-border" />
-            <div className="relative overflow-hidden rounded-xl">
-              <FoodImage
-                src={restaurant.imageUrl}
-                alt={`${restaurant.name} detail`}
-                className="h-56 w-full"
-              />
-            </div>
+    <AnimatePresence>
+      {restaurant ? (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 px-4 py-5 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
+          onClick={onClose}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="restaurant-detail-title"
+            className="max-h-[88svh] w-full max-w-lg overflow-y-auto rounded-xl border border-border/70 bg-card shadow-2xl"
+            initial={{ opacity: 0, scale: 0.95, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 18 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="space-y-5 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Shop details</p>
+                  <h2
+                    id="restaurant-detail-title"
+                    className="mt-1 text-2xl font-semibold text-primary"
+                  >
+                    {restaurant.name}
+                  </h2>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                    {restaurant.cuisine} · {restaurant.vibe}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-10 shrink-0 rounded-lg px-3"
+                  onClick={onClose}
+                >
+                  Close
+                </Button>
+              </div>
 
-            <SheetHeader className="mb-0 pr-0">
-              <SheetTitle className="text-3xl font-semibold">{restaurant.name}</SheetTitle>
-              <SheetDescription className="text-base">
-                {restaurant.cuisine} · {restaurant.vibe}
-              </SheetDescription>
-            </SheetHeader>
-
-            <div className="grid grid-cols-3 gap-2">
-              <DecisionStat label="Rating" value={String(restaurant.rating)} />
-              <DecisionStat label="Price" value={restaurant.price} />
-              <DecisionStat
-                label="Distance"
-                value={`${restaurant.distanceKm ?? '-'} km`}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                className="h-12 rounded-lg"
-                onClick={() => onOpenMaps(restaurant)}
-              >
-                <Navigation className="size-5" aria-hidden="true" />
-                Go Now
-              </Button>
-              <Button
-                variant={isSaved ? 'default' : 'outline'}
-                onClick={() => onToggleSaved(restaurant)}
-                aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
-                className="h-12 rounded-lg"
-              >
-                <Heart
-                  className={`size-5 ${isSaved ? 'fill-current' : ''}`}
-                  aria-hidden="true"
+              <div className="relative overflow-hidden rounded-xl">
+                <FoodImage
+                  src={restaurant.imageUrl}
+                  alt={`${restaurant.name} detail`}
+                  className="h-52 w-full"
                 />
-                {isSaved ? 'Saved' : 'Save'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => onShare(restaurant)}
-                aria-label={`Share ${restaurant.name}`}
-                className="h-12 rounded-lg"
-              >
-                <Share2 className="size-5" aria-hidden="true" />
-                Share
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => onCopy(restaurant)}
-                aria-label={`Copy ${restaurant.name} link`}
-                className="h-12 rounded-lg"
-              >
-                <Copy className="size-5" aria-hidden="true" />
-                Copy
-              </Button>
-            </div>
+              </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="accent" className="rounded-full px-3 py-2">
-                <Clock3 className="size-4" aria-hidden="true" />
-                {getOpenStatusLabel(restaurant)}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-2">
-                {restaurant.price}
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-2">
-                <MapPin className="size-4" aria-hidden="true" />
-                {restaurant.distanceKm ?? '-'} km
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-2">
-                <Star className="size-4" aria-hidden="true" />
-                {restaurant.rating}
-              </Badge>
-            </div>
+              <div className="grid grid-cols-3 gap-2">
+                <DecisionStat label="Rating" value={String(restaurant.rating)} />
+                <DecisionStat label="Price" value={restaurant.price} />
+                <DecisionStat
+                  label="Distance"
+                  value={`${restaurant.distanceKm ?? '-'} km`}
+                />
+              </div>
 
-            <section className="space-y-3">
-              <h3 className="text-xl font-semibold">Why This Place</h3>
-              <div className="rounded-xl border bg-card p-4 shadow-sm">
-                <p className="text-base leading-6 text-foreground">
-                  {restaurant.vibe}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {restaurant.tags.slice(0, 4).map((tag) => (
-                    <Badge key={tag} variant="secondary" className="rounded-md">
-                      {tag}
-                    </Badge>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  className="h-12 rounded-lg"
+                  onClick={() => onOpenMaps(restaurant)}
+                >
+                  <Navigation className="size-5" aria-hidden="true" />
+                  Go Now
+                </Button>
+                <Button
+                  variant={isSaved ? 'default' : 'outline'}
+                  onClick={() => onToggleSaved(restaurant)}
+                  aria-label={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
+                  className="h-12 rounded-lg"
+                >
+                  <Heart
+                    className={`size-5 ${isSaved ? 'fill-current' : ''}`}
+                    aria-hidden="true"
+                  />
+                  {isSaved ? 'Saved' : 'Save'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => onShare(restaurant)}
+                  aria-label={`Share ${restaurant.name}`}
+                  className="h-12 rounded-lg"
+                >
+                  <Share2 className="size-5" aria-hidden="true" />
+                  Share
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => onCopy(restaurant)}
+                  aria-label={`Copy ${restaurant.name} link`}
+                  className="h-12 rounded-lg"
+                >
+                  <Copy className="size-5" aria-hidden="true" />
+                  Copy
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="accent" className="rounded-full px-3 py-2">
+                  <Clock3 className="size-4" aria-hidden="true" />
+                  {getOpenStatusLabel(restaurant)}
+                </Badge>
+                <Badge variant="outline" className="rounded-full px-3 py-2">
+                  {restaurant.price}
+                </Badge>
+                <Badge variant="outline" className="rounded-full px-3 py-2">
+                  <MapPin className="size-4" aria-hidden="true" />
+                  {restaurant.distanceKm ?? '-'} km
+                </Badge>
+                <Badge variant="outline" className="rounded-full px-3 py-2">
+                  <Star className="size-4" aria-hidden="true" />
+                  {restaurant.rating}
+                </Badge>
+              </div>
+
+              <section className="space-y-3">
+                <h3 className="text-xl font-semibold">Why This Place</h3>
+                <div className="rounded-xl border bg-card p-4 shadow-sm">
+                  <p className="text-base leading-6 text-foreground">
+                    {restaurant.vibe}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {restaurant.tags.slice(0, 4).map((tag) => (
+                      <Badge key={tag} variant="secondary" className="rounded-md">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-sm leading-5 text-muted-foreground">
+                    {restaurant.source === 'live'
+                      ? 'Loaded from nearby map data. Open Maps for live reviews, directions, and exact hours.'
+                      : 'Real demo listing for app preview. Open Maps for live reviews, directions, and exact hours.'}
+                  </p>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h3 className="text-xl font-semibold">What's Inside</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {restaurant.menuHighlights.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-xl bg-[#9ff0fb] px-4 py-3 text-sm font-semibold text-[#001f23]"
+                    >
+                      {item}
+                    </span>
                   ))}
                 </div>
-                <p className="mt-3 text-sm leading-5 text-muted-foreground">
-                  {restaurant.source === 'live'
-                    ? 'Loaded from nearby map data. Open Maps for live reviews, directions, and exact hours.'
-                    : 'Real demo listing for app preview. Open Maps for live reviews, directions, and exact hours.'}
-                </p>
-              </div>
-            </section>
+              </section>
 
-            <section className="space-y-3">
-              <h3 className="text-xl font-semibold">What's Inside</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {restaurant.menuHighlights.map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-xl bg-[#9ff0fb] px-4 py-3 text-sm font-semibold text-[#001f23]"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </section>
+              <section className="space-y-3">
+                <h3 className="text-xl font-semibold">Place Details</h3>
+                <div className="divide-y rounded-xl border bg-card">
+                  <DetailRow icon={<MapPin className="size-6 text-primary" />} text={restaurant.address} />
+                  <DetailRow icon={<Clock3 className="size-6 text-muted-foreground" />} text={restaurant.hours} />
+                  <DetailRow
+                    icon={<Filter className="size-6 text-muted-foreground" />}
+                    text={restaurant.amenities.join(', ')}
+                  />
+                </div>
+              </section>
 
-            <section className="space-y-3">
-              <h3 className="text-xl font-semibold">Place Details</h3>
-              <div className="divide-y rounded-xl border bg-card">
-                <DetailRow icon={<MapPin className="size-6 text-primary" />} text={restaurant.address} />
-                <DetailRow icon={<Clock3 className="size-6 text-muted-foreground" />} text={restaurant.hours} />
-                <DetailRow
-                  icon={<Filter className="size-6 text-muted-foreground" />}
-                  text={restaurant.amenities.join(', ')}
-                />
-              </div>
-            </section>
-
-            <Button
-              variant="outline"
-              className="h-12 w-full rounded-lg"
-              onClick={() => onShare(restaurant)}
-            >
-              <Share2 className="size-4" aria-hidden="true" />
-              Share food plan
-            </Button>
-          </div>
-        ) : null}
-      </SheetContent>
-    </Sheet>
+              <Button
+                variant="outline"
+                className="h-12 w-full rounded-lg"
+                onClick={() => onShare(restaurant)}
+              >
+                <Share2 className="size-4" aria-hidden="true" />
+                Share food plan
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }
 
