@@ -398,8 +398,8 @@ function App() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Open food search"
-            onClick={() => setActiveView('search')}
+            aria-label="Open discover"
+            onClick={() => setActiveView('discover')}
           >
             <img src="/pwa-icon.svg" alt="" className="size-8" />
           </Button>
@@ -570,9 +570,7 @@ function App() {
 
       {activeView === 'activity' ? (
         <ActivityView
-          activeCategory={activeCategory || 'Custom'}
-          preferences={preferences}
-          statusLabel={statusLabel}
+          restaurants={popularRestaurants}
         />
       ) : null}
 
@@ -1298,15 +1296,90 @@ function SavedEmptyCard({ onBrowse }: { onBrowse: () => void }) {
   )
 }
 
-function ActivityView({
-  activeCategory,
-  preferences,
-  statusLabel,
-}: {
-  activeCategory: string
-  preferences: Preferences
-  statusLabel: string
-}) {
+function ActivityView({ restaurants }: { restaurants: Restaurant[] }) {
+  const [activePolls, setActivePolls] = useState<Poll[]>(() => [
+    {
+      id: 'friday-lunch-walk',
+      badge: 'Ends in 2h',
+      badgeType: 'time',
+      title: 'Friday Lunch Walk',
+      organizer: 'Organized by Sarah M.',
+      voters: ['SM', 'DK', '+3'],
+      options: [
+        { id: 'nasi-kandar', label: 'Nasi Kandar', votes: 5 },
+        { id: 'cafe-bowls', label: 'Cafe Bowls', votes: 2 },
+      ],
+    },
+    {
+      id: 'client-meeting-lunch',
+      badge: 'Tomorrow, 12:30 PM',
+      badgeType: 'date',
+      title: 'Client Meeting Lunch',
+      organizer: 'Organized by David K.',
+      note: 'Where should we take the new client?',
+      options: [
+        { id: 'madam-kwans', label: "Madam Kwan's KLCC", votes: 0 },
+        { id: 'village-park', label: 'Village Park Restaurant', votes: 0 },
+      ],
+      outline: true,
+    },
+  ])
+  const [selectedPollId, setSelectedPollId] = useState<string | null>(null)
+  const [isCreatePollOpen, setIsCreatePollOpen] = useState(false)
+  const selectedPoll = activePolls.find((poll) => poll.id === selectedPollId) ?? null
+  const completedPolls = [
+    {
+      icon: <Trophy className="size-5" aria-hidden="true" />,
+      title: 'Team Building Dinner',
+      winner: 'Sushi Zen',
+      time: 'Yesterday',
+      highlighted: true,
+    },
+    {
+      icon: <Utensils className="size-5" aria-hidden="true" />,
+      title: 'Quick Bite',
+      winner: 'Burger Joint',
+      time: 'Mon',
+    },
+    {
+      icon: <Clock3 className="size-5" aria-hidden="true" />,
+      title: 'Coffee Run',
+      winner: 'Bean Roasters',
+      time: 'Last Week',
+    },
+    {
+      icon: <Users className="size-5" aria-hidden="true" />,
+      title: 'Group Snacks',
+      winner: 'Inside Scoop',
+      time: 'May 28',
+    },
+  ].slice(0, 3)
+
+  function submitVote(pollId: string, optionId: string) {
+    setActivePolls((currentPolls) =>
+      currentPolls.map((poll) =>
+        poll.id === pollId
+          ? {
+              ...poll,
+              options: poll.options.map((option) =>
+                option.id === optionId
+                  ? { ...option, votes: option.votes + 1 }
+                  : option,
+              ),
+            }
+          : poll,
+      ),
+    )
+    setSelectedPollId(null)
+    toast.success('Vote added')
+  }
+
+  function createPoll(poll: Poll) {
+    setActivePolls((currentPolls) => [poll, ...currentPolls])
+    setIsCreatePollOpen(false)
+    toast.success('Poll added')
+  }
+
   return (
     <section className="space-y-5 px-4 py-5 pb-28">
       <PageTitle
@@ -1314,41 +1387,18 @@ function ActivityView({
         subtitle="Vote on active polls or review past decisions."
       />
 
-      <div className="grid grid-cols-3 gap-2 rounded-xl border border-border/70 bg-card p-2 shadow-sm">
-        <DecisionStat label="Mode" value={activeCategory} />
-        <DecisionStat label="Radius" value={`${preferences.radiusKm} km`} />
-        <DecisionStat label="Status" value={statusLabel} />
-      </div>
-
       <section className="space-y-3">
         <h3 className="flex items-center gap-2 text-xl font-semibold">
           <Clock3 className="size-5 text-accent" aria-hidden="true" />
           Active Polls
         </h3>
-        <PollCard
-          badge="Ends in 2h"
-          badgeIcon={<Clock3 className="size-3.5" aria-hidden="true" />}
-          title="Friday Lunch Walk"
-          organizer="Organized by Sarah M."
-          voters={['SM', 'DK', '+3']}
-          options={[
-            { label: 'Nasi Kandar', votes: 5, percent: 62 },
-            { label: 'Cafe Bowls', votes: 2, percent: 28 },
-          ]}
-          actionLabel="Vote Now"
-          actionIcon={<Trophy className="size-4" aria-hidden="true" />}
-        />
-        <PollCard
-          badge="Tomorrow, 12:30 PM"
-          badgeIcon={<CalendarDays className="size-3.5" aria-hidden="true" />}
-          title="Client Meeting Lunch"
-          organizer="Organized by David K."
-          note="Where should we take the new client?"
-          options={[]}
-          actionLabel="Join Poll"
-          actionIcon={<Users className="size-4" aria-hidden="true" />}
-          outline
-        />
+        {activePolls.map((poll) => (
+          <PollCard
+            key={poll.id}
+            poll={poll}
+            onAction={() => setSelectedPollId(poll.id)}
+          />
+        ))}
       </section>
 
       <section className="space-y-3">
@@ -1357,79 +1407,78 @@ function ActivityView({
           Completed Polls
         </h3>
         <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
-          <CompletedPollItem
-            icon={<Trophy className="size-5" aria-hidden="true" />}
-            title="Team Building Dinner"
-            winner="Sushi Zen"
-            time="Yesterday"
-            highlighted
-          />
-          <CompletedPollItem
-            icon={<Utensils className="size-5" aria-hidden="true" />}
-            title="Quick Bite"
-            winner="Burger Joint"
-            time="Mon"
-          />
-          <CompletedPollItem
-            icon={<Clock3 className="size-5" aria-hidden="true" />}
-            title="Coffee Run"
-            winner="Bean Roasters"
-            time="Last Week"
-          />
+          {completedPolls.map((poll) => (
+            <CompletedPollItem key={poll.title} {...poll} />
+          ))}
         </div>
       </section>
 
       <Button
         aria-label="Start poll"
+        onClick={() => setIsCreatePollOpen(true)}
         className="fixed bottom-24 right-4 z-30 size-14 rounded-full p-0 shadow-xl min-[640px]:right-[calc(50%-17rem)]"
       >
         <Plus className="size-7" aria-hidden="true" />
       </Button>
+      <VotePollDialog
+        poll={selectedPoll}
+        onClose={() => setSelectedPollId(null)}
+        onSubmit={submitVote}
+      />
+      <CreatePollDialog
+        isOpen={isCreatePollOpen}
+        places={restaurants}
+        onClose={() => setIsCreatePollOpen(false)}
+        onSubmit={createPoll}
+      />
     </section>
   )
 }
 
-function PollCard({
-  actionIcon,
-  actionLabel,
-  badge,
-  badgeIcon,
-  note,
-  options,
-  organizer,
-  outline = false,
-  title,
-  voters = [],
-}: {
-  actionIcon: ReactNode
-  actionLabel: string
+type PollOption = {
+  id: string
+  label: string
+  votes: number
+}
+
+type Poll = {
+  id: string
   badge: string
-  badgeIcon: ReactNode
-  note?: string
-  options: Array<{ label: string; votes: number; percent: number }>
-  organizer: string
-  outline?: boolean
+  badgeType: 'date' | 'time'
   title: string
+  organizer: string
+  note?: string
+  options: PollOption[]
+  outline?: boolean
   voters?: string[]
-}) {
+}
+
+function PollCard({ poll, onAction }: { poll: Poll; onAction: () => void }) {
+  const totalVotes = poll.options.reduce((total, option) => total + option.votes, 0)
+  const actionLabel = poll.outline ? 'Join Poll' : 'Vote Now'
+
   return (
     <Card className="rounded-xl border-border/70 shadow-sm">
       <CardContent className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <Badge
-              variant={outline ? 'secondary' : 'accent'}
+              variant={poll.outline ? 'secondary' : 'accent'}
               className="mb-2 rounded-full"
             >
-              {badgeIcon}
-              {badge}
+              {poll.badgeType === 'time' ? (
+                <Clock3 className="size-3.5" aria-hidden="true" />
+              ) : (
+                <CalendarDays className="size-3.5" aria-hidden="true" />
+              )}
+              {poll.badge}
             </Badge>
-            <h4 className="text-lg font-semibold">{title}</h4>
-            <p className="mt-1 text-sm text-muted-foreground">{organizer}</p>
+            <h4 className="text-lg font-semibold">{poll.title}</h4>
+            <p className="mt-1 text-sm text-muted-foreground">{poll.organizer}</p>
           </div>
-          {voters.length > 0 ? (
+          {poll.voters && poll.voters.length > 0 ? (
             <div className="flex shrink-0 -space-x-2">
-              {voters.map((voter) => (
+              {poll.voters.map((voter) => (
                 <span
                   key={voter}
                   className="flex size-8 items-center justify-center rounded-full border-2 border-card bg-secondary text-xs font-semibold text-primary"
@@ -1441,29 +1490,288 @@ function PollCard({
           ) : null}
         </div>
 
-        {note ? (
+        {poll.note ? (
           <p className="rounded-lg bg-secondary px-3 py-2 text-sm italic text-muted-foreground">
-            "{note}"
+            "{poll.note}"
           </p>
         ) : null}
 
-        {options.length > 0 ? (
+        {poll.options.length > 0 ? (
           <div className="space-y-2">
-            {options.map((option) => (
-              <VoteBar key={option.label} {...option} />
+            {poll.options.map((option) => (
+              <VoteBar
+                key={option.id}
+                label={option.label}
+                percent={totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0}
+                votes={option.votes}
+              />
             ))}
           </div>
         ) : null}
 
         <Button
-          variant={outline ? 'outline' : 'default'}
+          variant={poll.outline ? 'outline' : 'default'}
+          onClick={onAction}
           className="h-12 w-full rounded-lg"
         >
-          {actionIcon}
+          {poll.outline ? (
+            <Users className="size-4" aria-hidden="true" />
+          ) : (
+            <Trophy className="size-4" aria-hidden="true" />
+          )}
           {actionLabel}
         </Button>
       </CardContent>
     </Card>
+  )
+}
+
+function VotePollDialog({
+  onClose,
+  onSubmit,
+  poll,
+}: {
+  onClose: () => void
+  onSubmit: (pollId: string, optionId: string) => void
+  poll: Poll | null
+}) {
+  const [selectedOptionId, setSelectedOptionId] = useState('')
+  const selectedOptionExists =
+    poll?.options.some((option) => option.id === selectedOptionId) ?? false
+  const submittedOptionId = selectedOptionExists
+    ? selectedOptionId
+    : poll?.options[0]?.id || ''
+
+  return (
+    <AnimatePresence>
+      {poll ? (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 px-4 py-5 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
+          onClick={onClose}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vote-poll-title"
+            className="w-full max-w-lg rounded-xl border border-border/70 bg-card p-4 shadow-2xl"
+            initial={{ opacity: 0, scale: 0.95, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 18 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Choose one place</p>
+                <h2 id="vote-poll-title" className="mt-1 text-2xl font-semibold text-primary">
+                  {poll.title}
+                </h2>
+              </div>
+              <Button variant="outline" className="rounded-lg" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {poll.options.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={selectedOptionId === option.id}
+                  onClick={() => setSelectedOptionId(option.id)}
+                  className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition ${
+                    selectedOptionId === option.id
+                      ? 'border-primary bg-secondary text-primary'
+                      : 'border-border/70 bg-card hover:bg-secondary'
+                  }`}
+                >
+                  <span className="font-semibold">{option.label}</span>
+                  <span className="text-sm text-muted-foreground">{option.votes} votes</span>
+                </button>
+              ))}
+            </div>
+
+            <Button
+              className="mt-4 h-12 w-full rounded-lg"
+              disabled={!submittedOptionId}
+              onClick={() => submittedOptionId && onSubmit(poll.id, submittedOptionId)}
+            >
+              Submit Vote
+            </Button>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  )
+}
+
+function CreatePollDialog({
+  isOpen,
+  onClose,
+  onSubmit,
+  places,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (poll: Poll) => void
+  places: Restaurant[]
+}) {
+  const defaultPlaces = useMemo(() => places.slice(0, 4), [places])
+  const [date, setDate] = useState('')
+  const [description, setDescription] = useState('')
+  const [name, setName] = useState('')
+  const [selectedPlaceIds, setSelectedPlaceIds] = useState<string[]>(() =>
+    defaultPlaces.slice(0, 2).map((place) => place.id),
+  )
+  const [time, setTime] = useState('')
+
+  function resetForm() {
+    setDate('')
+    setDescription('')
+    setName('')
+    setSelectedPlaceIds(defaultPlaces.slice(0, 2).map((place) => place.id))
+    setTime('')
+  }
+
+  function closeDialog() {
+    resetForm()
+    onClose()
+  }
+
+  function togglePlace(placeId: string) {
+    setSelectedPlaceIds((currentIds) =>
+      currentIds.includes(placeId)
+        ? currentIds.filter((id) => id !== placeId)
+        : [...currentIds, placeId],
+    )
+  }
+
+  function submitNewPoll() {
+    const selectedPlaces = defaultPlaces.filter((place) =>
+      selectedPlaceIds.includes(place.id),
+    )
+
+    if (!name.trim() || selectedPlaces.length === 0) {
+      toast.warning('Add a poll name and at least one place.')
+      return
+    }
+
+    onSubmit({
+      id: `poll-${Date.now()}`,
+      badge: [date || 'Today', time].filter(Boolean).join(', '),
+      badgeType: 'date',
+      title: name.trim(),
+      organizer: 'Organized by you',
+      note: description.trim() || undefined,
+      options: selectedPlaces.map((place) => ({
+        id: place.id,
+        label: place.name,
+        votes: 0,
+      })),
+      outline: true,
+      voters: ['You'],
+    })
+    resetForm()
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 px-4 py-5 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
+          onClick={closeDialog}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-poll-title"
+            className="max-h-[88svh] w-full max-w-lg overflow-y-auto rounded-xl border border-border/70 bg-card p-4 shadow-2xl"
+            initial={{ opacity: 0, scale: 0.95, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 18 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">New team vote</p>
+                <h2 id="create-poll-title" className="mt-1 text-2xl font-semibold text-primary">
+                  Start Poll
+                </h2>
+              </div>
+              <Button variant="outline" className="rounded-lg" onClick={closeDialog}>
+                Close
+              </Button>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  aria-label="Poll date"
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                />
+                <Input
+                  aria-label="Poll time"
+                  type="time"
+                  value={time}
+                  onChange={(event) => setTime(event.target.value)}
+                />
+              </div>
+              <Input
+                aria-label="Poll name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Poll name"
+              />
+              <Input
+                aria-label="Poll description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Description"
+              />
+              <div className="space-y-2">
+                <p className="text-sm font-semibold">Place to eat</p>
+                {defaultPlaces.map((place) => (
+                  <label
+                    key={place.id}
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border/70 bg-card px-3 py-2"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold">
+                        {place.name}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {place.cuisine} · {place.price}
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={selectedPlaceIds.includes(place.id)}
+                      onChange={() => togglePlace(place.id)}
+                      className="size-5"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <Button className="mt-4 h-12 w-full rounded-lg" onClick={submitNewPoll}>
+              Add Poll
+            </Button>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }
 

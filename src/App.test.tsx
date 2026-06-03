@@ -182,13 +182,60 @@ describe('App', () => {
 
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /open food search/i }))
+    await user.click(screen.getByRole('button', { name: /open search/i }))
     expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
     expect(screen.getByLabelText(/search food page/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /discover tab/i }))
+    await user.click(screen.getByRole('button', { name: /open discover/i }))
+    expect(screen.getByText('Recommended Nearby')).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Open search' }))
     expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
+  })
+
+  it('votes in a poll popup and updates the vote count', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /activity tab/i }))
+
+    expect(screen.queryByText('MODE')).not.toBeInTheDocument()
+    expect(screen.getByText('2 votes')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Vote Now' }))
+    const dialog = screen.getByRole('dialog', { name: 'Friday Lunch Walk' })
+    await user.click(within(dialog).getByRole('button', { name: /Cafe Bowls/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Submit Vote' }))
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: 'Friday Lunch Walk' }),
+    )
+    expect(screen.getByText('3 votes')).toBeInTheDocument()
+  })
+
+  it('starts a poll with selected places', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /activity tab/i }))
+    await user.click(screen.getByRole('button', { name: 'Start poll' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Start Poll' })
+    await user.type(within(dialog).getByLabelText('Poll name'), 'Dinner Vote')
+    await user.type(
+      within(dialog).getByLabelText('Poll description'),
+      'Choose where to eat tonight',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Add Poll' }))
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: 'Start Poll' }),
+    )
+    expect(screen.getByText('Dinner Vote')).toBeInTheDocument()
+    expect(screen.getByText(/Choose where to eat tonight/)).toBeInTheDocument()
+    expect(screen.getByText('Restoran Nasi Kandar Pelita KLCC')).toBeInTheDocument()
   })
 
   it('selects food type chips from the horizontal row', async () => {
