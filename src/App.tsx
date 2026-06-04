@@ -2253,8 +2253,8 @@ function ProfileToggle({
         }`}
       >
         <motion.span
-          className="absolute top-0.5 size-5 rounded-full bg-white shadow-sm"
-          animate={{ x: isChecked ? 20 : 2 }}
+          className="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm"
+          animate={{ x: isChecked ? 20 : 0 }}
           transition={{ type: 'spring', stiffness: 450, damping: 30 }}
         />
       </button>
