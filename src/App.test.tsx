@@ -401,7 +401,14 @@ describe('App', () => {
     const dialog = screen.getByRole('dialog', {
       name: 'Restoran Nasi Kandar Pelita KLCC',
     })
-    expect(within(dialog).getByText('Shop details')).toBeInTheDocument()
+    expect(
+      within(dialog).getByRole('heading', {
+        name: 'Restoran Nasi Kandar Pelita KLCC',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).queryByRole('button', { name: 'Share food plan' }),
+    ).not.toBeInTheDocument()
     expect(within(dialog).getByText("What's Inside")).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Close' }))

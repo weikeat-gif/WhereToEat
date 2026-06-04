@@ -2935,10 +2935,9 @@ function RestaurantDetailPopup({
             <div className="space-y-5 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground">Shop details</p>
                   <h2
                     id="restaurant-detail-title"
-                    className="mt-1 text-2xl font-semibold text-primary"
+                    className="text-2xl font-semibold text-primary"
                   >
                     {restaurant.name}
                   </h2>
@@ -3077,14 +3076,6 @@ function RestaurantDetailPopup({
                 </div>
               </section>
 
-              <Button
-                variant="outline"
-                className="h-12 w-full rounded-lg"
-                onClick={() => onShare(restaurant)}
-              >
-                <Share2 className="size-4" aria-hidden="true" />
-                Share food plan
-              </Button>
             </div>
           </motion.div>
         </motion.div>
