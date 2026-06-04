@@ -311,19 +311,7 @@ function App() {
 
   function increaseRadiusForResults() {
     updatePreferences({ radiusKm: Math.min(20, preferences.radiusKm + 5) })
-    toast.info('Radius increased')
-  }
-
-  function pickRestaurantForGroup() {
-    if (!hasResults) {
-      toast.info('Try a wider radius or another food type first.')
-      return
-    }
-
-    const pick =
-      visibleRestaurants[Math.floor(Math.random() * visibleRestaurants.length)]
-    setSelectedRestaurant(pick)
-    toast.success(`Picked ${pick.name}`)
+    toast.info('Distance increased')
   }
 
   function toggleSavedRestaurant(restaurant: Restaurant) {
@@ -480,18 +468,15 @@ function App() {
       <section className="px-4 pt-4">
         <StatusControls
           activeCategory={activeCategory}
+          isSearching={permissionState === 'requesting' || isLoadingPlaces}
           preferences={preferences}
+          onFindNearby={() => searchNearbyFood()}
+          onNearest={() => setSortOption('nearest')}
           onSelectCategory={selectCategory}
           onSelectCuisine={selectCuisine}
           onUpdatePreferences={updatePreferences}
         />
       </section>
-
-      <QuickDecisionBar
-        onNearest={() => setSortOption('nearest')}
-        onPick={pickRestaurantForGroup}
-        onSelectCategory={selectCategory}
-      />
 
       {!hasResults ? (
         <EmptyResults
@@ -546,25 +531,6 @@ function App() {
         </div>
         </section>
       ) : null}
-
-      <section className="mt-6 space-y-3 px-4">
-        <SectionHeader title="Saved Places" action="Open saved" />
-        <div className="grid gap-3">
-          {savedRestaurants.map((restaurant) => (
-            <SavedCard
-              key={restaurant.id}
-              restaurant={restaurant}
-              onOpenMaps={() => openRestaurantMaps(restaurant)}
-              onRemove={() => toggleSavedRestaurant(restaurant)}
-              onSelect={() => setSelectedRestaurant(restaurant)}
-              onShare={() => void shareRestaurant(restaurant)}
-            />
-          ))}
-          {savedRestaurants.length === 0 ? (
-            <SavedEmptyCard onBrowse={() => setActiveView('discover')} />
-          ) : null}
-        </div>
-      </section>
 
       <section className="mt-6 px-4">
         <Card className="rounded-xl">
@@ -635,9 +601,15 @@ function App() {
       {activeView === 'profile' ? (
         <ProfileView
           dietaryPreferences={dietaryPreferences}
+          savedRestaurants={savedRestaurants}
           statusLabel={statusLabel}
           onAddPreference={addDietaryPreference}
+          onBrowseFood={() => setActiveView('discover')}
+          onOpenMaps={openRestaurantMaps}
           onRemovePreference={removeDietaryPreference}
+          onRemoveSaved={toggleSavedRestaurant}
+          onSelectRestaurant={setSelectedRestaurant}
+          onShareRestaurant={(restaurant) => void shareRestaurant(restaurant)}
         />
       ) : null}
 
@@ -666,10 +638,10 @@ function App() {
             onClick={() => setActiveView('discover')}
           />
           <NavItem
-            active={activeView === 'saved'}
-            icon={<Bookmark className="size-6" />}
-            label="Saved"
-            onClick={() => setActiveView('saved')}
+            active={activeView === 'search'}
+            icon={<Search className="size-6" />}
+            label="Search"
+            onClick={() => setActiveView('search')}
           />
           <NavItem
             active={activeView === 'activity'}
@@ -693,13 +665,19 @@ function App() {
 
 function StatusControls({
   activeCategory,
+  isSearching,
+  onFindNearby,
+  onNearest,
   preferences,
   onSelectCategory,
   onSelectCuisine,
   onUpdatePreferences,
 }: {
   activeCategory: string
+  isSearching: boolean
   preferences: Preferences
+  onFindNearby: () => void
+  onNearest: () => void
   onSelectCategory: (category: (typeof categories)[number]) => void
   onSelectCuisine: (cuisine: string) => void
   onUpdatePreferences: (nextPreferences: Partial<Preferences>) => void
@@ -723,6 +701,32 @@ function StatusControls({
     }
   }
 
+  const cheapCategory =
+    categories.find((item) => item.label === 'Cheap Eats') ?? categories[0]
+  const cafeCategory =
+    categories.find((item) => item.label === 'Cafe') ?? categories[0]
+  const lateNightCategory =
+    categories.find((item) => item.label === 'Late Night') ?? categories[0]
+
+  const quickModes = [
+    {
+      label: 'Nearest',
+      action: onNearest,
+    },
+    {
+      label: 'Cheap',
+      action: () => onSelectCategory(cheapCategory),
+    },
+    {
+      label: 'Cafe',
+      action: () => onSelectCategory(cafeCategory),
+    },
+    {
+      label: 'Late',
+      action: () => onSelectCategory(lateNightCategory),
+    },
+  ]
+
   return (
     <div className="rounded-xl border border-border/70 bg-card p-2 text-center shadow-sm">
       <div className="grid grid-cols-3 gap-2">
@@ -733,7 +737,7 @@ function StatusControls({
           onChange={handleModeChange}
         />
         <StatusSelect
-          label="Radius"
+          label="Distance"
           value={String(preferences.radiusKm)}
           options={radiusOptions.map(String)}
           suffix=" km"
@@ -749,8 +753,28 @@ function StatusControls({
         />
       </div>
       <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
-        Tap Mode, Radius, or Price to choose.
+        Tap Mode, Distance, or Price to choose.
       </p>
+      <Button
+        onClick={onFindNearby}
+        disabled={isSearching}
+        className="mt-3 h-12 w-full rounded-lg"
+      >
+        <Search className="size-4" aria-hidden="true" />
+        {isSearching ? 'Searching nearby' : 'Search nearby'}
+      </Button>
+      <div className="mt-2 grid grid-cols-4 gap-2">
+        {quickModes.map((mode) => (
+          <button
+            key={mode.label}
+            type="button"
+            onClick={mode.action}
+            className="min-h-12 rounded-lg bg-secondary px-2 text-xs font-semibold text-primary transition hover:bg-[#ffdea9] hover:text-[#271900]"
+          >
+            {mode.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -924,7 +948,7 @@ function EmptyResults({
             Try Cafe
           </Button>
           <Button variant="outline" onClick={onIncreaseRadius} className="rounded-lg">
-            Wider Radius
+            Wider Distance
           </Button>
           <Button variant="outline" onClick={onClear} className="rounded-lg">
             Reset
@@ -1023,65 +1047,6 @@ function getOpenStatusLabel(restaurant: Restaurant) {
   }
 
   return 'Check live hours'
-}
-
-function QuickDecisionBar({
-  onNearest,
-  onPick,
-  onSelectCategory,
-}: {
-  onNearest: () => void
-  onPick: () => void
-  onSelectCategory: (category: (typeof categories)[number]) => void
-}) {
-  const cheapCategory =
-    categories.find((item) => item.label === 'Cheap Eats') ?? categories[0]
-  const cafeCategory =
-    categories.find((item) => item.label === 'Cafe') ?? categories[0]
-  const lateNightCategory =
-    categories.find((item) => item.label === 'Late Night') ?? categories[0]
-
-  const quickModes = [
-    {
-      label: 'Nearest',
-      action: onNearest,
-    },
-    {
-      label: 'Cheap',
-      action: () => onSelectCategory(cheapCategory),
-    },
-    {
-      label: 'Cafe',
-      action: () => onSelectCategory(cafeCategory),
-    },
-    {
-      label: 'Late',
-      action: () => onSelectCategory(lateNightCategory),
-    },
-  ]
-
-  return (
-    <section className="px-4 pt-3">
-      <div className="rounded-xl border border-border/70 bg-card p-2 shadow-sm">
-        <Button onClick={onPick} className="h-12 w-full rounded-lg">
-          <Search className="size-4" aria-hidden="true" />
-          Pick for us
-        </Button>
-        <div className="mt-2 grid grid-cols-4 gap-2">
-          {quickModes.map((mode) => (
-            <button
-              key={mode.label}
-              type="button"
-              onClick={mode.action}
-              className="min-h-12 rounded-lg bg-secondary px-2 text-xs font-semibold text-primary transition hover:bg-[#ffdea9] hover:text-[#271900]"
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
 }
 
 function DragScrollArea({
@@ -2004,12 +1969,24 @@ function CompletedPollItem({
 function ProfileView({
   dietaryPreferences,
   onAddPreference,
+  onBrowseFood,
+  onOpenMaps,
   onRemovePreference,
+  onRemoveSaved,
+  onSelectRestaurant,
+  onShareRestaurant,
+  savedRestaurants,
   statusLabel,
 }: {
   dietaryPreferences: string[]
+  savedRestaurants: Restaurant[]
   onAddPreference: (preference: string) => void
+  onBrowseFood: () => void
+  onOpenMaps: (restaurant: Restaurant) => void
   onRemovePreference: (preference: string) => void
+  onRemoveSaved: (restaurant: Restaurant) => void
+  onSelectRestaurant: (restaurant: Restaurant) => void
+  onShareRestaurant: (restaurant: Restaurant) => void
   statusLabel: string
 }) {
   const [isPreferenceDialogOpen, setIsPreferenceDialogOpen] = useState(false)
@@ -2085,6 +2062,26 @@ function ProfileView({
           </div>
         </CardContent>
       </Card>
+
+      <section className="space-y-3">
+        <SectionHeader title="Saved Places" />
+        <div className="grid gap-3">
+          {savedRestaurants.length > 0 ? (
+            savedRestaurants.map((restaurant) => (
+              <SavedCard
+                key={`${restaurant.id}-profile`}
+                restaurant={restaurant}
+                onOpenMaps={() => onOpenMaps(restaurant)}
+                onRemove={() => onRemoveSaved(restaurant)}
+                onSelect={() => onSelectRestaurant(restaurant)}
+                onShare={() => onShareRestaurant(restaurant)}
+              />
+            ))
+          ) : (
+            <SavedEmptyCard onBrowse={onBrowseFood} />
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="rounded-xl border-border/70 shadow-sm">

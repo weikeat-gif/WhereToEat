@@ -153,15 +153,15 @@ describe('App', () => {
     expect(await screen.findByText('Type location')).toBeInTheDocument()
   })
 
-  it('opens the saved, activity, and profile sections from bottom navigation', async () => {
+  it('opens the search, activity, and profile sections from bottom navigation', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)
 
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /saved tab/i }))
-    expect(screen.getByRole('heading', { name: 'Saved Places' })).toBeInTheDocument()
-    expect(screen.getByText('Shortcut List')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /search tab/i }))
+    expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/search food page/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /activity tab/i }))
     expect(screen.getByRole('heading', { name: 'Team Activity' })).toBeInTheDocument()
@@ -173,6 +173,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Alex Chen' })).toBeInTheDocument()
     expect(screen.getByText('Team Captain')).toBeInTheDocument()
     expect(screen.getByText('Dietary Requirements')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Saved Places' })).toBeInTheDocument()
     expect(screen.getByText('Notification Preferences')).toBeInTheDocument()
   })
 
@@ -350,8 +351,29 @@ describe('App', () => {
 
     render(<App />)
 
+    expect(screen.getByRole('button', { name: 'Search nearby' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Nearest' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cheap' })).toBeInTheDocument()
+  })
+
+  it('uses discover filters to search nearby restaurants', async () => {
+    const user = userEvent.setup()
+    setGeolocation(
+      vi.fn((success) => {
+        success({
+          coords: {
+            latitude: 3.139,
+            longitude: 101.6869,
+          },
+        } as GeolocationPosition)
+      }),
+    )
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Search nearby' }))
+
+    expect(await screen.findAllByText('Stadium Cafe')).not.toHaveLength(0)
   })
 
   it('shows that status controls are selectable dropdowns', () => {
@@ -359,12 +381,12 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByText('Tap Mode, Radius, or Price to choose.')).toBeInTheDocument()
+    expect(screen.getByText('Tap Mode, Distance, or Price to choose.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Mode' })).toHaveAttribute(
       'aria-haspopup',
       'listbox',
     )
-    expect(screen.getByRole('button', { name: 'Radius' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Distance' })).toHaveAttribute(
       'aria-haspopup',
       'listbox',
     )
@@ -380,10 +402,10 @@ describe('App', () => {
 
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: 'Radius' }))
+    await user.click(screen.getByRole('button', { name: 'Distance' }))
     await user.click(screen.getByRole('option', { name: '10 km' }))
 
-    expect(screen.getByRole('button', { name: 'Radius' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Distance' })).toHaveAttribute(
       'aria-expanded',
       'false',
     )
@@ -420,7 +442,7 @@ describe('App', () => {
     )
   })
 
-  it('saves and removes a restaurant from the saved page', async () => {
+  it('saves and removes a restaurant from the profile saved section', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)
 
@@ -432,7 +454,7 @@ describe('App', () => {
       })[0],
     )
 
-    await user.click(screen.getByRole('button', { name: /saved tab/i }))
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
     expect(
       screen.getAllByText('Restoran Nasi Kandar Pelita KLCC'),
     ).not.toHaveLength(0)
