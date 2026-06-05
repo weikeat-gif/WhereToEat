@@ -20,6 +20,7 @@ import {
   Filter,
   Heart,
   History,
+  KeyRound,
   Lock,
   LogOut,
   LocateFixed,
@@ -30,8 +31,10 @@ import {
   Search,
   Share2,
   Star,
+  Phone,
   Trophy,
   Utensils,
+  UserPlus,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -65,12 +68,28 @@ import {
 const preferenceKey = 'makanmana.preferences'
 const dietaryPreferencesKey = 'makanmana.dietary-preferences'
 const savedRestaurantsKey = 'makanmana.saved-restaurants'
+const authUserKey = 'makanmana.auth-user'
+const authUsersKey = 'makanmana.auth-users'
+const demoOtpCode = '123456'
 
 type Preferences = {
   radiusKm: number
   priceLevel: '$' | '$$' | '$$$' | '$$$$'
   halalOnly: boolean
   groupFriendly: boolean
+}
+
+type AuthUser = {
+  id: string
+  name: string
+  username: string
+  phone: string
+  joinedAt: string
+  authProvider: 'google' | 'password' | 'phone'
+}
+
+type StoredAuthUser = AuthUser & {
+  password?: string
 }
 
 const radiusOptions = [1, 3, 5, 10, 20] as const
@@ -147,6 +166,78 @@ function readSavedRestaurants(): Restaurant[] {
   }
 }
 
+function readAuthenticatedUser(): AuthUser | null {
+  try {
+    const stored = window.localStorage.getItem(authUserKey)
+
+    if (!stored) {
+      return null
+    }
+
+    const parsed = JSON.parse(stored)
+
+    if (!isAuthUser(parsed)) {
+      return null
+    }
+
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function readAuthUsers(): StoredAuthUser[] {
+  try {
+    const stored = window.localStorage.getItem(authUsersKey)
+
+    if (!stored) {
+      return []
+    }
+
+    const parsed = JSON.parse(stored)
+
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed.filter(isStoredAuthUser)
+  } catch {
+    return []
+  }
+}
+
+function saveAuthUsers(users: StoredAuthUser[]) {
+  window.localStorage.setItem(authUsersKey, JSON.stringify(users))
+}
+
+function saveAuthenticatedUser(user: AuthUser) {
+  window.localStorage.setItem(authUserKey, JSON.stringify(user))
+}
+
+function createAuthUser({
+  authProvider,
+  name,
+  password,
+  phone,
+  username,
+}: {
+  authProvider: AuthUser['authProvider']
+  name: string
+  password?: string
+  phone: string
+  username: string
+}): StoredAuthUser {
+  return {
+    id: `user-${Date.now()}`,
+    name,
+    username,
+    phone,
+    joinedAt: new Date().toISOString(),
+    authProvider,
+    password,
+  }
+}
+
 function readDietaryPreferences() {
   try {
     const stored = window.localStorage.getItem(dietaryPreferencesKey)
@@ -167,6 +258,47 @@ function readDietaryPreferences() {
   }
 }
 
+function isAuthUser(value: unknown): value is AuthUser {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'name' in value &&
+    'username' in value &&
+    'phone' in value &&
+    'joinedAt' in value
+  )
+}
+
+function isStoredAuthUser(value: unknown): value is StoredAuthUser {
+  return isAuthUser(value)
+}
+
+function getPublicAuthUser(user: StoredAuthUser): AuthUser {
+  return {
+    id: user.id,
+    name: user.name,
+    username: user.username,
+    phone: user.phone,
+    joinedAt: user.joinedAt,
+    authProvider: user.authProvider,
+  }
+}
+
+function formatJoinedDate(joinedAt: string) {
+  const date = new Date(joinedAt)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Joined recently'
+  }
+
+  return `Joined ${date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })}`
+}
+
 function isStoredRestaurant(value: unknown): value is Restaurant {
   return (
     typeof value === 'object' &&
@@ -179,6 +311,9 @@ function isStoredRestaurant(value: unknown): value is Restaurant {
 }
 
 function App() {
+  const [authenticatedUser, setAuthenticatedUser] = useState<AuthUser | null>(() =>
+    readAuthenticatedUser(),
+  )
   const [preferences, setPreferences] = useState<Preferences>(() => readPreferences())
   const [dietaryPreferences, setDietaryPreferences] = useState<string[]>(() =>
     readDietaryPreferences(),
@@ -257,6 +392,110 @@ function App() {
 
   function updatePreferences(nextPreferences: Partial<Preferences>) {
     setPreferences((current) => ({ ...current, ...nextPreferences }))
+  }
+
+  function completeAuth(user: StoredAuthUser | AuthUser) {
+    const publicUser = 'password' in user ? getPublicAuthUser(user) : user
+    saveAuthenticatedUser(publicUser)
+    setAuthenticatedUser(publicUser)
+    toast.success(`Welcome, ${publicUser.name}`)
+  }
+
+  function signInWithGoogle() {
+    const users = readAuthUsers()
+    const existingUser = users.find((user) => user.authProvider === 'google')
+
+    if (existingUser) {
+      completeAuth(existingUser)
+      return
+    }
+
+    const googleUser = createAuthUser({
+      authProvider: 'google',
+      name: 'Google User',
+      username: 'google.user',
+      phone: '',
+    })
+
+    saveAuthUsers([googleUser, ...users])
+    completeAuth(googleUser)
+  }
+
+  function signInWithPassword(username: string, password: string) {
+    const users = readAuthUsers()
+    const normalizedUsername = username.trim().toLowerCase()
+    const user = users.find(
+      (storedUser) =>
+        storedUser.username.toLowerCase() === normalizedUsername &&
+        storedUser.password === password,
+    )
+
+    if (!user) {
+      toast.error('Username or password is incorrect')
+      return
+    }
+
+    completeAuth(user)
+  }
+
+  function signInWithPhone(phone: string) {
+    const normalizedPhone = phone.trim()
+    const users = readAuthUsers()
+    const user = users.find((storedUser) => storedUser.phone === normalizedPhone)
+
+    if (!user) {
+      const phoneUser = createAuthUser({
+        authProvider: 'phone',
+        name: `User ${normalizedPhone.slice(-4) || 'Phone'}`,
+        username: normalizedPhone || 'phone-user',
+        phone: normalizedPhone,
+      })
+      saveAuthUsers([phoneUser, ...users])
+      completeAuth(phoneUser)
+      return
+    }
+
+    completeAuth(user)
+  }
+
+  function signUpWithPassword({
+    name,
+    password,
+    phone,
+    username,
+  }: {
+    name: string
+    password: string
+    phone: string
+    username: string
+  }) {
+    const users = readAuthUsers()
+    const normalizedUsername = username.trim().toLowerCase()
+
+    if (
+      users.some((storedUser) => storedUser.username.toLowerCase() === normalizedUsername)
+    ) {
+      toast.error('This username is already used')
+      return
+    }
+
+    const newUser = createAuthUser({
+      authProvider: 'password',
+      name: name.trim(),
+      username: username.trim(),
+      phone: phone.trim(),
+      password,
+    })
+
+    saveAuthUsers([newUser, ...users])
+    completeAuth(newUser)
+  }
+
+  function logOut() {
+    window.localStorage.removeItem(authUserKey)
+    setAuthenticatedUser(null)
+    setActiveView('discover')
+    toast.success('Logged out')
   }
 
   function addDietaryPreference(preference: string) {
@@ -437,6 +676,17 @@ function App() {
     toast.success('Food plan copied')
   }
 
+  if (!authenticatedUser) {
+    return (
+      <AuthView
+        onGoogleSignIn={signInWithGoogle}
+        onPasswordSignIn={signInWithPassword}
+        onPhoneSignIn={signInWithPhone}
+        onSignUp={signUpWithPassword}
+      />
+    )
+  }
+
   return (
     <main className="relative mx-auto min-h-svh w-full max-w-xl overflow-x-hidden bg-background pb-28 text-foreground shadow-[0_0_0_1px_rgba(190,200,202,0.35)]">
       <header className="sticky top-0 z-30 w-full overflow-hidden border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur">
@@ -600,12 +850,14 @@ function App() {
 
       {activeView === 'profile' ? (
         <ProfileView
+          authenticatedUser={authenticatedUser}
           dietaryPreferences={dietaryPreferences}
           savedRestaurants={savedRestaurants}
           statusLabel={statusLabel}
           onAddPreference={addDietaryPreference}
           onBrowseFood={() => setActiveView('discover')}
           onOpenMaps={openRestaurantMaps}
+          onLogOut={logOut}
           onRemovePreference={removeDietaryPreference}
           onRemoveSaved={toggleSavedRestaurant}
           onSelectRestaurant={setSelectedRestaurant}
@@ -658,6 +910,344 @@ function App() {
         </div>
       </nav>
 
+      <Toaster richColors position="bottom-center" />
+    </main>
+  )
+}
+
+function AuthView({
+  onGoogleSignIn,
+  onPasswordSignIn,
+  onPhoneSignIn,
+  onSignUp,
+}: {
+  onGoogleSignIn: () => void
+  onPasswordSignIn: (username: string, password: string) => void
+  onPhoneSignIn: (phone: string) => void
+  onSignUp: (details: {
+    name: string
+    password: string
+    phone: string
+    username: string
+  }) => void
+}) {
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  const [loginUsername, setLoginUsername] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginPhone, setLoginPhone] = useState('')
+  const [loginOtp, setLoginOtp] = useState('')
+  const [isLoginOtpSent, setIsLoginOtpSent] = useState(false)
+  const [signupName, setSignupName] = useState('')
+  const [signupUsername, setSignupUsername] = useState('')
+  const [signupPassword, setSignupPassword] = useState('')
+  const [signupPhone, setSignupPhone] = useState('')
+  const [signupOtp, setSignupOtp] = useState('')
+  const [isSignupOtpSent, setIsSignupOtpSent] = useState(false)
+
+  function requestLoginOtp() {
+    if (!loginPhone.trim()) {
+      toast.error('Enter your phone number first')
+      return
+    }
+
+    setIsLoginOtpSent(true)
+    toast.success(`Demo OTP sent: ${demoOtpCode}`)
+  }
+
+  function requestSignupOtp() {
+    if (!signupPhone.trim()) {
+      toast.error('Enter your phone number first')
+      return
+    }
+
+    setIsSignupOtpSent(true)
+    toast.success(`Demo OTP sent: ${demoOtpCode}`)
+  }
+
+  function submitPasswordLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!loginUsername.trim() || !loginPassword) {
+      toast.error('Enter username and password')
+      return
+    }
+
+    onPasswordSignIn(loginUsername, loginPassword)
+  }
+
+  function submitPhoneLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!isLoginOtpSent) {
+      requestLoginOtp()
+      return
+    }
+
+    if (loginOtp !== demoOtpCode) {
+      toast.error('OTP is incorrect')
+      return
+    }
+
+    onPhoneSignIn(loginPhone)
+  }
+
+  function submitSignup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (
+      !signupName.trim() ||
+      !signupUsername.trim() ||
+      !signupPassword ||
+      !signupPhone.trim()
+    ) {
+      toast.error('Fill in all sign up details')
+      return
+    }
+
+    if (!isSignupOtpSent) {
+      toast.error('Request OTP before creating account')
+      return
+    }
+
+    if (signupOtp !== demoOtpCode) {
+      toast.error('OTP is incorrect')
+      return
+    }
+
+    onSignUp({
+      name: signupName,
+      username: signupUsername,
+      password: signupPassword,
+      phone: signupPhone,
+    })
+  }
+
+  return (
+    <main className="relative mx-auto flex min-h-svh w-full max-w-xl flex-col bg-background px-4 py-6 text-foreground shadow-[0_0_0_1px_rgba(190,200,202,0.35)]">
+      <div className="flex items-center gap-3">
+        <img src="/pwa-icon.svg" alt="" className="size-11" />
+        <div>
+          <h1 className="text-3xl font-semibold text-primary">MakanMana</h1>
+          <p className="text-sm text-muted-foreground">
+            Sign in to save food, vote, and keep your profile.
+          </p>
+        </div>
+      </div>
+
+      <Card className="mt-6 rounded-xl border-border/70 shadow-sm">
+        <CardHeader>
+          <CardTitle>{authMode === 'login' ? 'Log in' : 'Sign up'}</CardTitle>
+          <CardDescription>
+            Use Google, username/password, or phone OTP.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-secondary p-1">
+            {(['login', 'signup'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setAuthMode(mode)}
+                className={`h-10 rounded-md text-sm font-semibold transition ${
+                  authMode === mode
+                    ? 'bg-card text-primary shadow-sm'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {mode === 'login' ? 'Log in' : 'Sign up'}
+              </button>
+            ))}
+          </div>
+
+          <Button className="h-12 w-full rounded-lg" onClick={onGoogleSignIn}>
+            <UserPlus className="size-5" aria-hidden="true" />
+            Continue with Google
+          </Button>
+
+          {authMode === 'login' ? (
+            <div className="space-y-4">
+              <form className="space-y-3" onSubmit={submitPasswordLogin}>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold" htmlFor="login-username">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <UserRound
+                      className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <Input
+                      id="login-username"
+                      value={loginUsername}
+                      onChange={(event) => setLoginUsername(event.target.value)}
+                      placeholder="your username"
+                      className="h-12 rounded-lg pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold" htmlFor="login-password">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock
+                      className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <Input
+                      id="login-password"
+                      type="password"
+                      value={loginPassword}
+                      onChange={(event) => setLoginPassword(event.target.value)}
+                      placeholder="password"
+                      className="h-12 rounded-lg pl-10"
+                    />
+                  </div>
+                </div>
+                <Button type="submit" variant="outline" className="h-12 w-full rounded-lg">
+                  <KeyRound className="size-5" aria-hidden="true" />
+                  Log in with password
+                </Button>
+              </form>
+
+              <form className="space-y-3 rounded-xl border bg-card p-3" onSubmit={submitPhoneLogin}>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold" htmlFor="login-phone">
+                    Phone number
+                  </label>
+                  <div className="relative">
+                    <Phone
+                      className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <Input
+                      id="login-phone"
+                      value={loginPhone}
+                      onChange={(event) => setLoginPhone(event.target.value)}
+                      placeholder="+60 12 345 6789"
+                      className="h-12 rounded-lg pl-10"
+                    />
+                  </div>
+                </div>
+                {isLoginOtpSent ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold" htmlFor="login-otp">
+                      OTP
+                    </label>
+                    <Input
+                      id="login-otp"
+                      value={loginOtp}
+                      onChange={(event) => setLoginOtp(event.target.value)}
+                      placeholder={demoOtpCode}
+                      className="h-12 rounded-lg"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Demo OTP: {demoOtpCode}
+                    </p>
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 rounded-lg"
+                    onClick={requestLoginOtp}
+                  >
+                    Request OTP
+                  </Button>
+                  <Button type="submit" className="h-12 rounded-lg">
+                    Verify
+                  </Button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <form className="space-y-3" onSubmit={submitSignup}>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold" htmlFor="signup-name">
+                  Name
+                </label>
+                <Input
+                  id="signup-name"
+                  value={signupName}
+                  onChange={(event) => setSignupName(event.target.value)}
+                  placeholder="Your display name"
+                  className="h-12 rounded-lg"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold" htmlFor="signup-username">
+                    Username
+                  </label>
+                  <Input
+                    id="signup-username"
+                    value={signupUsername}
+                    onChange={(event) => setSignupUsername(event.target.value)}
+                    placeholder="makanfan"
+                    className="h-12 rounded-lg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold" htmlFor="signup-password">
+                    Password
+                  </label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    value={signupPassword}
+                    onChange={(event) => setSignupPassword(event.target.value)}
+                    placeholder="password"
+                    className="h-12 rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold" htmlFor="signup-phone">
+                  Phone number
+                </label>
+                <Input
+                  id="signup-phone"
+                  value={signupPhone}
+                  onChange={(event) => setSignupPhone(event.target.value)}
+                  placeholder="+60 12 345 6789"
+                  className="h-12 rounded-lg"
+                />
+              </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_128px] gap-2">
+                <Input
+                  aria-label="Sign up OTP"
+                  value={signupOtp}
+                  onChange={(event) => setSignupOtp(event.target.value)}
+                  placeholder={isSignupOtpSent ? demoOtpCode : 'OTP code'}
+                  className="h-12 rounded-lg"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 rounded-lg"
+                  onClick={requestSignupOtp}
+                >
+                  Request OTP
+                </Button>
+              </div>
+              {isSignupOtpSent ? (
+                <p className="text-xs text-muted-foreground">
+                  Demo OTP: {demoOtpCode}
+                </p>
+              ) : null}
+              <Button type="submit" className="h-12 w-full rounded-lg">
+                Create account
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      <p className="mt-4 rounded-xl bg-secondary p-3 text-xs leading-5 text-muted-foreground">
+        MVP note: Google and SMS OTP are demo flows in this version. Connect a
+        real auth provider later for production security.
+      </p>
       <Toaster richColors position="bottom-center" />
     </main>
   )
@@ -1967,9 +2557,11 @@ function CompletedPollItem({
 }
 
 function ProfileView({
+  authenticatedUser,
   dietaryPreferences,
   onAddPreference,
   onBrowseFood,
+  onLogOut,
   onOpenMaps,
   onRemovePreference,
   onRemoveSaved,
@@ -1978,10 +2570,12 @@ function ProfileView({
   savedRestaurants,
   statusLabel,
 }: {
+  authenticatedUser: AuthUser
   dietaryPreferences: string[]
   savedRestaurants: Restaurant[]
   onAddPreference: (preference: string) => void
   onBrowseFood: () => void
+  onLogOut: () => void
   onOpenMaps: (restaurant: Restaurant) => void
   onRemovePreference: (preference: string) => void
   onRemoveSaved: (restaurant: Restaurant) => void
@@ -2010,13 +2604,20 @@ function ProfileView({
             <UserRound className="size-12 text-primary" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-3xl font-semibold text-primary">Alex Chen</h2>
+            <h2 className="text-3xl font-semibold text-primary">
+              {authenticatedUser.name}
+            </h2>
             <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <Badge variant="accent" className="rounded-full">
                 <Star className="size-3.5" aria-hidden="true" />
                 Team Captain
               </Badge>
-              <span className="text-sm text-muted-foreground">Joined 2023</span>
+              <span className="text-sm text-muted-foreground">
+                {formatJoinedDate(authenticatedUser.joinedAt)}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                @{authenticatedUser.username}
+              </span>
             </div>
           </div>
           <Button variant="secondary" size="icon" aria-label="Edit profile">
@@ -2137,6 +2738,7 @@ function ProfileView({
 
       <Button
         variant="outline"
+        onClick={onLogOut}
         className="h-12 w-full rounded-lg border-[#d56b6b] text-[#b42323] hover:bg-[#fff0f0]"
       >
         <LogOut className="size-5" aria-hidden="true" />

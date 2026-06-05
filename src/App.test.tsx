@@ -5,6 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
 const originalGeolocation = navigator.geolocation
+const authUserKey = 'makanmana.auth-user'
+const authUsersKey = 'makanmana.auth-users'
+const demoAuthUser = {
+  id: 'test-user',
+  name: 'Alex Chen',
+  username: 'alexchen',
+  phone: '+60123456789',
+  joinedAt: '2023-01-01T00:00:00.000Z',
+  authProvider: 'password',
+}
 
 function setGeolocation(
   getCurrentPosition: Geolocation['getCurrentPosition'] | undefined,
@@ -15,9 +25,18 @@ function setGeolocation(
   })
 }
 
+function seedAuthUser() {
+  window.localStorage.setItem(authUserKey, JSON.stringify(demoAuthUser))
+  window.localStorage.setItem(
+    authUsersKey,
+    JSON.stringify([{ ...demoAuthUser, password: 'password123' }]),
+  )
+}
+
 describe('App', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    seedAuthUser()
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -51,6 +70,46 @@ describe('App', () => {
     })
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('signs up with phone OTP and shows the user name in profile', async () => {
+    const user = userEvent.setup()
+    window.localStorage.removeItem(authUserKey)
+    window.localStorage.removeItem(authUsersKey)
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+    await user.type(screen.getByLabelText('Name'), 'Wei Keat')
+    await user.type(screen.getByLabelText('Username'), 'weikeat')
+    await user.type(screen.getByLabelText('Password'), 'secret123')
+    await user.type(screen.getByLabelText('Phone number'), '+60112223333')
+    await user.click(screen.getByRole('button', { name: 'Request OTP' }))
+    await user.type(screen.getByLabelText('Sign up OTP'), '123456')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(screen.getByText('Recommended Nearby')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+
+    expect(screen.getByRole('heading', { name: 'Wei Keat' })).toBeInTheDocument()
+    expect(screen.getByText('@weikeat')).toBeInTheDocument()
+    expect(screen.getByText(/^Joined /)).toBeInTheDocument()
+  })
+
+  it('logs out from profile and returns to login', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+    await user.click(screen.getByRole('button', { name: 'Log Out' }))
+
+    expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument()
   })
 
   it('uses phone location when geolocation succeeds', async () => {
