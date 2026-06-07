@@ -415,6 +415,21 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Cheap' })).toBeInTheDocument()
   })
 
+  it('picks the top matching restaurant from discover results', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Pick for me' }))
+
+    expect(
+      screen.getByRole('dialog', {
+        name: 'Restoran Nasi Kandar Pelita KLCC',
+      }),
+    ).toBeInTheDocument()
+  })
+
   it('uses discover filters to search nearby restaurants', async () => {
     const user = userEvent.setup()
     setGeolocation(

@@ -30,6 +30,7 @@ import {
   Plus,
   Search,
   Share2,
+  Shuffle,
   Star,
   Phone,
   Trophy,
@@ -676,6 +677,18 @@ function App() {
     toast.success('Food plan copied')
   }
 
+  function pickTopRestaurant() {
+    const restaurant = visibleRestaurants[0]
+
+    if (!restaurant) {
+      toast.info('No matching places to pick yet')
+      return
+    }
+
+    setSelectedRestaurant(restaurant)
+    toast.success(`Picked ${restaurant.name}`)
+  }
+
   if (!authenticatedUser) {
     return (
       <AuthView
@@ -727,6 +740,19 @@ function App() {
           onUpdatePreferences={updatePreferences}
         />
       </section>
+
+      {hasResults ? (
+        <section className="mt-3 px-4">
+          <Button
+            className="h-12 w-full rounded-lg"
+            onClick={pickTopRestaurant}
+            disabled={isLoadingPlaces}
+          >
+            <Shuffle className="size-5" aria-hidden="true" />
+            Pick for me
+          </Button>
+        </section>
+      ) : null}
 
       {!hasResults ? (
         <EmptyResults
