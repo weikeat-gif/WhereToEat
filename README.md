@@ -28,6 +28,8 @@ http://127.0.0.1:5175/
 
 ## Firebase Auth Setup
 
+Full setup guide: [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md)
+
 Copy `.env.example` to `.env.local` and add your Firebase web app values:
 
 ```bash
