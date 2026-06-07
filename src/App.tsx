@@ -64,6 +64,10 @@ import {
   sampleRestaurants,
   type Restaurant,
 } from '@/lib/restaurants'
+import type {
+  FirebaseAuthProfile,
+  PhoneOtpConfirmation,
+} from '@/lib/firebaseAuth'
 
 const preferenceKey = 'makanmana.preferences'
 const dietaryPreferencesKey = 'makanmana.dietary-preferences'
@@ -90,6 +94,14 @@ type AuthUser = {
 
 type StoredAuthUser = AuthUser & {
   password?: string
+}
+
+type AuthSignUpDetails = {
+  name: string
+  otp: string
+  password: string
+  phone: string
+  username: string
 }
 
 const radiusOptions = [1, 3, 5, 10, 20] as const
@@ -285,6 +297,17 @@ function getPublicAuthUser(user: StoredAuthUser): AuthUser {
   }
 }
 
+function getAuthUserFromFirebase(profile: FirebaseAuthProfile): AuthUser {
+  return {
+    id: profile.id,
+    name: profile.name,
+    username: profile.username,
+    phone: profile.phone,
+    joinedAt: profile.joinedAt,
+    authProvider: profile.authProvider,
+  }
+}
+
 function formatJoinedDate(joinedAt: string) {
   const date = new Date(joinedAt)
 
@@ -332,6 +355,8 @@ function App() {
     useState<LocationPermissionState>('idle')
   const [restaurants, setRestaurants] = useState<Restaurant[]>(sampleRestaurants)
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
+  const [phoneOtpConfirmation, setPhoneOtpConfirmation] =
+    useState<PhoneOtpConfirmation | null>(null)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(
     null,
   )
@@ -394,14 +419,34 @@ function App() {
     setPreferences((current) => ({ ...current, ...nextPreferences }))
   }
 
-  function completeAuth(user: StoredAuthUser | AuthUser) {
+  function completeAuth(user: StoredAuthUser | AuthUser | FirebaseAuthProfile) {
+    if ('authProvider' in user && !('password' in user) && 'id' in user) {
+      const firebaseUser = getAuthUserFromFirebase(user as FirebaseAuthProfile)
+      saveAuthenticatedUser(firebaseUser)
+      setAuthenticatedUser(firebaseUser)
+      toast.success(`Welcome, ${firebaseUser.name}`)
+      return
+    }
+
     const publicUser = 'password' in user ? getPublicAuthUser(user) : user
     saveAuthenticatedUser(publicUser)
     setAuthenticatedUser(publicUser)
     toast.success(`Welcome, ${publicUser.name}`)
   }
 
-  function signInWithGoogle() {
+  async function signInWithGoogle() {
+    const firebaseAuth = await import('@/lib/firebaseAuth')
+
+    if (firebaseAuth.isFirebaseAuthConfigured()) {
+      try {
+        completeAuth(await firebaseAuth.signInWithFirebaseGoogle())
+        return
+      } catch {
+        toast.error('Google sign in failed')
+        return
+      }
+    }
+
     const users = readAuthUsers()
     const existingUser = users.find((user) => user.authProvider === 'google')
 
@@ -421,7 +466,21 @@ function App() {
     completeAuth(googleUser)
   }
 
-  function signInWithPassword(username: string, password: string) {
+  async function signInWithPassword(username: string, password: string) {
+    const firebaseAuth = await import('@/lib/firebaseAuth')
+
+    if (firebaseAuth.isFirebaseAuthConfigured()) {
+      try {
+        completeAuth(
+          await firebaseAuth.signInWithFirebasePassword(username, password),
+        )
+        return
+      } catch {
+        toast.error('Username or password is incorrect')
+        return
+      }
+    }
+
     const users = readAuthUsers()
     const normalizedUsername = username.trim().toLowerCase()
     const user = users.find(
@@ -438,7 +497,59 @@ function App() {
     completeAuth(user)
   }
 
-  function signInWithPhone(phone: string) {
+  async function requestPhoneOtp(phone: string) {
+    if (!phone.trim()) {
+      toast.error('Enter your phone number first')
+      return false
+    }
+
+    const firebaseAuth = await import('@/lib/firebaseAuth')
+
+    if (firebaseAuth.isFirebaseAuthConfigured()) {
+      try {
+        const confirmation = await firebaseAuth.requestFirebasePhoneOtp(
+          phone.trim(),
+          'auth-recaptcha-container',
+        )
+        setPhoneOtpConfirmation(confirmation)
+        toast.success('OTP sent')
+        return true
+      } catch {
+        toast.error('Could not send OTP')
+        return false
+      }
+    }
+
+    toast.success(`Demo OTP sent: ${demoOtpCode}`)
+    return true
+  }
+
+  async function signInWithPhone(phone: string, otp: string) {
+    const firebaseAuth = await import('@/lib/firebaseAuth')
+
+    if (firebaseAuth.isFirebaseAuthConfigured()) {
+      if (!phoneOtpConfirmation) {
+        toast.error('Request OTP first')
+        return
+      }
+
+      try {
+        completeAuth(
+          await firebaseAuth.confirmFirebasePhoneOtp(phoneOtpConfirmation, otp),
+        )
+        setPhoneOtpConfirmation(null)
+        return
+      } catch {
+        toast.error('OTP is incorrect')
+        return
+      }
+    }
+
+    if (otp !== demoOtpCode) {
+      toast.error('OTP is incorrect')
+      return
+    }
+
     const normalizedPhone = phone.trim()
     const users = readAuthUsers()
     const user = users.find((storedUser) => storedUser.phone === normalizedPhone)
@@ -458,17 +569,43 @@ function App() {
     completeAuth(user)
   }
 
-  function signUpWithPassword({
+  async function signUpWithPassword({
     name,
+    otp,
     password,
     phone,
     username,
-  }: {
-    name: string
-    password: string
-    phone: string
-    username: string
-  }) {
+  }: AuthSignUpDetails) {
+    const firebaseAuth = await import('@/lib/firebaseAuth')
+
+    if (firebaseAuth.isFirebaseAuthConfigured()) {
+      if (!phoneOtpConfirmation) {
+        toast.error('Request OTP before creating account')
+        return
+      }
+
+      try {
+        await firebaseAuth.confirmFirebasePhoneOtp(phoneOtpConfirmation, otp)
+        completeAuth(
+          await firebaseAuth.signUpWithFirebasePassword({
+            name: name.trim(),
+            password,
+            username: username.trim(),
+          }),
+        )
+        setPhoneOtpConfirmation(null)
+        return
+      } catch {
+        toast.error('Could not create account')
+        return
+      }
+    }
+
+    if (otp !== demoOtpCode) {
+      toast.error('OTP is incorrect')
+      return
+    }
+
     const users = readAuthUsers()
     const normalizedUsername = username.trim().toLowerCase()
 
@@ -493,6 +630,7 @@ function App() {
 
   function logOut() {
     window.localStorage.removeItem(authUserKey)
+    setPhoneOtpConfirmation(null)
     setAuthenticatedUser(null)
     setActiveView('discover')
     toast.success('Logged out')
@@ -681,6 +819,7 @@ function App() {
       <AuthView
         onGoogleSignIn={signInWithGoogle}
         onPasswordSignIn={signInWithPassword}
+        onRequestPhoneOtp={requestPhoneOtp}
         onPhoneSignIn={signInWithPhone}
         onSignUp={signUpWithPassword}
       />
@@ -919,17 +1058,14 @@ function AuthView({
   onGoogleSignIn,
   onPasswordSignIn,
   onPhoneSignIn,
+  onRequestPhoneOtp,
   onSignUp,
 }: {
-  onGoogleSignIn: () => void
-  onPasswordSignIn: (username: string, password: string) => void
-  onPhoneSignIn: (phone: string) => void
-  onSignUp: (details: {
-    name: string
-    password: string
-    phone: string
-    username: string
-  }) => void
+  onGoogleSignIn: () => Promise<void> | void
+  onPasswordSignIn: (username: string, password: string) => Promise<void> | void
+  onPhoneSignIn: (phone: string, otp: string) => Promise<void> | void
+  onRequestPhoneOtp: (phone: string) => Promise<boolean>
+  onSignUp: (details: AuthSignUpDetails) => Promise<void> | void
 }) {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [loginUsername, setLoginUsername] = useState('')
@@ -944,27 +1080,15 @@ function AuthView({
   const [signupOtp, setSignupOtp] = useState('')
   const [isSignupOtpSent, setIsSignupOtpSent] = useState(false)
 
-  function requestLoginOtp() {
-    if (!loginPhone.trim()) {
-      toast.error('Enter your phone number first')
-      return
-    }
-
-    setIsLoginOtpSent(true)
-    toast.success(`Demo OTP sent: ${demoOtpCode}`)
+  async function requestLoginOtp() {
+    setIsLoginOtpSent(await onRequestPhoneOtp(loginPhone))
   }
 
-  function requestSignupOtp() {
-    if (!signupPhone.trim()) {
-      toast.error('Enter your phone number first')
-      return
-    }
-
-    setIsSignupOtpSent(true)
-    toast.success(`Demo OTP sent: ${demoOtpCode}`)
+  async function requestSignupOtp() {
+    setIsSignupOtpSent(await onRequestPhoneOtp(signupPhone))
   }
 
-  function submitPasswordLogin(event: FormEvent<HTMLFormElement>) {
+  async function submitPasswordLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!loginUsername.trim() || !loginPassword) {
@@ -972,10 +1096,10 @@ function AuthView({
       return
     }
 
-    onPasswordSignIn(loginUsername, loginPassword)
+    await onPasswordSignIn(loginUsername, loginPassword)
   }
 
-  function submitPhoneLogin(event: FormEvent<HTMLFormElement>) {
+  async function submitPhoneLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!isLoginOtpSent) {
@@ -983,15 +1107,10 @@ function AuthView({
       return
     }
 
-    if (loginOtp !== demoOtpCode) {
-      toast.error('OTP is incorrect')
-      return
-    }
-
-    onPhoneSignIn(loginPhone)
+    await onPhoneSignIn(loginPhone, loginOtp)
   }
 
-  function submitSignup(event: FormEvent<HTMLFormElement>) {
+  async function submitSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (
@@ -1009,13 +1128,9 @@ function AuthView({
       return
     }
 
-    if (signupOtp !== demoOtpCode) {
-      toast.error('OTP is incorrect')
-      return
-    }
-
-    onSignUp({
+    await onSignUp({
       name: signupName,
+      otp: signupOtp,
       username: signupUsername,
       password: signupPassword,
       phone: signupPhone,
@@ -1248,6 +1363,7 @@ function AuthView({
         MVP note: Google and SMS OTP are demo flows in this version. Connect a
         real auth provider later for production security.
       </p>
+      <div id="auth-recaptcha-container" />
       <Toaster richColors position="bottom-center" />
     </main>
   )
