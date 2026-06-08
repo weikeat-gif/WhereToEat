@@ -1,9 +1,11 @@
 import { getApps, initializeApp, type FirebaseOptions } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
   getAuth,
   getRedirectResult,
   GoogleAuthProvider,
+  linkWithCredential,
   RecaptchaVerifier,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
@@ -85,24 +87,60 @@ export async function signInWithFirebasePassword(
 }
 
 export async function signUpWithFirebasePassword({
-  name,
   password,
   username,
 }: {
-  name: string
   password: string
   username: string
 }) {
   const auth = getConfiguredAuth()
+  const normalizedUsername = username.trim()
   const result = await createUserWithEmailAndPassword(
     auth,
-    getFirebaseEmail(username),
+    getFirebaseEmail(normalizedUsername),
     password,
   )
 
-  await updateProfile(result.user, { displayName: name })
+  await updateProfile(result.user, { displayName: normalizedUsername })
 
-  return mapFirebaseUser(result.user, 'password', username, name)
+  return mapFirebaseUser(
+    result.user,
+    'password',
+    normalizedUsername,
+    normalizedUsername,
+  )
+}
+
+export async function completeFirebaseGoogleAccount({
+  password,
+  phone,
+  username,
+}: {
+  password: string
+  phone: string
+  username: string
+}) {
+  const auth = getConfiguredAuth()
+  const user = auth.currentUser
+  const normalizedUsername = username.trim()
+
+  if (!user) {
+    throw new Error('No Google user is signed in')
+  }
+
+  await updateProfile(user, { displayName: normalizedUsername })
+  await linkWithCredential(
+    user,
+    EmailAuthProvider.credential(getFirebaseEmail(normalizedUsername), password),
+  )
+
+  return mapFirebaseUser(
+    user,
+    'google',
+    normalizedUsername,
+    normalizedUsername,
+    phone.trim(),
+  )
 }
 
 export async function requestFirebasePhoneOtp(
@@ -179,6 +217,14 @@ export function getFirebaseAuthErrorMessage(error: unknown) {
     return 'This username is already used.'
   }
 
+  if (code === 'auth/credential-already-in-use') {
+    return 'This username is already linked to another account.'
+  }
+
+  if (code === 'auth/provider-already-linked') {
+    return 'This Google account already has a username and password.'
+  }
+
   if (code === 'auth/weak-password') {
     return 'Password is too weak.'
   }
@@ -205,6 +251,7 @@ function mapFirebaseUser(
   authProvider: FirebaseAuthProfile['authProvider'],
   username = user.email?.split('@')[0] ?? user.phoneNumber ?? user.uid,
   displayName = user.displayName ?? username,
+  phone = user.phoneNumber ?? '',
 ): FirebaseAuthProfile {
   return {
     authProvider,
@@ -213,7 +260,7 @@ function mapFirebaseUser(
       ? new Date(user.metadata.creationTime).toISOString()
       : new Date().toISOString(),
     name: displayName,
-    phone: user.phoneNumber ?? '',
+    phone,
     username,
   }
 }

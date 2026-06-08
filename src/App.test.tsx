@@ -72,7 +72,7 @@ describe('App', () => {
     vi.unstubAllGlobals()
   })
 
-  it('signs up with phone OTP and shows the user name in profile', async () => {
+  it('signs up with phone OTP and shows the username in profile', async () => {
     const user = userEvent.setup()
     window.localStorage.removeItem(authUserKey)
     window.localStorage.removeItem(authUsersKey)
@@ -83,7 +83,6 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
-    await user.type(screen.getByLabelText('Name'), 'Wei Keat')
     await user.type(screen.getByLabelText('Username'), 'weikeat')
     await user.type(screen.getByLabelText('Password'), 'secret123')
     await user.type(screen.getByLabelText('Phone number'), '+60112223333')
@@ -95,9 +94,35 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: /profile tab/i }))
 
-    expect(screen.getByRole('heading', { name: 'Wei Keat' })).toBeInTheDocument()
-    expect(screen.getByText('@weikeat')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'weikeat' })).toBeInTheDocument()
+    expect(screen.queryByText('@weikeat')).not.toBeInTheDocument()
     expect(screen.getByText(/^Joined /)).toBeInTheDocument()
+  })
+
+  it('requires Google sign up users to complete username, password, and phone', async () => {
+    const user = userEvent.setup()
+    window.localStorage.removeItem(authUserKey)
+    window.localStorage.removeItem(authUsersKey)
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+
+    expect(
+      screen.getByRole('heading', { name: 'Complete Google Sign Up' }),
+    ).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Username'), 'googlemakan')
+    await user.type(screen.getByLabelText('Password'), 'secret123')
+    await user.type(screen.getByLabelText('Phone number'), '+60112224444')
+    await user.click(screen.getByRole('button', { name: 'Enter App' }))
+
+    expect(screen.getByText('Recommended Nearby')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+
+    expect(screen.getByRole('heading', { name: 'googlemakan' })).toBeInTheDocument()
   })
 
   it('logs out from profile and returns to login', async () => {
@@ -229,7 +254,7 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Start poll' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /profile tab/i }))
-    expect(screen.getByRole('heading', { name: 'Alex Chen' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'alexchen' })).toBeInTheDocument()
     expect(screen.getByText('Team Captain')).toBeInTheDocument()
     expect(screen.getByText('Dietary Requirements')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Saved Places' })).toBeInTheDocument()

@@ -97,8 +97,13 @@ type StoredAuthUser = AuthUser & {
 }
 
 type AuthSignUpDetails = {
-  name: string
   otp: string
+  password: string
+  phone: string
+  username: string
+}
+
+type GoogleAccountDetails = {
   password: string
   phone: string
   username: string
@@ -300,12 +305,20 @@ function getPublicAuthUser(user: StoredAuthUser): AuthUser {
 function getAuthUserFromFirebase(profile: FirebaseAuthProfile): AuthUser {
   return {
     id: profile.id,
-    name: profile.name,
+    name: profile.username,
     username: profile.username,
     phone: profile.phone,
     joinedAt: profile.joinedAt,
     authProvider: profile.authProvider,
   }
+}
+
+function saveCompletedGoogleUser(user: AuthUser, password?: string) {
+  const users = readAuthUsers()
+  const storedUser: StoredAuthUser = password ? { ...user, password } : user
+  const otherUsers = users.filter((currentUser) => currentUser.id !== user.id)
+
+  saveAuthUsers([storedUser, ...otherUsers])
 }
 
 function formatJoinedDate(joinedAt: string) {
@@ -357,6 +370,7 @@ function App() {
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
   const [phoneOtpConfirmation, setPhoneOtpConfirmation] =
     useState<PhoneOtpConfirmation | null>(null)
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<AuthUser | null>(null)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(
     null,
   )
@@ -395,7 +409,16 @@ function App() {
         const profile = await firebaseAuth.getFirebaseRedirectProfile()
 
         if (profile) {
-          completeAuth(profile)
+          const existingUser = readAuthUsers().find(
+            (user) => user.authProvider === 'google' && user.id === profile.id,
+          )
+
+          if (existingUser) {
+            completeAuth(existingUser)
+            return
+          }
+
+          setPendingGoogleUser(getAuthUserFromFirebase(profile))
         }
       } catch (error) {
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
@@ -450,14 +473,16 @@ function App() {
       const firebaseUser = getAuthUserFromFirebase(user as FirebaseAuthProfile)
       saveAuthenticatedUser(firebaseUser)
       setAuthenticatedUser(firebaseUser)
-      toast.success(`Welcome, ${firebaseUser.name}`)
+      setPendingGoogleUser(null)
+      toast.success(`Welcome, ${firebaseUser.username}`)
       return
     }
 
     const publicUser = 'password' in user ? getPublicAuthUser(user) : user
     saveAuthenticatedUser(publicUser)
     setAuthenticatedUser(publicUser)
-    toast.success(`Welcome, ${publicUser.name}`)
+    setPendingGoogleUser(null)
+    toast.success(`Welcome, ${publicUser.username}`)
   }
 
   async function signInWithGoogle() {
@@ -487,13 +512,12 @@ function App() {
 
     const googleUser = createAuthUser({
       authProvider: 'google',
-      name: 'Google User',
-      username: 'google.user',
+      name: '',
+      username: '',
       phone: '',
     })
 
-    saveAuthUsers([googleUser, ...users])
-    completeAuth(googleUser)
+    setPendingGoogleUser(getPublicAuthUser(googleUser))
   }
 
   async function signInWithPassword(username: string, password: string) {
@@ -599,8 +623,61 @@ function App() {
     completeAuth(user)
   }
 
+  async function completeGoogleAccount({
+    password,
+    phone,
+    username,
+  }: GoogleAccountDetails) {
+    if (!pendingGoogleUser) {
+      toast.error('Start Google sign up first')
+      return
+    }
+
+    const firebaseAuth = await import('@/lib/firebaseAuth')
+    const normalizedUsername = username.trim()
+
+    if (firebaseAuth.isFirebaseAuthConfigured()) {
+      try {
+        const firebaseProfile = await firebaseAuth.completeFirebaseGoogleAccount({
+          password,
+          phone,
+          username: normalizedUsername,
+        })
+        const completedUser = getAuthUserFromFirebase(firebaseProfile)
+
+        saveCompletedGoogleUser(completedUser)
+        completeAuth(completedUser)
+        return
+      } catch (error) {
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
+        return
+      }
+    }
+
+    const users = readAuthUsers()
+
+    if (
+      users.some(
+        (storedUser) =>
+          storedUser.username.toLowerCase() === normalizedUsername.toLowerCase(),
+      )
+    ) {
+      toast.error('This username is already used')
+      return
+    }
+
+    const completedUser: AuthUser = {
+      ...pendingGoogleUser,
+      name: normalizedUsername,
+      username: normalizedUsername,
+      phone: phone.trim(),
+    }
+
+    saveCompletedGoogleUser(completedUser, password)
+    completeAuth(completedUser)
+  }
+
   async function signUpWithPassword({
-    name,
     otp,
     password,
     phone,
@@ -618,7 +695,6 @@ function App() {
         await firebaseAuth.confirmFirebasePhoneOtp(phoneOtpConfirmation, otp)
         completeAuth(
           await firebaseAuth.signUpWithFirebasePassword({
-            name: name.trim(),
             password,
             username: username.trim(),
           }),
@@ -648,7 +724,7 @@ function App() {
 
     const newUser = createAuthUser({
       authProvider: 'password',
-      name: name.trim(),
+      name: username.trim(),
       username: username.trim(),
       phone: phone.trim(),
       password,
@@ -845,6 +921,16 @@ function App() {
   }
 
   if (!authenticatedUser) {
+    if (pendingGoogleUser) {
+      return (
+        <GoogleAccountSetupView
+          onCancel={() => setPendingGoogleUser(null)}
+          onComplete={completeGoogleAccount}
+          pendingGoogleUser={pendingGoogleUser}
+        />
+      )
+    }
+
     return (
       <AuthView
         onGoogleSignIn={signInWithGoogle}
@@ -1084,6 +1170,120 @@ function App() {
   )
 }
 
+function GoogleAccountSetupView({
+  onCancel,
+  onComplete,
+  pendingGoogleUser,
+}: {
+  onCancel: () => void
+  onComplete: (details: GoogleAccountDetails) => Promise<void> | void
+  pendingGoogleUser: AuthUser
+}) {
+  const suggestedUsername =
+    pendingGoogleUser.username && !pendingGoogleUser.username.includes('@')
+      ? pendingGoogleUser.username
+      : ''
+  const [username, setUsername] = useState(suggestedUsername)
+  const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState(pendingGoogleUser.phone)
+
+  async function submitGoogleDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!username.trim() || !password || !phone.trim()) {
+      toast.error('Fill in username, password, and phone number')
+      return
+    }
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+
+    await onComplete({ password, phone, username })
+  }
+
+  return (
+    <main className="relative mx-auto flex min-h-svh w-full max-w-xl flex-col bg-background px-4 py-6 text-foreground shadow-[0_0_0_1px_rgba(190,200,202,0.35)]">
+      <div className="flex items-center gap-3">
+        <img src="/pwa-icon.svg" alt="" className="size-11" />
+        <div>
+          <h1 className="text-3xl font-semibold text-primary">MakanMana</h1>
+          <p className="text-sm text-muted-foreground">
+            Finish your Google account setup.
+          </p>
+        </div>
+      </div>
+
+      <Card className="mt-6 rounded-xl border-border/70 shadow-sm">
+        <CardHeader>
+          <CardTitle>Complete Google Sign Up</CardTitle>
+          <CardDescription>
+            Add your app username, password, and phone number before entering.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-3" onSubmit={submitGoogleDetails}>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="google-username">
+                Username
+              </label>
+              <Input
+                id="google-username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="makanfan"
+                className="h-12 rounded-lg"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="google-password">
+                Password
+              </label>
+              <Input
+                id="google-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="minimum 6 characters"
+                className="h-12 rounded-lg"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="google-phone">
+                Phone number
+              </label>
+              <Input
+                id="google-phone"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="+60 12 345 6789"
+                className="h-12 rounded-lg"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 rounded-lg"
+                onClick={onCancel}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="h-12 rounded-lg">
+                Enter App
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div id="auth-recaptcha-container" />
+      <Toaster richColors position="bottom-center" />
+    </main>
+  )
+}
+
 function AuthView({
   onGoogleSignIn,
   onPasswordSignIn,
@@ -1103,7 +1303,6 @@ function AuthView({
   const [loginPhone, setLoginPhone] = useState('')
   const [loginOtp, setLoginOtp] = useState('')
   const [isLoginOtpSent, setIsLoginOtpSent] = useState(false)
-  const [signupName, setSignupName] = useState('')
   const [signupUsername, setSignupUsername] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   const [signupPhone, setSignupPhone] = useState('')
@@ -1144,7 +1343,6 @@ function AuthView({
     event.preventDefault()
 
     if (
-      !signupName.trim() ||
       !signupUsername.trim() ||
       !signupPassword ||
       !signupPhone.trim()
@@ -1159,7 +1357,6 @@ function AuthView({
     }
 
     await onSignUp({
-      name: signupName,
       otp: signupOtp,
       username: signupUsername,
       password: signupPassword,
@@ -1308,18 +1505,6 @@ function AuthView({
             </div>
           ) : (
             <form className="space-y-3" onSubmit={submitSignup}>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold" htmlFor="signup-name">
-                  Name
-                </label>
-                <Input
-                  id="signup-name"
-                  value={signupName}
-                  onChange={(event) => setSignupName(event.target.value)}
-                  placeholder="Your display name"
-                  className="h-12 rounded-lg"
-                />
-              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold" htmlFor="signup-username">
@@ -2751,7 +2936,7 @@ function ProfileView({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-3xl font-semibold text-primary">
-              {authenticatedUser.name}
+              {authenticatedUser.username}
             </h2>
             <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <Badge variant="accent" className="rounded-full">
@@ -2760,9 +2945,6 @@ function ProfileView({
               </Badge>
               <span className="text-sm text-muted-foreground">
                 {formatJoinedDate(authenticatedUser.joinedAt)}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                @{authenticatedUser.username}
               </span>
             </div>
           </div>
