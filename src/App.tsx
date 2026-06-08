@@ -31,7 +31,6 @@ import {
   Search,
   Share2,
   Star,
-  Phone,
   Trophy,
   Utensils,
   UserPlus,
@@ -74,6 +73,7 @@ const dietaryPreferencesKey = 'makanmana.dietary-preferences'
 const savedRestaurantsKey = 'makanmana.saved-restaurants'
 const authUserKey = 'makanmana.auth-user'
 const authUsersKey = 'makanmana.auth-users'
+const googleAuthIntentKey = 'makanmana.google-auth-intent'
 const demoOtpCode = '123456'
 
 type Preferences = {
@@ -120,6 +120,7 @@ const defaultPreferences: Preferences = {
 }
 
 type ActiveView = 'discover' | 'search' | 'saved' | 'activity' | 'profile' | 'settings'
+type AuthMode = 'login' | 'signup'
 type SortOption = 'nearest' | 'cheapest' | 'rating' | 'group'
 
 const categories = [
@@ -321,6 +322,24 @@ function saveCompletedGoogleUser(user: AuthUser, password?: string) {
   saveAuthUsers([storedUser, ...otherUsers])
 }
 
+function readGoogleAuthIntent(): AuthMode {
+  return window.localStorage.getItem(googleAuthIntentKey) === 'signup'
+    ? 'signup'
+    : 'login'
+}
+
+function saveStoredAuthUser(user: AuthUser, password?: string) {
+  const users = readAuthUsers()
+  const storedUser: StoredAuthUser = password ? { ...user, password } : user
+  const otherUsers = users.filter(
+    (currentUser) =>
+      currentUser.id !== user.id &&
+      currentUser.username.toLowerCase() !== user.username.toLowerCase(),
+  )
+
+  saveAuthUsers([storedUser, ...otherUsers])
+}
+
 function formatJoinedDate(joinedAt: string) {
   const date = new Date(joinedAt)
 
@@ -409,6 +428,8 @@ function App() {
         const profile = await firebaseAuth.getFirebaseRedirectProfile()
 
         if (profile) {
+          const googleIntent = readGoogleAuthIntent()
+          window.localStorage.removeItem(googleAuthIntentKey)
           const existingUser = readAuthUsers().find(
             (user) => user.authProvider === 'google' && user.id === profile.id,
           )
@@ -418,7 +439,12 @@ function App() {
             return
           }
 
-          setPendingGoogleUser(getAuthUserFromFirebase(profile))
+          if (googleIntent === 'signup') {
+            setPendingGoogleUser(getAuthUserFromFirebase(profile))
+            return
+          }
+
+          toast.error('No Google account found. Please sign up first.')
         }
       } catch (error) {
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
@@ -485,11 +511,12 @@ function App() {
     toast.success(`Welcome, ${publicUser.username}`)
   }
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle(authMode: AuthMode) {
     const firebaseAuth = await import('@/lib/firebaseAuth')
 
     if (firebaseAuth.isFirebaseAuthConfigured()) {
       try {
+        window.localStorage.setItem(googleAuthIntentKey, authMode)
         const profile = await firebaseAuth.signInWithFirebaseGoogle()
 
         if (profile) {
@@ -506,7 +533,17 @@ function App() {
     const existingUser = users.find((user) => user.authProvider === 'google')
 
     if (existingUser) {
-      completeAuth(existingUser)
+      if (authMode === 'login') {
+        completeAuth(existingUser)
+        return
+      }
+
+      toast.error('Google account already exists. Log in with Google.')
+      return
+    }
+
+    if (authMode === 'login') {
+      toast.error('No Google account found. Please sign up first.')
       return
     }
 
@@ -525,9 +562,17 @@ function App() {
 
     if (firebaseAuth.isFirebaseAuthConfigured()) {
       try {
-        completeAuth(
-          await firebaseAuth.signInWithFirebasePassword(username, password),
+        const profile = await firebaseAuth.signInWithFirebasePassword(
+          username,
+          password,
         )
+        const existingUser = readAuthUsers().find(
+          (storedUser) =>
+            storedUser.id === profile.id ||
+            storedUser.username.toLowerCase() === profile.username.toLowerCase(),
+        )
+
+        completeAuth(existingUser ?? profile)
         return
       } catch (error) {
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
@@ -578,51 +623,6 @@ function App() {
     return true
   }
 
-  async function signInWithPhone(phone: string, otp: string) {
-    const firebaseAuth = await import('@/lib/firebaseAuth')
-
-    if (firebaseAuth.isFirebaseAuthConfigured()) {
-      if (!phoneOtpConfirmation) {
-        toast.error('Request OTP first')
-        return
-      }
-
-      try {
-        completeAuth(
-          await firebaseAuth.confirmFirebasePhoneOtp(phoneOtpConfirmation, otp),
-        )
-        setPhoneOtpConfirmation(null)
-        return
-      } catch (error) {
-        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
-        return
-      }
-    }
-
-    if (otp !== demoOtpCode) {
-      toast.error('OTP is incorrect')
-      return
-    }
-
-    const normalizedPhone = phone.trim()
-    const users = readAuthUsers()
-    const user = users.find((storedUser) => storedUser.phone === normalizedPhone)
-
-    if (!user) {
-      const phoneUser = createAuthUser({
-        authProvider: 'phone',
-        name: `User ${normalizedPhone.slice(-4) || 'Phone'}`,
-        username: normalizedPhone || 'phone-user',
-        phone: normalizedPhone,
-      })
-      saveAuthUsers([phoneUser, ...users])
-      completeAuth(phoneUser)
-      return
-    }
-
-    completeAuth(user)
-  }
-
   async function completeGoogleAccount({
     password,
     phone,
@@ -630,7 +630,7 @@ function App() {
   }: GoogleAccountDetails) {
     if (!pendingGoogleUser) {
       toast.error('Start Google sign up first')
-      return
+      return false
     }
 
     const firebaseAuth = await import('@/lib/firebaseAuth')
@@ -646,11 +646,12 @@ function App() {
         const completedUser = getAuthUserFromFirebase(firebaseProfile)
 
         saveCompletedGoogleUser(completedUser)
-        completeAuth(completedUser)
-        return
+        setPendingGoogleUser(null)
+        toast.success('Account created. Log in to continue.')
+        return true
       } catch (error) {
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
-        return
+        return false
       }
     }
 
@@ -663,7 +664,7 @@ function App() {
       )
     ) {
       toast.error('This username is already used')
-      return
+      return false
     }
 
     const completedUser: AuthUser = {
@@ -674,7 +675,9 @@ function App() {
     }
 
     saveCompletedGoogleUser(completedUser, password)
-    completeAuth(completedUser)
+    setPendingGoogleUser(null)
+    toast.success('Account created. Log in to continue.')
+    return true
   }
 
   async function signUpWithPassword({
@@ -688,28 +691,31 @@ function App() {
     if (firebaseAuth.isFirebaseAuthConfigured()) {
       if (!phoneOtpConfirmation) {
         toast.error('Request OTP before creating account')
-        return
+        return false
       }
 
       try {
         await firebaseAuth.confirmFirebasePhoneOtp(phoneOtpConfirmation, otp)
-        completeAuth(
-          await firebaseAuth.signUpWithFirebasePassword({
-            password,
-            username: username.trim(),
-          }),
-        )
+        const profile = await firebaseAuth.signUpWithFirebasePassword({
+          password,
+          phone,
+          username: username.trim(),
+        })
+        const newUser = getAuthUserFromFirebase(profile)
+
+        saveStoredAuthUser(newUser)
         setPhoneOtpConfirmation(null)
-        return
+        toast.success('Account created. Log in to continue.')
+        return true
       } catch (error) {
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
-        return
+        return false
       }
     }
 
     if (otp !== demoOtpCode) {
       toast.error('OTP is incorrect')
-      return
+      return false
     }
 
     const users = readAuthUsers()
@@ -719,7 +725,7 @@ function App() {
       users.some((storedUser) => storedUser.username.toLowerCase() === normalizedUsername)
     ) {
       toast.error('This username is already used')
-      return
+      return false
     }
 
     const newUser = createAuthUser({
@@ -731,7 +737,9 @@ function App() {
     })
 
     saveAuthUsers([newUser, ...users])
-    completeAuth(newUser)
+    setPhoneOtpConfirmation(null)
+    toast.success('Account created. Log in to continue.')
+    return true
   }
 
   function logOut() {
@@ -936,7 +944,6 @@ function App() {
         onGoogleSignIn={signInWithGoogle}
         onPasswordSignIn={signInWithPassword}
         onRequestPhoneOtp={requestPhoneOtp}
-        onPhoneSignIn={signInWithPhone}
         onSignUp={signUpWithPassword}
       />
     )
@@ -1176,7 +1183,7 @@ function GoogleAccountSetupView({
   pendingGoogleUser,
 }: {
   onCancel: () => void
-  onComplete: (details: GoogleAccountDetails) => Promise<void> | void
+  onComplete: (details: GoogleAccountDetails) => Promise<boolean> | boolean
   pendingGoogleUser: AuthUser
 }) {
   const suggestedUsername =
@@ -1271,7 +1278,7 @@ function GoogleAccountSetupView({
                 Cancel
               </Button>
               <Button type="submit" className="h-12 rounded-lg">
-                Enter App
+                Create account
               </Button>
             </div>
           </form>
@@ -1287,31 +1294,22 @@ function GoogleAccountSetupView({
 function AuthView({
   onGoogleSignIn,
   onPasswordSignIn,
-  onPhoneSignIn,
   onRequestPhoneOtp,
   onSignUp,
 }: {
-  onGoogleSignIn: () => Promise<void> | void
+  onGoogleSignIn: (authMode: AuthMode) => Promise<void> | void
   onPasswordSignIn: (username: string, password: string) => Promise<void> | void
-  onPhoneSignIn: (phone: string, otp: string) => Promise<void> | void
   onRequestPhoneOtp: (phone: string) => Promise<boolean>
-  onSignUp: (details: AuthSignUpDetails) => Promise<void> | void
+  onSignUp: (details: AuthSignUpDetails) => Promise<boolean> | boolean
 }) {
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
-  const [loginPhone, setLoginPhone] = useState('')
-  const [loginOtp, setLoginOtp] = useState('')
-  const [isLoginOtpSent, setIsLoginOtpSent] = useState(false)
   const [signupUsername, setSignupUsername] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   const [signupPhone, setSignupPhone] = useState('')
   const [signupOtp, setSignupOtp] = useState('')
   const [isSignupOtpSent, setIsSignupOtpSent] = useState(false)
-
-  async function requestLoginOtp() {
-    setIsLoginOtpSent(await onRequestPhoneOtp(loginPhone))
-  }
 
   async function requestSignupOtp() {
     setIsSignupOtpSent(await onRequestPhoneOtp(signupPhone))
@@ -1326,17 +1324,6 @@ function AuthView({
     }
 
     await onPasswordSignIn(loginUsername, loginPassword)
-  }
-
-  async function submitPhoneLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!isLoginOtpSent) {
-      requestLoginOtp()
-      return
-    }
-
-    await onPhoneSignIn(loginPhone, loginOtp)
   }
 
   async function submitSignup(event: FormEvent<HTMLFormElement>) {
@@ -1356,12 +1343,23 @@ function AuthView({
       return
     }
 
-    await onSignUp({
+    const didCreateAccount = await onSignUp({
       otp: signupOtp,
       username: signupUsername,
       password: signupPassword,
       phone: signupPhone,
     })
+
+    if (didCreateAccount) {
+      setAuthMode('login')
+      setLoginUsername(signupUsername)
+      setLoginPassword('')
+      setSignupUsername('')
+      setSignupPassword('')
+      setSignupPhone('')
+      setSignupOtp('')
+      setIsSignupOtpSent(false)
+    }
   }
 
   return (
@@ -1380,7 +1378,9 @@ function AuthView({
         <CardHeader>
           <CardTitle>{authMode === 'login' ? 'Log in' : 'Sign up'}</CardTitle>
           <CardDescription>
-            Use Google, username/password, or phone OTP.
+            {authMode === 'login'
+              ? 'Use Google or username/password.'
+              : 'Create an account with Google or username/password.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1401,7 +1401,10 @@ function AuthView({
             ))}
           </div>
 
-          <Button className="h-12 w-full rounded-lg" onClick={onGoogleSignIn}>
+          <Button
+            className="h-12 w-full rounded-lg"
+            onClick={() => onGoogleSignIn(authMode)}
+          >
             <UserPlus className="size-5" aria-hidden="true" />
             Continue with Google
           </Button>
@@ -1450,57 +1453,6 @@ function AuthView({
                   <KeyRound className="size-5" aria-hidden="true" />
                   Log in with password
                 </Button>
-              </form>
-
-              <form className="space-y-3 rounded-xl border bg-card p-3" onSubmit={submitPhoneLogin}>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold" htmlFor="login-phone">
-                    Phone number
-                  </label>
-                  <div className="relative">
-                    <Phone
-                      className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <Input
-                      id="login-phone"
-                      value={loginPhone}
-                      onChange={(event) => setLoginPhone(event.target.value)}
-                      placeholder="+60 12 345 6789"
-                      className="h-12 rounded-lg pl-10"
-                    />
-                  </div>
-                </div>
-                {isLoginOtpSent ? (
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold" htmlFor="login-otp">
-                      OTP
-                    </label>
-                    <Input
-                      id="login-otp"
-                      value={loginOtp}
-                      onChange={(event) => setLoginOtp(event.target.value)}
-                      placeholder={demoOtpCode}
-                      className="h-12 rounded-lg"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Demo OTP: {demoOtpCode}
-                    </p>
-                  </div>
-                ) : null}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-12 rounded-lg"
-                    onClick={requestLoginOtp}
-                  >
-                    Request OTP
-                  </Button>
-                  <Button type="submit" className="h-12 rounded-lg">
-                    Verify
-                  </Button>
-                </div>
               </form>
             </div>
           ) : (
@@ -1575,8 +1527,8 @@ function AuthView({
       </Card>
 
       <p className="mt-4 rounded-xl bg-secondary p-3 text-xs leading-5 text-muted-foreground">
-        MVP note: Google and SMS OTP are demo flows in this version. Connect a
-        real auth provider later for production security.
+        MVP note: SMS OTP is used only to verify new sign ups. Google login is
+        available after the account is created.
       </p>
       <div id="auth-recaptcha-container" />
       <Toaster richColors position="bottom-center" />

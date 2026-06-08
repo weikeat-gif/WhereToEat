@@ -72,7 +72,7 @@ describe('App', () => {
     vi.unstubAllGlobals()
   })
 
-  it('signs up with phone OTP and shows the username in profile', async () => {
+  it('signs up with phone OTP, returns to login, and then enters with password', async () => {
     const user = userEvent.setup()
     window.localStorage.removeItem(authUserKey)
     window.localStorage.removeItem(authUsersKey)
@@ -90,6 +90,13 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Sign up OTP'), '123456')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
+    expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Username')).toHaveValue('weikeat')
+    expect(screen.queryByLabelText('Phone number')).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Password'), 'secret123')
+    await user.click(screen.getByRole('button', { name: 'Log in with password' }))
+
     expect(screen.getByText('Recommended Nearby')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /profile tab/i }))
@@ -99,7 +106,7 @@ describe('App', () => {
     expect(screen.getByText(/^Joined /)).toBeInTheDocument()
   })
 
-  it('requires Google sign up users to complete username, password, and phone', async () => {
+  it('requires Google sign up users to create an account before Google login enters', async () => {
     const user = userEvent.setup()
     window.localStorage.removeItem(authUserKey)
     window.localStorage.removeItem(authUsersKey)
@@ -107,6 +114,7 @@ describe('App', () => {
 
     render(<App />)
 
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
 
     expect(
@@ -116,8 +124,12 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Username'), 'googlemakan')
     await user.type(screen.getByLabelText('Password'), 'secret123')
     await user.type(screen.getByLabelText('Phone number'), '+60112224444')
-    await user.click(screen.getByRole('button', { name: 'Enter App' }))
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
 
+    expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+    expect(screen.queryByText('Recommended Nearby')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
     expect(screen.getByText('Recommended Nearby')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /profile tab/i }))

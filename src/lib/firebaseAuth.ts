@@ -88,9 +88,11 @@ export async function signInWithFirebasePassword(
 
 export async function signUpWithFirebasePassword({
   password,
+  phone,
   username,
 }: {
   password: string
+  phone: string
   username: string
 }) {
   const auth = getConfiguredAuth()
@@ -108,6 +110,7 @@ export async function signUpWithFirebasePassword({
     'password',
     normalizedUsername,
     normalizedUsername,
+    phone.trim(),
   )
 }
 
