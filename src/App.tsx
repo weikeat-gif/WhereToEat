@@ -379,6 +379,32 @@ function App() {
     )
   }, [savedRestaurants])
 
+  useEffect(() => {
+    if (authenticatedUser) {
+      return
+    }
+
+    async function completeFirebaseRedirectSignIn() {
+      const firebaseAuth = await import('@/lib/firebaseAuth')
+
+      if (!firebaseAuth.isFirebaseAuthConfigured()) {
+        return
+      }
+
+      try {
+        const profile = await firebaseAuth.getFirebaseRedirectProfile()
+
+        if (profile) {
+          completeAuth(profile)
+        }
+      } catch (error) {
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
+      }
+    }
+
+    void completeFirebaseRedirectSignIn()
+  }, [authenticatedUser])
+
   const visibleRestaurants = useMemo(
     () =>
       prioritizeRestaurantsByPreferences(
@@ -439,10 +465,14 @@ function App() {
 
     if (firebaseAuth.isFirebaseAuthConfigured()) {
       try {
-        completeAuth(await firebaseAuth.signInWithFirebaseGoogle())
+        const profile = await firebaseAuth.signInWithFirebaseGoogle()
+
+        if (profile) {
+          completeAuth(profile)
+        }
         return
-      } catch {
-        toast.error('Google sign in failed')
+      } catch (error) {
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
         return
       }
     }
@@ -475,8 +505,8 @@ function App() {
           await firebaseAuth.signInWithFirebasePassword(username, password),
         )
         return
-      } catch {
-        toast.error('Username or password is incorrect')
+      } catch (error) {
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
         return
       }
     }
@@ -514,8 +544,8 @@ function App() {
         setPhoneOtpConfirmation(confirmation)
         toast.success('OTP sent')
         return true
-      } catch {
-        toast.error('Could not send OTP')
+      } catch (error) {
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
         return false
       }
     }
@@ -539,8 +569,8 @@ function App() {
         )
         setPhoneOtpConfirmation(null)
         return
-      } catch {
-        toast.error('OTP is incorrect')
+      } catch (error) {
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
         return
       }
     }
@@ -595,8 +625,8 @@ function App() {
         )
         setPhoneOtpConfirmation(null)
         return
-      } catch {
-        toast.error('Could not create account')
+      } catch (error) {
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
         return
       }
     }

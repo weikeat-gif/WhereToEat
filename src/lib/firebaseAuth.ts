@@ -2,11 +2,12 @@ import { getApps, initializeApp, type FirebaseOptions } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
   RecaptchaVerifier,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
-  signInWithPopup,
+  signInWithRedirect,
   updateProfile,
   type ConfirmationResult,
   type User,
@@ -35,6 +36,10 @@ const firebaseConfig: FirebaseOptions = {
 let recaptchaVerifier: RecaptchaVerifier | null = null
 
 export function isFirebaseAuthConfigured() {
+  if (import.meta.env.MODE === 'test') {
+    return false
+  }
+
   return Boolean(
     firebaseConfig.apiKey &&
       firebaseConfig.appId &&
@@ -49,7 +54,18 @@ export async function signInWithFirebaseGoogle() {
   provider.addScope('profile')
   provider.addScope('email')
 
-  const result = await signInWithPopup(auth, provider)
+  await signInWithRedirect(auth, provider)
+
+  return null
+}
+
+export async function getFirebaseRedirectProfile() {
+  const auth = getConfiguredAuth()
+  const result = await getRedirectResult(auth)
+
+  if (!result) {
+    return null
+  }
 
   return mapFirebaseUser(result.user, 'google')
 }
@@ -120,6 +136,58 @@ export function getFirebaseEmail(username: string) {
   }
 
   return `${normalizedUsername}@makanmana.local`
+}
+
+export function getFirebaseAuthErrorMessage(error: unknown) {
+  const code =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+      ? error.code
+      : ''
+
+  if (code === 'auth/unauthorized-domain') {
+    return 'This domain is not authorized in Firebase Authentication settings.'
+  }
+
+  if (code === 'auth/operation-not-allowed') {
+    return 'This sign-in method is not enabled in Firebase Authentication.'
+  }
+
+  if (code === 'auth/invalid-phone-number') {
+    return 'Use a valid phone number with country code, for example +60123456789.'
+  }
+
+  if (code === 'auth/missing-app-credential' || code === 'auth/invalid-app-credential') {
+    return 'Phone OTP reCAPTCHA failed. Check Firebase Phone Auth and authorized domains.'
+  }
+
+  if (code === 'auth/quota-exceeded') {
+    return 'Firebase SMS quota was exceeded. Use Firebase test phone numbers while developing.'
+  }
+
+  if (code === 'auth/invalid-verification-code') {
+    return 'OTP is incorrect.'
+  }
+
+  if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
+    return 'Google login popup was blocked or closed. Try again.'
+  }
+
+  if (code === 'auth/email-already-in-use') {
+    return 'This username is already used.'
+  }
+
+  if (code === 'auth/weak-password') {
+    return 'Password is too weak.'
+  }
+
+  if (code === 'auth/invalid-credential') {
+    return 'Username or password is incorrect.'
+  }
+
+  return 'Firebase authentication failed. Check Firebase Console setup.'
 }
 
 function getConfiguredAuth() {
