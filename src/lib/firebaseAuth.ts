@@ -9,6 +9,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
   signInWithRedirect,
+  signOut,
   updateProfile,
   type ConfirmationResult,
   type User,
@@ -150,6 +151,12 @@ export function resetFirebaseRecaptchaVerifier() {
   recaptchaVerifier?.clear()
   recaptchaVerifier = null
   recaptchaVerifierContainerId = ''
+}
+
+export async function signOutFirebaseUser() {
+  const auth = getConfiguredAuth()
+
+  await signOut(auth)
 }
 
 function getRecaptchaVerifier(

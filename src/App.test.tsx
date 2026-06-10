@@ -104,6 +104,12 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'weikeat' })).toBeInTheDocument()
     expect(screen.queryByText('@weikeat')).not.toBeInTheDocument()
     expect(screen.getByText(/^Joined /)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Log Out' }))
+
+    expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Username')).toHaveValue('')
+    expect(screen.queryByText('Recommended Nearby')).not.toBeInTheDocument()
   })
 
   it('lets Google sign up and Google login enter without username and password', async () => {

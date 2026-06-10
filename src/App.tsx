@@ -659,7 +659,17 @@ function App() {
     return true
   }
 
-  function logOut() {
+  async function logOut() {
+    const firebaseAuth = await import('@/lib/firebaseAuth')
+
+    if (firebaseAuth.isFirebaseAuthConfigured()) {
+      try {
+        await firebaseAuth.signOutFirebaseUser()
+      } catch {
+        toast.error('Could not fully sign out of Firebase. Try again.')
+      }
+    }
+
     window.localStorage.removeItem(authUserKey)
     setPhoneOtpConfirmation(null)
     setAuthenticatedUser(null)
@@ -2657,7 +2667,7 @@ function ProfileView({
   savedRestaurants: Restaurant[]
   onAddPreference: (preference: string) => void
   onBrowseFood: () => void
-  onLogOut: () => void
+  onLogOut: () => Promise<void> | void
   onOpenMaps: (restaurant: Restaurant) => void
   onRemovePreference: (preference: string) => void
   onRemoveSaved: (restaurant: Restaurant) => void
