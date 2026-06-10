@@ -257,6 +257,11 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Search Food' })).toBeInTheDocument()
     expect(screen.getByLabelText(/search food page/i)).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: /map tab/i }))
+    expect(screen.getByRole('heading', { name: 'Map' })).toBeInTheDocument()
+    expect(screen.getByText('Food route hub')).toBeInTheDocument()
+    expect(screen.getByText('Places for directions')).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: /activity tab/i }))
     expect(screen.getByRole('heading', { name: 'Team Activity' })).toBeInTheDocument()
     expect(screen.getByText('Active Polls')).toBeInTheDocument()

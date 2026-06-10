@@ -113,7 +113,14 @@ const defaultPreferences: Preferences = {
   groupFriendly: true,
 }
 
-type ActiveView = 'discover' | 'search' | 'saved' | 'activity' | 'profile' | 'settings'
+type ActiveView =
+  | 'discover'
+  | 'search'
+  | 'map'
+  | 'saved'
+  | 'activity'
+  | 'profile'
+  | 'settings'
 type AuthMode = 'login' | 'signup'
 type SortOption = 'nearest' | 'cheapest' | 'rating' | 'group'
 
@@ -1021,6 +1028,21 @@ function App() {
         />
       ) : null}
 
+      {activeView === 'map' ? (
+        <MapHubView
+          quickMapsUrl={quickMapsUrl}
+          restaurants={visibleRestaurants}
+          savedRestaurants={savedRestaurants}
+          statusLabel={statusLabel}
+          onFindNearby={() => searchNearbyFood()}
+          onOpenBroadMap={() =>
+            window.open(quickMapsUrl, '_blank', 'noopener,noreferrer')
+          }
+          onOpenMaps={openRestaurantMaps}
+          onSelectRestaurant={setSelectedRestaurant}
+        />
+      ) : null}
+
       {activeView === 'activity' ? (
         <ActivityView
           restaurants={popularRestaurants}
@@ -1060,8 +1082,8 @@ function App() {
         onToggleSaved={(restaurant) => toggleSavedRestaurant(restaurant)}
       />
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-4 py-2 backdrop-blur">
-        <div className="grid grid-cols-4 gap-2">
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-4 pb-2 pt-3 backdrop-blur">
+        <div className="grid grid-cols-[1fr_1fr_72px_1fr_1fr] items-end gap-1">
           <NavItem
             active={activeView === 'discover'}
             icon={<Compass className="size-6" />}
@@ -1073,6 +1095,10 @@ function App() {
             icon={<Search className="size-6" />}
             label="Search"
             onClick={() => setActiveView('search')}
+          />
+          <MapNavItem
+            active={activeView === 'map'}
+            onClick={() => setActiveView('map')}
           />
           <NavItem
             active={activeView === 'activity'}
@@ -2041,6 +2067,160 @@ function SavedEmptyCard({ onBrowse }: { onBrowse: () => void }) {
         </Button>
       </CardContent>
     </Card>
+  )
+}
+
+function MapHubView({
+  onFindNearby,
+  onOpenBroadMap,
+  onOpenMaps,
+  onSelectRestaurant,
+  quickMapsUrl,
+  restaurants,
+  savedRestaurants,
+  statusLabel,
+}: {
+  onFindNearby: () => void
+  onOpenBroadMap: () => void
+  onOpenMaps: (restaurant: Restaurant) => void
+  onSelectRestaurant: (restaurant: Restaurant) => void
+  quickMapsUrl: string
+  restaurants: Restaurant[]
+  savedRestaurants: Restaurant[]
+  statusLabel: string
+}) {
+  const directionPlaces = useMemo(() => {
+    const seen = new Set<string>()
+
+    return [...savedRestaurants, ...restaurants]
+      .filter((restaurant) => {
+        if (seen.has(restaurant.id)) {
+          return false
+        }
+
+        seen.add(restaurant.id)
+        return true
+      })
+      .slice(0, 5)
+  }, [restaurants, savedRestaurants])
+
+  return (
+    <section className="space-y-5 px-4 py-5 pb-28">
+      <PageTitle
+        title="Map"
+        subtitle="Open live directions for nearby food picks."
+      />
+
+      <Card className="overflow-hidden rounded-xl border-border/70 shadow-sm">
+        <CardContent className="space-y-4 p-4">
+          <div className="relative min-h-52 overflow-hidden rounded-xl bg-primary p-4 text-primary-foreground">
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute left-8 top-8 h-28 w-28 rounded-full border border-white/70" />
+              <div className="absolute bottom-6 right-8 h-36 w-36 rounded-full border border-white/60" />
+              <div className="absolute left-1/3 top-10 h-40 w-1 rotate-45 rounded-full bg-white/80" />
+            </div>
+            <div className="relative z-10 flex h-full min-h-44 flex-col justify-between">
+              <div>
+                <Badge variant="accent" className="rounded-full">
+                  <Navigation className="size-3.5" aria-hidden="true" />
+                  Map ready
+                </Badge>
+                <h2 className="mt-4 text-3xl font-semibold">Food route hub</h2>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-white/85">
+                  Use this after voting or choosing a shop to open live routes,
+                  hours, and reviews in Google Maps.
+                </p>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <Button
+                  className="h-12 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90"
+                  onClick={onOpenBroadMap}
+                >
+                  <Navigation className="size-5" aria-hidden="true" />
+                  Open live map
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="h-12 rounded-lg"
+                  onClick={onFindNearby}
+                >
+                  <LocateFixed className="size-5" aria-hidden="true" />
+                  Refresh nearby
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-lg bg-secondary p-3 text-center">
+              <p className="text-xs uppercase text-muted-foreground">Status</p>
+              <p className="mt-1 truncate font-semibold text-primary">{statusLabel}</p>
+            </div>
+            <div className="rounded-lg bg-secondary p-3 text-center">
+              <p className="text-xs uppercase text-muted-foreground">Saved</p>
+              <p className="mt-1 font-semibold text-primary">{savedRestaurants.length}</p>
+            </div>
+            <div className="rounded-lg bg-secondary p-3 text-center">
+              <p className="text-xs uppercase text-muted-foreground">Places</p>
+              <p className="mt-1 font-semibold text-primary">{directionPlaces.length}</p>
+            </div>
+          </div>
+
+          <p className="rounded-lg bg-secondary p-3 text-xs leading-5 text-muted-foreground break-words">
+            {quickMapsUrl}
+          </p>
+        </CardContent>
+      </Card>
+
+      <section className="space-y-3">
+        <SectionHeader title="Places for directions" />
+        <div className="grid gap-3">
+          {directionPlaces.length > 0 ? (
+            directionPlaces.map((restaurant) => (
+              <Card key={`map-${restaurant.id}`} className="rounded-xl border-border/70">
+                <CardContent className="grid grid-cols-[1fr_auto] gap-3 p-4">
+                  <button
+                    type="button"
+                    className="min-w-0 text-left"
+                    onClick={() => onSelectRestaurant(restaurant)}
+                  >
+                    <p className="truncate text-base font-semibold">
+                      {restaurant.name}
+                    </p>
+                    <p className="mt-1 truncate text-sm text-muted-foreground">
+                      {restaurant.cuisine} · {restaurant.price} · {restaurant.distanceKm} km
+                    </p>
+                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                      {restaurant.vibe}
+                    </p>
+                  </button>
+                  <Button
+                    size="icon"
+                    className="size-12 rounded-xl"
+                    onClick={() => onOpenMaps(restaurant)}
+                    aria-label={`Open ${restaurant.name} in Maps`}
+                  >
+                    <Navigation className="size-5" aria-hidden="true" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className="rounded-xl border-border/70">
+              <CardContent className="p-5 text-center">
+                <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-secondary">
+                  <MapPin className="size-6 text-primary" aria-hidden="true" />
+                </div>
+                <h3 className="mt-4 text-xl font-semibold">No places yet</h3>
+                <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
+                  Search nearby food first, then return here for directions.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </section>
+    </section>
   )
 }
 
@@ -3864,6 +4044,36 @@ function NavItem({
     >
       {icon}
       <span>{label}</span>
+    </button>
+  )
+}
+
+function MapNavItem({
+  active = false,
+  onClick,
+}: {
+  active?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Map tab"
+      className={`group flex -translate-y-4 flex-col items-center gap-1 rounded-2xl px-1 pb-1 text-xs font-semibold text-primary transition duration-200 hover:-translate-y-5 ${
+        active ? 'text-primary' : 'text-foreground'
+      }`}
+    >
+      <span
+        className={`flex size-16 items-center justify-center rounded-full border-4 border-card shadow-[0_16px_34px_rgba(0,83,91,0.28)] transition group-hover:shadow-[0_18px_38px_rgba(0,83,91,0.36)] ${
+          active
+            ? 'bg-accent text-accent-foreground'
+            : 'bg-primary text-primary-foreground'
+        }`}
+      >
+        <Navigation className="size-7" aria-hidden="true" />
+      </span>
+      <span>Map</span>
     </button>
   )
 }
