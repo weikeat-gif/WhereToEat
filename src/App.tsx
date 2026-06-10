@@ -403,7 +403,9 @@ function App() {
       }
 
       try {
-        const profile = await firebaseAuth.getFirebaseRedirectProfile()
+        const profile =
+          (await firebaseAuth.getFirebaseRedirectProfile()) ??
+          (await firebaseAuth.getFirebaseSignedInProfile())
 
         if (profile) {
           const existingUser = readAuthUsers().find(

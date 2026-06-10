@@ -4,6 +4,7 @@ import {
   getAuth,
   getRedirectResult,
   GoogleAuthProvider,
+  onAuthStateChanged,
   RecaptchaVerifier,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
@@ -69,6 +70,28 @@ export async function getFirebaseRedirectProfile() {
   }
 
   return mapFirebaseUser(result.user, 'google')
+}
+
+export async function getFirebaseSignedInProfile() {
+  const auth = getConfiguredAuth()
+
+  if (auth.currentUser) {
+    return mapFirebaseUser(auth.currentUser, getFirebaseUserProvider(auth.currentUser))
+  }
+
+  return new Promise<FirebaseAuthProfile | null>((resolve, reject) => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        unsubscribe()
+        resolve(user ? mapFirebaseUser(user, getFirebaseUserProvider(user)) : null)
+      },
+      (error) => {
+        unsubscribe()
+        reject(error)
+      },
+    )
+  })
 }
 
 export async function signInWithFirebasePassword(
@@ -197,6 +220,10 @@ export function getFirebaseAuthErrorMessage(
   }
 
   if (code === 'auth/operation-not-allowed') {
+    if (message.toLowerCase().includes('region enabled')) {
+      return 'Phone OTP is blocked for this SMS region. In Firebase Console, open Authentication > Settings > SMS region policy and allow Malaysia/your test country.'
+    }
+
     if (authMethod === 'google') {
       return 'Google sign-in is not enabled. In Firebase Console, open Authentication > Sign-in method and enable Google.'
     }
@@ -269,6 +296,18 @@ function getConfiguredAuth() {
   const app = getApps()[0] ?? initializeApp(firebaseConfig)
 
   return getAuth(app)
+}
+
+function getFirebaseUserProvider(user: User): FirebaseAuthProfile['authProvider'] {
+  if (user.providerData.some((provider) => provider.providerId === 'google.com')) {
+    return 'google'
+  }
+
+  if (user.phoneNumber) {
+    return 'phone'
+  }
+
+  return 'password'
 }
 
 function mapFirebaseUser(
