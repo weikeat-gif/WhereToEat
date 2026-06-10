@@ -16,7 +16,6 @@ import {
   Compass,
   Copy,
   CreditCard,
-  Edit3,
   Filter,
   Heart,
   History,
@@ -2673,10 +2672,24 @@ function ProfileView({
     email: '',
     password: '',
     payment: '',
+    username: authenticatedUser.username,
   })
 
-  function updateAccountField(field: AccountField, value: string) {
+  function updateAccountField(field: AccountField, value: string, currentPassword = '') {
+    if (field === 'password') {
+      const storedUser = readAuthUsers().find(
+        (user) => user.id === authenticatedUser.id,
+      )
+
+      if (storedUser?.password && storedUser.password !== currentPassword) {
+        toast.error('Current password is incorrect')
+        return false
+      }
+    }
+
     setAccountDetails((current) => ({ ...current, [field]: value }))
+    toast.success(`${accountFieldCopy[field].label} updated`)
+    return true
   }
 
   return (
@@ -2700,9 +2713,6 @@ function ProfileView({
               </span>
             </div>
           </div>
-          <Button variant="secondary" size="icon" aria-label="Edit profile">
-            <Edit3 className="size-5" aria-hidden="true" />
-          </Button>
         </CardContent>
       </Card>
 
@@ -2774,6 +2784,12 @@ function ProfileView({
           </CardHeader>
           <CardContent className="divide-y divide-border/70">
             <ProfileMenuItem
+              icon={<UserRound className="size-5" />}
+              label="Username"
+              value={accountDetails.username}
+              onClick={() => setEditingAccountField('username')}
+            />
+            <ProfileMenuItem
               icon={<Mail className="size-5" />}
               label="Email Address"
               value={accountDetails.email}
@@ -2843,7 +2859,7 @@ function ProfileView({
   )
 }
 
-type AccountField = 'email' | 'password' | 'payment'
+type AccountField = 'email' | 'password' | 'payment' | 'username'
 
 const accountFieldCopy: Record<
   AccountField,
@@ -2864,6 +2880,11 @@ const accountFieldCopy: Record<
     placeholder: 'Visa ending 4242',
     type: 'text',
   },
+  username: {
+    label: 'Username',
+    placeholder: 'weikeat',
+    type: 'text',
+  },
 }
 
 function ProfileMenuItem({
@@ -2881,6 +2902,7 @@ function ProfileMenuItem({
     <button
       type="button"
       onClick={onClick}
+      aria-label={value ? `${label} ${value}` : label}
       className="flex w-full items-center justify-between gap-3 py-3 text-left transition hover:text-primary"
     >
       <span className="flex min-w-0 items-center gap-3">
@@ -2914,7 +2936,7 @@ function ProfileToggle({
   const [isChecked, setIsChecked] = useState(checked)
 
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_3.5rem] items-center gap-3">
       <span className="min-w-0">
         <span className="block text-sm">{title}</span>
         <span className="mt-0.5 block text-xs text-muted-foreground">{subtitle}</span>
@@ -2925,7 +2947,7 @@ function ProfileToggle({
         aria-checked={isChecked}
         aria-label={title}
         onClick={() => setIsChecked((current) => !current)}
-        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+        className={`relative mx-auto h-6 w-11 shrink-0 rounded-full border transition-colors ${
           isChecked
             ? 'border-primary bg-primary'
             : 'border-border bg-secondary'
@@ -3019,17 +3041,25 @@ function AccountInputDialog({
 }: {
   field: AccountField
   onClose: () => void
-  onSave: (field: AccountField, value: string) => void
+  onSave: (field: AccountField, value: string, currentPassword?: string) => boolean
   value: string
 }) {
   const [inputValue, setInputValue] = useState(value)
+  const [currentPassword, setCurrentPassword] = useState('')
 
   const copy = accountFieldCopy[field]
 
   function submitAccountField(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    onSave(field, inputValue.trim())
-    onClose()
+
+    if (field === 'password' && !currentPassword) {
+      toast.error('Enter your current password first')
+      return
+    }
+
+    if (onSave(field, inputValue.trim(), currentPassword)) {
+      onClose()
+    }
   }
 
   return (
@@ -3055,12 +3085,29 @@ function AccountInputDialog({
           <div className="space-y-1">
             <h3 className="text-xl font-semibold text-primary">{copy.label}</h3>
             <p className="text-sm text-muted-foreground">
-              Update your account information for this profile.
+              {field === 'password'
+                ? 'Confirm your current password before setting a new one.'
+                : 'Update your account information for this profile.'}
             </p>
           </div>
+          {field === 'password' ? (
+            <div className="mt-4 space-y-2">
+              <label className="text-sm font-semibold" htmlFor="account-current-password">
+                Current Password
+              </label>
+              <Input
+                id="account-current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                placeholder="Enter current password"
+                className="h-12 rounded-lg"
+              />
+            </div>
+          ) : null}
           <div className="mt-4 space-y-2">
             <label className="text-sm font-semibold" htmlFor={`account-${field}`}>
-              {copy.label}
+              {field === 'password' ? 'New Password' : copy.label}
             </label>
             <Input
               id={`account-${field}`}

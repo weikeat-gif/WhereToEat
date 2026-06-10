@@ -262,6 +262,8 @@ describe('App', () => {
     expect(screen.getByText('Team Captain')).toBeInTheDocument()
     expect(screen.getByText('Dietary Requirements')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Saved Places' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Username alexchen' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit profile' })).not.toBeInTheDocument()
     expect(screen.getByText('Notification Preferences')).toBeInTheDocument()
   })
 
@@ -306,6 +308,30 @@ describe('App', () => {
 
     expect(screen.queryByRole('dialog', { name: 'Email Address' })).not.toBeInTheDocument()
     expect(screen.getByText('alex@test.com')).toBeInTheDocument()
+  })
+
+  it('requires the current password before saving a new password', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /profile tab/i }))
+    await user.click(screen.getByRole('button', { name: 'Password' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Password' })
+    await user.type(within(dialog).getByLabelText('Current Password'), 'wrong')
+    await user.type(within(dialog).getByLabelText('New Password'), 'newsecret123')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(screen.getByRole('dialog', { name: 'Password' })).toBeInTheDocument()
+
+    await user.clear(within(dialog).getByLabelText('Current Password'))
+    await user.type(within(dialog).getByLabelText('Current Password'), 'password123')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Password' })).not.toBeInTheDocument()
+    expect(screen.getByText('Saved password')).toBeInTheDocument()
   })
 
   it('toggles profile notifications with switch controls', async () => {
