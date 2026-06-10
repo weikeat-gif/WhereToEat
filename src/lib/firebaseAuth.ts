@@ -1,11 +1,9 @@
 import { getApps, initializeApp, type FirebaseOptions } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
-  EmailAuthProvider,
   getAuth,
   getRedirectResult,
   GoogleAuthProvider,
-  linkWithCredential,
   RecaptchaVerifier,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
@@ -114,38 +112,6 @@ export async function signUpWithFirebasePassword({
   )
 }
 
-export async function completeFirebaseGoogleAccount({
-  password,
-  phone,
-  username,
-}: {
-  password: string
-  phone: string
-  username: string
-}) {
-  const auth = getConfiguredAuth()
-  const user = auth.currentUser
-  const normalizedUsername = username.trim()
-
-  if (!user) {
-    throw new Error('No Google user is signed in')
-  }
-
-  await updateProfile(user, { displayName: normalizedUsername })
-  await linkWithCredential(
-    user,
-    EmailAuthProvider.credential(getFirebaseEmail(normalizedUsername), password),
-  )
-
-  return mapFirebaseUser(
-    user,
-    'google',
-    normalizedUsername,
-    normalizedUsername,
-    phone.trim(),
-  )
-}
-
 export async function requestFirebasePhoneOtp(
   phone: string,
   recaptchaContainerId: string,
@@ -187,6 +153,21 @@ export function getFirebaseAuthErrorMessage(error: unknown) {
     typeof error.code === 'string'
       ? error.code
       : ''
+  const message =
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string'
+      ? error.message
+      : ''
+
+  if (code === 'auth/configuration-not-found') {
+    return 'Firebase Auth configuration was not found. Enable Google or Phone sign-in in Firebase Console.'
+  }
+
+  if (code === 'auth/invalid-api-key') {
+    return 'Firebase API key is invalid. Check your local Firebase environment values.'
+  }
 
   if (code === 'auth/unauthorized-domain') {
     return 'This domain is not authorized in Firebase Authentication settings.'
@@ -236,7 +217,13 @@ export function getFirebaseAuthErrorMessage(error: unknown) {
     return 'Username or password is incorrect.'
   }
 
-  return 'Firebase authentication failed. Check Firebase Console setup.'
+  if (code === 'auth/network-request-failed') {
+    return 'Firebase network request failed. Check your internet connection and Firebase project settings.'
+  }
+
+  return code
+    ? `Firebase authentication failed (${code}). Check Firebase Console setup.`
+    : message || 'Firebase authentication failed. Check Firebase Console setup.'
 }
 
 function getConfiguredAuth() {
