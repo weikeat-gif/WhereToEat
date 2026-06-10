@@ -278,6 +278,28 @@ describe('App', () => {
     expect(screen.getByText('Notification Preferences')).toBeInTheDocument()
   })
 
+  it('sends a selected restaurant to the map route page', async () => {
+    const user = userEvent.setup()
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.click(screen.getAllByRole('button', { name: 'View details' })[0])
+    expect(
+      screen.getByRole('dialog', { name: 'Restoran Nasi Kandar Pelita KLCC' }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Go to Map' }))
+
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole('dialog', { name: 'Restoran Nasi Kandar Pelita KLCC' }),
+    )
+    expect(screen.getByRole('heading', { name: 'Map' })).toBeInTheDocument()
+    expect(screen.getByText('Route to shop')).toBeInTheDocument()
+    expect(screen.getAllByText('Restoran Nasi Kandar Pelita KLCC')).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Start GPS route' })).toBeInTheDocument()
+  })
+
   it('adds profile preferences and keeps recommendations visible', async () => {
     const user = userEvent.setup()
     setGeolocation(undefined)

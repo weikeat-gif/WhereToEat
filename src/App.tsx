@@ -345,6 +345,23 @@ function formatJoinedDate(joinedAt: string) {
   })}`
 }
 
+function buildGoogleMapsDirectionsUrl(
+  restaurant: Restaurant,
+  userLocation: Coordinates | null,
+) {
+  const params = new URLSearchParams({
+    api: '1',
+    destination: `${restaurant.lat},${restaurant.lng}`,
+    travelmode: 'driving',
+  })
+
+  if (userLocation) {
+    params.set('origin', `${userLocation.lat},${userLocation.lng}`)
+  }
+
+  return `https://www.google.com/maps/dir/?${params.toString()}`
+}
+
 function isStoredRestaurant(value: unknown): value is Restaurant {
   return (
     typeof value === 'object' &&
@@ -383,6 +400,7 @@ function App() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(
     null,
   )
+  const [routeRestaurant, setRouteRestaurant] = useState<Restaurant | null>(null)
 
   useEffect(() => {
     window.localStorage.setItem(preferenceKey, JSON.stringify(preferences))
@@ -835,6 +853,20 @@ function App() {
     )
   }
 
+  function openRestaurantRoute(restaurant: Restaurant) {
+    window.open(
+      buildGoogleMapsDirectionsUrl(restaurant, userLocation),
+      '_blank',
+      'noopener,noreferrer',
+    )
+  }
+
+  function routeRestaurantInMap(restaurant: Restaurant) {
+    setRouteRestaurant(restaurant)
+    setSelectedRestaurant(null)
+    setActiveView('map')
+  }
+
   async function copyRestaurantLink(restaurant: Restaurant) {
     await navigator.clipboard.writeText(buildGoogleMapsRestaurantUrl(restaurant))
     toast.success('Restaurant link copied')
@@ -1031,15 +1063,19 @@ function App() {
       {activeView === 'map' ? (
         <MapHubView
           quickMapsUrl={quickMapsUrl}
+          routeRestaurant={routeRestaurant}
           restaurants={visibleRestaurants}
           savedRestaurants={savedRestaurants}
           statusLabel={statusLabel}
+          userLocation={userLocation}
           onFindNearby={() => searchNearbyFood()}
           onOpenBroadMap={() =>
             window.open(quickMapsUrl, '_blank', 'noopener,noreferrer')
           }
           onOpenMaps={openRestaurantMaps}
+          onOpenRoute={openRestaurantRoute}
           onSelectRestaurant={setSelectedRestaurant}
+          onSetRouteRestaurant={setRouteRestaurant}
         />
       ) : null}
 
@@ -1076,14 +1112,14 @@ function App() {
         isSaved={
           selectedRestaurant ? savedRestaurantIds.has(selectedRestaurant.id) : false
         }
-        onOpenMaps={openRestaurantMaps}
         onCopy={(restaurant) => void copyRestaurantLink(restaurant)}
+        onRouteInMap={routeRestaurantInMap}
         onShare={(restaurant) => void shareRestaurant(restaurant)}
         onToggleSaved={(restaurant) => toggleSavedRestaurant(restaurant)}
       />
 
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-4 pb-2 pt-3 backdrop-blur">
-        <div className="grid grid-cols-[1fr_1fr_72px_1fr_1fr] items-end gap-1">
+        <div className="grid grid-cols-[1fr_1fr_60px_1fr_1fr] items-end gap-1">
           <NavItem
             active={activeView === 'discover'}
             icon={<Compass className="size-6" />}
@@ -2074,20 +2110,28 @@ function MapHubView({
   onFindNearby,
   onOpenBroadMap,
   onOpenMaps,
+  onOpenRoute,
   onSelectRestaurant,
+  onSetRouteRestaurant,
   quickMapsUrl,
+  routeRestaurant,
   restaurants,
   savedRestaurants,
   statusLabel,
+  userLocation,
 }: {
   onFindNearby: () => void
   onOpenBroadMap: () => void
   onOpenMaps: (restaurant: Restaurant) => void
+  onOpenRoute: (restaurant: Restaurant) => void
   onSelectRestaurant: (restaurant: Restaurant) => void
+  onSetRouteRestaurant: (restaurant: Restaurant) => void
   quickMapsUrl: string
+  routeRestaurant: Restaurant | null
   restaurants: Restaurant[]
   savedRestaurants: Restaurant[]
   statusLabel: string
+  userLocation: Coordinates | null
 }) {
   const directionPlaces = useMemo(() => {
     const seen = new Set<string>()
@@ -2103,6 +2147,7 @@ function MapHubView({
       })
       .slice(0, 5)
   }, [restaurants, savedRestaurants])
+  const activeRouteRestaurant = routeRestaurant
 
   return (
     <section className="space-y-5 px-4 py-5 pb-28">
@@ -2172,6 +2217,62 @@ function MapHubView({
         </CardContent>
       </Card>
 
+      {activeRouteRestaurant ? (
+        <Card className="rounded-xl border-border/70 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Navigation className="size-5 text-primary" aria-hidden="true" />
+              Route to shop
+            </CardTitle>
+            <CardDescription>
+              {userLocation
+                ? 'Using your current GPS as the starting point.'
+                : 'Google Maps will ask for your current location when the route opens.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-[32px_1fr] gap-3 rounded-xl bg-secondary p-4">
+              <span className="mt-1 size-3 rounded-full bg-primary" />
+              <div className="min-w-0">
+                <p className="text-xs uppercase text-muted-foreground">Start</p>
+                <p className="truncate font-semibold">
+                  {userLocation
+                    ? `${userLocation.lat}, ${userLocation.lng}`
+                    : 'Use current phone GPS'}
+                </p>
+              </div>
+              <span className="ml-1 h-10 w-px bg-border" />
+              <div className="min-w-0" />
+              <span className="mt-1 size-3 rounded-full bg-accent" />
+              <div className="min-w-0">
+                <p className="text-xs uppercase text-muted-foreground">Destination</p>
+                <p className="truncate font-semibold">{activeRouteRestaurant.name}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {activeRouteRestaurant.lat}, {activeRouteRestaurant.lng}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                className="h-12 rounded-lg"
+                onClick={() => onOpenRoute(activeRouteRestaurant)}
+              >
+                <Navigation className="size-5" aria-hidden="true" />
+                Start GPS route
+              </Button>
+              <Button
+                variant="outline"
+                className="h-12 rounded-lg"
+                onClick={() => onOpenMaps(activeRouteRestaurant)}
+              >
+                <MapPin className="size-5" aria-hidden="true" />
+                View place
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <section className="space-y-3">
         <SectionHeader title="Places for directions" />
         <div className="grid gap-3">
@@ -2197,8 +2298,8 @@ function MapHubView({
                   <Button
                     size="icon"
                     className="size-12 rounded-xl"
-                    onClick={() => onOpenMaps(restaurant)}
-                    aria-label={`Open ${restaurant.name} in Maps`}
+                    onClick={() => onSetRouteRestaurant(restaurant)}
+                    aria-label={`Route to ${restaurant.name}`}
                   >
                     <Navigation className="size-5" aria-hidden="true" />
                   </Button>
@@ -3792,16 +3893,16 @@ function RestaurantDetailPopup({
   isSaved,
   restaurant,
   onClose,
-  onOpenMaps,
   onCopy,
+  onRouteInMap,
   onShare,
   onToggleSaved,
 }: {
   isSaved: boolean
   restaurant: Restaurant | null
   onClose: () => void
-  onOpenMaps: (restaurant: Restaurant) => void
   onCopy: (restaurant: Restaurant) => void
+  onRouteInMap: (restaurant: Restaurant) => void
   onShare: (restaurant: Restaurant) => void
   onToggleSaved: (restaurant: Restaurant) => void
 }) {
@@ -3890,10 +3991,10 @@ function RestaurantDetailPopup({
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   className="h-12 rounded-lg"
-                  onClick={() => onOpenMaps(restaurant)}
+                  onClick={() => onRouteInMap(restaurant)}
                 >
                   <Navigation className="size-5" aria-hidden="true" />
-                  Go Now
+                  Go to Map
                 </Button>
                 <Button
                   variant={isSaved ? 'default' : 'outline'}
@@ -4060,18 +4161,18 @@ function MapNavItem({
       type="button"
       onClick={onClick}
       aria-label="Map tab"
-      className={`group flex -translate-y-4 flex-col items-center gap-1 rounded-2xl px-1 pb-1 text-xs font-semibold text-primary transition duration-200 hover:-translate-y-5 ${
+      className={`group flex -translate-y-1 flex-col items-center gap-1 rounded-2xl px-1 pb-1 text-xs font-semibold text-primary transition duration-200 hover:-translate-y-1.5 ${
         active ? 'text-primary' : 'text-foreground'
       }`}
     >
       <span
-        className={`flex size-16 items-center justify-center rounded-full border-4 border-card shadow-[0_16px_34px_rgba(0,83,91,0.28)] transition group-hover:shadow-[0_18px_38px_rgba(0,83,91,0.36)] ${
+        className={`flex size-12 items-center justify-center rounded-full border-2 border-card shadow-[0_10px_24px_rgba(0,83,91,0.24)] transition group-hover:shadow-[0_12px_28px_rgba(0,83,91,0.3)] ${
           active
             ? 'bg-accent text-accent-foreground'
             : 'bg-primary text-primary-foreground'
         }`}
       >
-        <Navigation className="size-7" aria-hidden="true" />
+        <Navigation className="size-6" aria-hidden="true" />
       </span>
       <span>Map</span>
     </button>
