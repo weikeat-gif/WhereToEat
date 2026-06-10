@@ -865,6 +865,11 @@ function App() {
     setRouteRestaurant(restaurant)
     setSelectedRestaurant(null)
     setActiveView('map')
+    if (import.meta.env.MODE !== 'test') {
+      window.requestAnimationFrame(() =>
+        window.scrollTo({ top: 0, behavior: 'smooth' }),
+      )
+    }
   }
 
   async function copyRestaurantLink(restaurant: Restaurant) {
@@ -1118,7 +1123,7 @@ function App() {
         onToggleSaved={(restaurant) => toggleSavedRestaurant(restaurant)}
       />
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-4 pb-2 pt-3 backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-xl border-t border-border/70 bg-card/95 px-3 pb-1.5 pt-2 backdrop-blur">
         <div className="grid grid-cols-[1fr_1fr_60px_1fr_1fr] items-end gap-1">
           <NavItem
             active={activeView === 'discover'}
@@ -3908,6 +3913,7 @@ function RestaurantDetailPopup({
 }) {
   useEffect(() => {
     if (!restaurant) {
+      document.body.style.overflow = ''
       return
     }
 
@@ -3922,7 +3928,8 @@ function RestaurantDetailPopup({
     document.addEventListener('keydown', handleKeyDown)
 
     return () => {
-      document.body.style.overflow = previousOverflow
+      document.body.style.overflow =
+        previousOverflow === 'hidden' ? '' : previousOverflow
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [onClose, restaurant])
