@@ -911,7 +911,7 @@ function App() {
   }
 
   return (
-    <main className="relative mx-auto min-h-svh w-full max-w-xl overflow-x-hidden bg-background pb-28 text-foreground shadow-[0_0_0_1px_rgba(190,200,202,0.35)]">
+    <main className="relative mx-auto h-svh w-full max-w-xl touch-pan-y overflow-x-hidden overflow-y-auto bg-background pb-28 text-foreground shadow-[0_0_0_1px_rgba(190,200,202,0.35)]">
       <header className="sticky top-0 z-30 w-full overflow-hidden border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur">
         <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
           <Button
