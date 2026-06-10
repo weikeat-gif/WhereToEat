@@ -575,6 +575,7 @@ function App() {
         toast.success('OTP sent')
         return true
       } catch (error) {
+        firebaseAuth.resetFirebaseRecaptchaVerifier()
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
         return false
       }
@@ -609,9 +610,11 @@ function App() {
 
         saveStoredAuthUser(newUser)
         setPhoneOtpConfirmation(null)
+        firebaseAuth.resetFirebaseRecaptchaVerifier()
         toast.success('Account created. Log in to continue.')
         return true
       } catch (error) {
+        firebaseAuth.resetFirebaseRecaptchaVerifier()
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
         return false
       }

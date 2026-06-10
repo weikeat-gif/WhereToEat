@@ -34,6 +34,7 @@ const firebaseConfig: FirebaseOptions = {
 }
 
 let recaptchaVerifier: RecaptchaVerifier | null = null
+let recaptchaVerifierContainerId = ''
 
 export function isFirebaseAuthConfigured() {
   if (import.meta.env.MODE === 'test') {
@@ -117,13 +118,32 @@ export async function requestFirebasePhoneOtp(
   recaptchaContainerId: string,
 ) {
   const auth = getConfiguredAuth()
+  const verifier = getRecaptchaVerifier(auth, recaptchaContainerId)
 
+  return signInWithPhoneNumber(auth, phone, verifier)
+}
+
+export function resetFirebaseRecaptchaVerifier() {
   recaptchaVerifier?.clear()
+  recaptchaVerifier = null
+  recaptchaVerifierContainerId = ''
+}
+
+function getRecaptchaVerifier(
+  auth: ReturnType<typeof getAuth>,
+  recaptchaContainerId: string,
+) {
+  if (recaptchaVerifier && recaptchaVerifierContainerId === recaptchaContainerId) {
+    return recaptchaVerifier
+  }
+
+  resetFirebaseRecaptchaVerifier()
   recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
     size: 'invisible',
   })
+  recaptchaVerifierContainerId = recaptchaContainerId
 
-  return signInWithPhoneNumber(auth, phone, recaptchaVerifier)
+  return recaptchaVerifier
 }
 
 export async function confirmFirebasePhoneOtp(
