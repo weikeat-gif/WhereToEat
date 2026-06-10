@@ -165,7 +165,10 @@ export function getFirebaseEmail(username: string) {
   return `${normalizedUsername}@makanmana.local`
 }
 
-export function getFirebaseAuthErrorMessage(error: unknown) {
+export function getFirebaseAuthErrorMessage(
+  error: unknown,
+  authMethod?: 'email' | 'google' | 'phone',
+) {
   const code =
     typeof error === 'object' &&
     error !== null &&
@@ -194,6 +197,18 @@ export function getFirebaseAuthErrorMessage(error: unknown) {
   }
 
   if (code === 'auth/operation-not-allowed') {
+    if (authMethod === 'google') {
+      return 'Google sign-in is not enabled. In Firebase Console, open Authentication > Sign-in method and enable Google.'
+    }
+
+    if (authMethod === 'phone') {
+      return 'Phone OTP is not enabled. In Firebase Console, open Authentication > Sign-in method and enable Phone.'
+    }
+
+    if (authMethod === 'email') {
+      return 'Email/password sign-in is not enabled. In Firebase Console, open Authentication > Sign-in method and enable Email/Password.'
+    }
+
     return 'This sign-in method is not enabled in Firebase Authentication.'
   }
 

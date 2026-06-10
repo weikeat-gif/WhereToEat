@@ -420,7 +420,7 @@ function App() {
           completeAuth(googleUser)
         }
       } catch (error) {
-        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error, 'google'))
       }
     }
 
@@ -494,7 +494,7 @@ function App() {
         }
         return
       } catch (error) {
-        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error, 'google'))
         return
       }
     }
@@ -536,7 +536,7 @@ function App() {
         completeAuth(existingUser ?? profile)
         return
       } catch (error) {
-        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error, 'email'))
         return
       }
     }
@@ -576,7 +576,7 @@ function App() {
         return true
       } catch (error) {
         firebaseAuth.resetFirebaseRecaptchaVerifier()
-        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error, 'phone'))
         return false
       }
     }
@@ -615,7 +615,7 @@ function App() {
         return true
       } catch (error) {
         firebaseAuth.resetFirebaseRecaptchaVerifier()
-        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error))
+        toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error, 'phone'))
         return false
       }
     }
