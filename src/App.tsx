@@ -102,6 +102,8 @@ type AuthSignUpDetails = {
   username: string
 }
 
+type OtpRequestResult = 'demo' | 'firebase' | false
+
 const radiusOptions = [1, 3, 5, 10, 20] as const
 const priceLevels = ['$', '$$', '$$$', '$$$$'] as const
 
@@ -305,6 +307,10 @@ function getAuthUserFromFirebase(profile: FirebaseAuthProfile): AuthUser {
     joinedAt: profile.joinedAt,
     authProvider: profile.authProvider,
   }
+}
+
+function normalizePhoneNumber(phone: string) {
+  return phone.replace(/[\s().-]/g, '')
 }
 
 function saveStoredAuthUser(user: AuthUser, password?: string) {
@@ -560,7 +566,9 @@ function App() {
   }
 
   async function requestPhoneOtp(phone: string) {
-    if (!phone.trim()) {
+    const normalizedPhone = normalizePhoneNumber(phone)
+
+    if (!normalizedPhone) {
       toast.error('Enter your phone number first')
       return false
     }
@@ -570,12 +578,12 @@ function App() {
     if (firebaseAuth.isFirebaseAuthConfigured()) {
       try {
         const confirmation = await firebaseAuth.requestFirebasePhoneOtp(
-          phone.trim(),
+          normalizedPhone,
           'auth-recaptcha-container',
         )
         setPhoneOtpConfirmation(confirmation)
         toast.success('OTP sent')
-        return true
+        return 'firebase'
       } catch (error) {
         firebaseAuth.resetFirebaseRecaptchaVerifier()
         toast.error(firebaseAuth.getFirebaseAuthErrorMessage(error, 'phone'))
@@ -584,7 +592,7 @@ function App() {
     }
 
     toast.success(`Demo OTP sent: ${demoOtpCode}`)
-    return true
+    return 'demo'
   }
 
   async function signUpWithPassword({
@@ -594,6 +602,7 @@ function App() {
     username,
   }: AuthSignUpDetails) {
     const firebaseAuth = await import('@/lib/firebaseAuth')
+    const normalizedPhone = normalizePhoneNumber(phone)
 
     if (firebaseAuth.isFirebaseAuthConfigured()) {
       if (!phoneOtpConfirmation) {
@@ -605,7 +614,7 @@ function App() {
         await firebaseAuth.confirmFirebasePhoneOtp(phoneOtpConfirmation, otp)
         const profile = await firebaseAuth.signUpWithFirebasePassword({
           password,
-          phone,
+          phone: normalizedPhone,
           username: username.trim(),
         })
         const newUser = getAuthUserFromFirebase(profile)
@@ -641,7 +650,7 @@ function App() {
       authProvider: 'password',
       name: username.trim(),
       username: username.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone,
       password,
     })
 
@@ -1084,7 +1093,7 @@ function AuthView({
 }: {
   onGoogleSignIn: () => Promise<void> | void
   onPasswordSignIn: (username: string, password: string) => Promise<void> | void
-  onRequestPhoneOtp: (phone: string) => Promise<boolean>
+  onRequestPhoneOtp: (phone: string) => Promise<OtpRequestResult>
   onSignUp: (details: AuthSignUpDetails) => Promise<boolean> | boolean
 }) {
   const [authMode, setAuthMode] = useState<AuthMode>('login')
@@ -1095,9 +1104,12 @@ function AuthView({
   const [signupPhone, setSignupPhone] = useState('')
   const [signupOtp, setSignupOtp] = useState('')
   const [isSignupOtpSent, setIsSignupOtpSent] = useState(false)
+  const [signupOtpMode, setSignupOtpMode] = useState<Exclude<OtpRequestResult, false> | null>(null)
 
   async function requestSignupOtp() {
-    setIsSignupOtpSent(await onRequestPhoneOtp(signupPhone))
+    const result = await onRequestPhoneOtp(signupPhone)
+    setIsSignupOtpSent(Boolean(result))
+    setSignupOtpMode(result || null)
   }
 
   async function submitPasswordLogin(event: FormEvent<HTMLFormElement>) {
@@ -1144,6 +1156,7 @@ function AuthView({
       setSignupPhone('')
       setSignupOtp('')
       setIsSignupOtpSent(false)
+      setSignupOtpMode(null)
     }
   }
 
@@ -1277,7 +1290,7 @@ function AuthView({
                   id="signup-phone"
                   value={signupPhone}
                   onChange={(event) => setSignupPhone(event.target.value)}
-                  placeholder="+60 12 345 6789"
+                  placeholder="+60123456789"
                   className="h-12 rounded-lg"
                 />
               </div>
@@ -1300,7 +1313,9 @@ function AuthView({
               </div>
               {isSignupOtpSent ? (
                 <p className="text-xs text-muted-foreground">
-                  Demo OTP: {demoOtpCode}
+                  {signupOtpMode === 'demo'
+                    ? `Demo OTP: ${demoOtpCode}`
+                    : 'Use the OTP code configured for this Firebase test phone number.'}
                 </p>
               ) : null}
               <Button type="submit" className="h-12 w-full rounded-lg">
