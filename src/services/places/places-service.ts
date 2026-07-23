@@ -10,3 +10,24 @@ export interface PlacesService {
   searchNearby(criteria: SearchCriteria): Promise<SearchResults>;
   getPlaceDetails(placeId: string): Promise<PlaceDetails>;
 }
+
+export type PlacesServiceErrorCode =
+  | 'configuration'
+  | 'network'
+  | 'unauthorized'
+  | 'rate-limited'
+  | 'not-found'
+  | 'upstream'
+  | 'invalid-response';
+
+export class PlacesServiceError extends Error {
+  constructor(
+    message: string,
+    readonly code: PlacesServiceErrorCode,
+    readonly retryable: boolean,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'PlacesServiceError';
+  }
+}
