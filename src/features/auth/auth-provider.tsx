@@ -1,26 +1,145 @@
 import {
   createContext,
   type PropsWithChildren,
+  useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 
 import type { AppUser } from '@/contracts/auth';
+import { isSupabaseConfigured } from '@/services/supabase/client';
+import { toUserMessage } from '@/services/supabase/errors';
+
+import type { AuthGateway } from './auth-gateway';
+import { defaultAuthGateway } from './supabase-auth-gateway';
 
 type AuthContextValue = {
   user: AppUser | null;
   isLoading: boolean;
+  isBusy: boolean;
+  error: string | null;
+  emailCodeSent: boolean;
+  backendMode: 'live' | 'mock';
+  signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
+  requestEmailCode: (email: string) => Promise<void>;
+  verifyEmailCode: (email: string, code: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  clearError: () => void;
   setMockUser: (user: AppUser | null) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({ children }: PropsWithChildren) {
+type AuthProviderProps = PropsWithChildren<{
+  gateway?: AuthGateway;
+}>;
+
+export function AuthProvider({
+  children,
+  gateway = defaultAuthGateway,
+}: AuthProviderProps) {
   const [user, setMockUser] = useState<AppUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBusy, setIsBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const unsubscribe = gateway.subscribe((session) => {
+      if (!active) return;
+      setMockUser(session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    gateway
+      .restoreSession()
+      .then((session) => {
+        if (active) setMockUser(session?.user ?? null);
+      })
+      .catch((restoreError: unknown) => {
+        if (active) setError(toUserMessage(restoreError));
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [gateway]);
+
+  const perform = useCallback(async (operation: () => Promise<void>) => {
+    setError(null);
+    setIsBusy(true);
+    try {
+      await operation();
+    } catch (operationError) {
+      const message = toUserMessage(operationError);
+      setError(message);
+      throw operationError;
+    } finally {
+      setIsBusy(false);
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(
+    () => perform(() => gateway.signInWithGoogle()),
+    [gateway, perform],
+  );
+  const signInWithApple = useCallback(
+    () => perform(() => gateway.signInWithApple()),
+    [gateway, perform],
+  );
+  const requestEmailCode = useCallback(
+    async (email: string) => {
+      await perform(() => gateway.requestEmailCode(email));
+      setEmailCodeSent(true);
+    },
+    [gateway, perform],
+  );
+  const verifyEmailCode = useCallback(
+    (email: string, code: string) =>
+      perform(() => gateway.verifyEmailCode(email, code)),
+    [gateway, perform],
+  );
+  const signOut = useCallback(async () => {
+    await perform(() => gateway.signOut());
+    setEmailCodeSent(false);
+  }, [gateway, perform]);
+
   const value = useMemo(
-    () => ({ user, isLoading: false, setMockUser }),
-    [user],
+    () => ({
+      user,
+      isLoading,
+      isBusy,
+      error,
+      emailCodeSent,
+      backendMode: isSupabaseConfigured ? ('live' as const) : ('mock' as const),
+      signInWithGoogle,
+      signInWithApple,
+      requestEmailCode,
+      verifyEmailCode,
+      signOut,
+      clearError: () => setError(null),
+      setMockUser,
+    }),
+    [
+      emailCodeSent,
+      error,
+      isBusy,
+      isLoading,
+      requestEmailCode,
+      signInWithApple,
+      signInWithGoogle,
+      signOut,
+      user,
+      verifyEmailCode,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
