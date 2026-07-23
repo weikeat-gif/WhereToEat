@@ -1,0 +1,46 @@
+import type { ComponentProps } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet } from 'react-native';
+
+type IconButtonProps = {
+  accessibilityLabel: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+  onPress: () => void;
+  color: string;
+  backgroundColor: string;
+  testID?: string;
+};
+
+export function IconButton({
+  accessibilityLabel,
+  icon,
+  onPress,
+  color,
+  backgroundColor,
+  testID,
+}: IconButtonProps) {
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={onPress}
+      testID={testID}
+      style={({ pressed }) => [
+        styles.button,
+        { backgroundColor, opacity: pressed ? 0.7 : 1 },
+      ]}>
+      <Ionicons color={color} name={icon} size={22} />
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  button: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    borderRadius: 22,
+    justifyContent: 'center',
+  },
+});
