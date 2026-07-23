@@ -62,7 +62,7 @@ export function SemanticChip({
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: 36,
+    minHeight: 44,
     alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1,

@@ -30,3 +30,5 @@ pnpm verify
 - `supabase`: database migrations and edge functions
 
 The selected visual reference is stored under `docs/reference`.
+The product problem, MVP, launch requirements, and post-MVP scope are in
+`docs/product/mvp.md`.

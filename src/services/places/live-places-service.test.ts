@@ -14,6 +14,7 @@ describe('LivePlacesService', () => {
   };
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -53,6 +54,67 @@ describe('LivePlacesService', () => {
       code: 'network',
       retryable: true,
     });
+  });
+
+  it('aborts a stalled proxy request with a retryable timeout error', async () => {
+    jest.useFakeTimers();
+    const fetcher = jest.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          );
+        }),
+    );
+    const service = new LivePlacesService(
+      'https://places.example.test/api',
+      fetcher,
+      25,
+    );
+
+    const failure = service.getPlaceDetails('place-1').catch((error) => error);
+    await jest.advanceTimersByTimeAsync(25);
+
+    await expect(failure).resolves.toMatchObject<Partial<PlacesServiceError>>(
+      {
+        code: 'network',
+        retryable: true,
+        message: 'The places request timed out.',
+      },
+    );
+  });
+
+  it('keeps the timeout active while the proxy response body is parsed', async () => {
+    jest.useFakeTimers();
+    const fetcher = jest.fn(
+      async (_url: string | URL | Request, init?: RequestInit) =>
+        ({
+          ok: true,
+          status: 200,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () =>
+                reject(new DOMException('Aborted', 'AbortError')),
+              );
+            }),
+        }) as Response,
+    );
+    const service = new LivePlacesService(
+      'https://places.example.test/api',
+      fetcher,
+      25,
+    );
+
+    const failure = service.getPlaceDetails('place-1').catch((error) => error);
+    await jest.advanceTimersByTimeAsync(25);
+
+    await expect(failure).resolves.toMatchObject<Partial<PlacesServiceError>>(
+      {
+        code: 'network',
+        retryable: true,
+        message: 'The places request timed out.',
+      },
+    );
   });
 
   it('normalizes the Edge Function Google payload into shared search results', async () => {

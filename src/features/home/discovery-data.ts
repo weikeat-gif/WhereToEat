@@ -3,7 +3,7 @@ import type { ImageSource } from 'expo-image';
 import type { PlaceSummary } from '@/contracts/place';
 
 export type DiscoveryPlace = PlaceSummary & {
-  image: ImageSource;
+  image?: ImageSource;
   address: string;
   description: string;
   openingNote: string;

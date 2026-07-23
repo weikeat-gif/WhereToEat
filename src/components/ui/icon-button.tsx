@@ -9,6 +9,7 @@ type IconButtonProps = {
   color: string;
   backgroundColor: string;
   testID?: string;
+  disabled?: boolean;
 };
 
 export function IconButton({
@@ -18,17 +19,20 @@ export function IconButton({
   color,
   backgroundColor,
   testID,
+  disabled = false,
 }: IconButtonProps) {
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       hitSlop={8}
       onPress={onPress}
       testID={testID}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor, opacity: pressed ? 0.7 : 1 },
+        { backgroundColor, opacity: disabled ? 0.45 : pressed ? 0.7 : 1 },
       ]}>
       <Ionicons color={color} name={icon} size={22} />
     </Pressable>

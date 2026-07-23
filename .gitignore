@@ -5,7 +5,9 @@ node_modules/
 
 # Expo
 .expo/
+.expo-final-*.log
 dist/
+dist-qa/
 web-build/
 expo-env.d.ts
 

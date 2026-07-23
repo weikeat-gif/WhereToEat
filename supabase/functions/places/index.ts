@@ -1,5 +1,11 @@
-// @ts-expect-error Deno requires explicit TypeScript extensions for local imports.
-import { createPlacesHandler, type HalalRecord, type PlacesAction, UpstreamError } from './core.ts';
+import {
+  createPlacesHandler,
+  fetchWithTimeout,
+  type HalalRecord,
+  type PlacesAction,
+  setBoundedMapValue,
+  UpstreamError,
+} from './core.ts';
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -12,14 +18,16 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 
 const cache = new Map<string, { expiresAt: number; value: unknown }>();
 const rate = new Map<string, { count: number; resetAt: number }>();
+const MAX_CACHE_ENTRIES = 500;
+const MAX_RATE_ENTRIES = 5_000;
 
 const FIELD_MASKS = {
   nearby:
-    'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.photos,places.types',
+    'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.types',
   autocomplete:
     'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
   details:
-    'id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,photos,types',
+    'id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
 } as const;
 
 async function googleRequest(input: PlacesAction): Promise<unknown> {
@@ -51,7 +59,7 @@ async function googleRequest(input: PlacesAction): Promise<unknown> {
     init.body = JSON.stringify({
       input: input.input,
       sessionToken: input.sessionToken,
-      includedPrimaryTypes: ['restaurant', 'cafe'],
+      includedPrimaryTypes: ['(regions)'],
       regionCode: 'MY',
     });
   } else {
@@ -59,11 +67,12 @@ async function googleRequest(input: PlacesAction): Promise<unknown> {
     init = { method: 'GET', headers };
   }
 
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new UpstreamError('Google Places request failed.', response.status);
-  }
-  return response.json();
+  return fetchWithTimeout(fetch, url, init, async (response) => {
+    if (!response.ok) {
+      throw new UpstreamError('Google Places request failed.', response.status);
+    }
+    return response.json();
+  });
 }
 
 async function loadHalal(placeIds: string[]): Promise<HalalRecord[]> {
@@ -75,14 +84,20 @@ async function loadHalal(placeIds: string[]): Promise<HalalRecord[]> {
     'google_place_id,source_name,source_url,verified_at,expires_at',
   );
   query.searchParams.set('google_place_id', `in.(${values})`);
-  const response = await fetch(query, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  return fetchWithTimeout(
+    fetch,
+    query,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
     },
-  });
-  if (!response.ok) return [];
-  return response.json() as Promise<HalalRecord[]>;
+    async (response) => {
+      if (!response.ok) return [];
+      return response.json() as Promise<HalalRecord[]>;
+    },
+  );
 }
 
 const handler = createPlacesHandler({
@@ -92,7 +107,10 @@ const handler = createPlacesHandler({
     const now = Date.now();
     const window = rate.get(key);
     if (!window || window.resetAt <= now) {
-      rate.set(key, { count: 1, resetAt: now + 60_000 });
+      setBoundedMapValue(rate, MAX_RATE_ENTRIES, key, {
+        count: 1,
+        resetAt: now + 60_000,
+      });
       return true;
     }
     window.count += 1;
@@ -108,7 +126,10 @@ const handler = createPlacesHandler({
     return hit.value;
   },
   setCached(key, value) {
-    cache.set(key, { expiresAt: Date.now() + 30_000, value });
+    setBoundedMapValue(cache, MAX_CACHE_ENTRIES, key, {
+      expiresAt: Date.now() + 30_000,
+      value,
+    });
   },
 });
 

@@ -7,11 +7,10 @@ import {
 import { placesService } from '@/services/places';
 import type { PlacesService } from '@/services/places/places-service';
 
-function pickImages(photoUrls: string[], fallback: ImageSource) {
-  const images: ImageSource[] =
-    photoUrls.length > 0
-      ? photoUrls.slice(0, 3).map((uri) => ({ uri }))
-      : [fallback];
+function pickImages(photoUrls: string[]) {
+  const images: ImageSource[] = photoUrls
+    .slice(0, 3)
+    .map((uri) => ({ uri }));
   return images.map((image, index) => ({
     name: index === 0 ? 'Signature dish' : `Popular pick ${index + 1}`,
     image,
@@ -28,9 +27,8 @@ export async function loadDisplayPlace(
   if (fixture) return fixture;
 
   const details = await service.getPlaceDetails(id);
-  const fallbackImage = DISCOVERY_PLACES[0].image;
   const photoUrl = details.photoUrl ?? details.photoUrls[0];
-  const image: ImageSource = photoUrl ? { uri: photoUrl } : fallbackImage;
+  const image: ImageSource | undefined = photoUrl ? { uri: photoUrl } : undefined;
 
   return {
     ...details,
@@ -40,6 +38,6 @@ export async function loadDisplayPlace(
       details.description ??
       'Restaurant information supplied by Google Places.',
     openingNote: details.openingHours[0] ?? 'Hours unavailable',
-    popularPicks: pickImages(details.photoUrls, image),
+    popularPicks: pickImages(details.photoUrls),
   };
 }

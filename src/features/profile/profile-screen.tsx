@@ -1,8 +1,10 @@
 import type { ComponentProps } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/features/auth/auth-provider';
 import { useAppTheme } from '@/theme/theme-provider';
 import type { ThemeMode } from '@/theme/tokens';
 
@@ -36,6 +38,7 @@ const MODES: ModeOption[] = [
 
 export function ProfileScreen() {
   const { colors, mode, resolvedMode, setMode } = useAppTheme();
+  const { user } = useAuth();
 
   return (
     <SafeAreaView
@@ -52,6 +55,49 @@ export function ProfileScreen() {
           <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
             <Ionicons color={colors.accentText} name="person" size={28} />
           </View>
+        </View>
+
+        <View
+          style={[
+            styles.account,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}>
+          <View
+            style={[
+              styles.accountIcon,
+              { backgroundColor: colors.surfaceElevated },
+            ]}>
+            <Ionicons
+              color={colors.accentForeground}
+              name="person-outline"
+              size={23}
+            />
+          </View>
+          <View style={styles.accountCopy}>
+            <Text style={[styles.accountLabel, { color: colors.textMuted }]}>
+              ACCOUNT
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.accountValue, { color: colors.text }]}>
+              {user?.email ?? user?.displayName ?? 'Browsing as guest'}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityLabel={user ? 'Manage account' : 'Sign in'}
+            accessibilityRole="button"
+            onPress={() => router.push('/auth')}
+            style={({ pressed }) => [
+              styles.accountButton,
+              {
+                backgroundColor: colors.accent,
+                opacity: pressed ? 0.78 : 1,
+              },
+            ]}>
+            <Text style={[styles.accountButtonText, { color: colors.accentText }]}>
+              {user ? 'Manage' : 'Sign in'}
+            </Text>
+          </Pressable>
         </View>
 
         <View
@@ -105,6 +151,7 @@ export function ProfileScreen() {
             const selected = mode === option.mode;
             return (
               <Pressable
+                aria-checked={selected}
                 accessibilityLabel={`${option.label} theme`}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: selected }}
@@ -196,6 +243,33 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
   },
+  account: {
+    minHeight: 78,
+    alignItems: 'center',
+    borderRadius: 19,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 13,
+  },
+  accountIcon: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    borderRadius: 15,
+    justifyContent: 'center',
+  },
+  accountCopy: { flex: 1 },
+  accountLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  accountValue: { fontSize: 14, fontWeight: '800', marginTop: 4 },
+  accountButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    borderRadius: 999,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  accountButtonText: { fontSize: 13, fontWeight: '900' },
   preview: { borderRadius: 24, borderWidth: 1, gap: 22, padding: 20 },
   previewTop: {
     alignItems: 'center',

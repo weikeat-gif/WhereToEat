@@ -17,25 +17,71 @@ import {
   type SavedPlacesRepository,
 } from './saved-service';
 
+export function savedIdsForUser(
+  ownerId: string | null,
+  userId: string | null,
+  ids: Set<string>,
+  empty: Set<string>,
+) {
+  return ownerId === userId ? ids : empty;
+}
+
+export function isCurrentSavedLoad(
+  active: boolean,
+  effectUserId: string | null,
+  currentUserId: string | null,
+) {
+  return active && effectUserId === currentUserId;
+}
+
 function useSavedPlacesState(
   userId: string | null,
   repository: SavedPlacesRepository = savedPlacesRepository,
 ) {
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const currentUserIdRef = useRef(userId);
+  currentUserIdRef.current = userId;
+  const emptyIdsRef = useRef(new Set<string>());
+  const [savedState, setSavedState] = useState(() => ({
+    ownerId: userId,
+    ids: new Set<string>(),
+  }));
   const [isLoading, setIsLoading] = useState(Boolean(userId));
   const [error, setError] = useState<string | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const ownerMatches = savedState.ownerId === userId;
+  const savedIds = savedIdsForUser(
+    savedState.ownerId,
+    userId,
+    savedState.ids,
+    emptyIdsRef.current,
+  );
   const idsRef = useRef(savedIds);
+  if (!ownerMatches) idsRef.current = emptyIdsRef.current;
+  const pendingIdsRef = useRef(new Set<string>());
+  const touchedIdsRef = useRef(new Set<string>());
+  const userGenerationRef = useRef(0);
 
-  const update = useCallback((next: Set<string>) => {
-    idsRef.current = next;
-    setSavedIds(next);
-  }, []);
+  const update = useCallback(
+    (next: Set<string>, ownerId = currentUserIdRef.current) => {
+      idsRef.current = next;
+      setSavedState({
+        ownerId,
+        ids: next,
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
+    const effectUserId = userId;
+    userGenerationRef.current += 1;
+    pendingIdsRef.current.clear();
+    touchedIdsRef.current.clear();
+    setPendingIds(new Set());
     setError(null);
+    update(new Set(), effectUserId);
     if (!userId) {
-      update(new Set());
       setIsLoading(false);
       return () => {
         active = false;
@@ -46,13 +92,43 @@ function useSavedPlacesState(
     repository
       .list(userId)
       .then((rows) => {
-        if (active) update(new Set(rows.map((row) => row.googlePlaceId)));
+        if (
+          !isCurrentSavedLoad(
+            active,
+            effectUserId,
+            currentUserIdRef.current,
+          )
+        ) {
+          return;
+        }
+        const loaded = new Set(rows.map((row) => row.googlePlaceId));
+        for (const touchedId of touchedIdsRef.current) {
+          if (idsRef.current.has(touchedId)) loaded.add(touchedId);
+          else loaded.delete(touchedId);
+        }
+        update(loaded, effectUserId);
       })
       .catch((loadError: unknown) => {
-        if (active) setError(toUserMessage(loadError));
+        if (
+          isCurrentSavedLoad(
+            active,
+            effectUserId,
+            currentUserIdRef.current,
+          )
+        ) {
+          setError(toUserMessage(loadError));
+        }
       })
       .finally(() => {
-        if (active) setIsLoading(false);
+        if (
+          isCurrentSavedLoad(
+            active,
+            effectUserId,
+            currentUserIdRef.current,
+          )
+        ) {
+          setIsLoading(false);
+        }
       });
 
     return () => {
@@ -62,24 +138,51 @@ function useSavedPlacesState(
 
   const toggle = useCallback(
     async (googlePlaceId: string) => {
+      if (pendingIdsRef.current.has(googlePlaceId)) {
+        return idsRef.current.has(googlePlaceId);
+      }
+      pendingIdsRef.current.add(googlePlaceId);
+      touchedIdsRef.current.add(googlePlaceId);
+      setPendingIds(new Set(pendingIdsRef.current));
       setError(null);
+      const operationGeneration = userGenerationRef.current;
+      const operationUserId = userId;
+      const operationIsCurrent = () =>
+        operationGeneration === userGenerationRef.current &&
+        operationUserId === currentUserIdRef.current;
+      const updateIfCurrent = (next: Set<string>) => {
+        if (operationIsCurrent()) update(next);
+      };
       try {
         return await toggleSavedPlace({
           userId,
           googlePlaceId,
           current: idsRef.current,
           repository,
-          update,
+          update: updateIfCurrent,
         });
       } catch (toggleError) {
-        setError(toUserMessage(toggleError));
+        if (operationIsCurrent()) {
+          setError(toUserMessage(toggleError));
+        }
         throw toggleError;
+      } finally {
+        if (operationIsCurrent()) {
+          pendingIdsRef.current.delete(googlePlaceId);
+          setPendingIds(new Set(pendingIdsRef.current));
+        }
       }
     },
     [repository, update, userId],
   );
 
-  return { savedIds, isLoading, error, toggle };
+  return {
+    savedIds,
+    pendingIds: ownerMatches ? pendingIds : emptyIdsRef.current,
+    isLoading: ownerMatches ? isLoading : Boolean(userId),
+    error: ownerMatches ? error : null,
+    toggle,
+  };
 }
 
 type SavedPlacesContextValue = ReturnType<typeof useSavedPlacesState>;

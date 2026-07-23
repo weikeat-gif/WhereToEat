@@ -29,6 +29,7 @@ import { useSearch } from '@/features/search/search-provider';
 import { useAppTheme } from '@/theme/theme-provider';
 
 import { loadDisplayPlace } from './place-details-loader';
+import { placeOpeningStatus } from './place-status';
 
 const CATEGORY_ICONS = [
   'fast-food-outline',
@@ -41,16 +42,23 @@ export function PlaceDetailsScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { savedIds, error: saveError, toggle } = useSavedPlaces();
+  const {
+    savedIds,
+    pendingIds = new Set<string>(),
+    error: saveError,
+    toggle,
+  } = useSavedPlaces();
   const { results } = useSearch();
   const initialPlace = DISCOVERY_PLACES.find((candidate) => candidate.id === id);
   const [loadedPlace, setLoadedPlace] = useState(initialPlace);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const summary = results.find((candidate) => candidate.id === loadedPlace?.id);
   const place = loadedPlace && summary
     ? { ...loadedPlace, ...summary }
     : loadedPlace;
   const saved = place ? savedIds.has(place.id) : false;
+  const openingStatus = placeOpeningStatus(place?.isOpen);
 
   useEffect(() => {
     let active = true;
@@ -89,16 +97,28 @@ export function PlaceDetailsScreen() {
 
   async function sharePlace() {
     if (!place) return;
-    await Share.share({
-      message: `${place.name} — ${place.subtitle}. ${place.address}`,
-      title: place.name,
-    });
+    setActionError(null);
+    try {
+      await Share.share({
+        message: `${place.name} — ${place.subtitle}. ${place.address}`,
+        title: place.name,
+      });
+    } catch {
+      setActionError('Unable to share this restaurant.');
+    }
   }
 
-  function openDirections() {
+  async function openDirections() {
     if (!place) return;
     const query = encodeURIComponent(`${place.name}, ${place.address}`);
-    void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+    setActionError(null);
+    try {
+      await Linking.openURL(
+        `https://www.google.com/maps/search/?api=1&query=${query}`,
+      );
+    } catch {
+      setActionError('Unable to open directions.');
+    }
   }
 
   if (!place) {
@@ -140,13 +160,32 @@ export function PlaceDetailsScreen() {
         contentContainerStyle={{ paddingBottom: 118 + insets.bottom }}
         showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Image
-            accessibilityLabel={`${place.name} signature dish`}
-            contentFit="cover"
-            source={place.image}
-            style={StyleSheet.absoluteFill}
-            transition={180}
-          />
+          {place.image ? (
+            <Image
+              accessibilityLabel={`${place.name} signature dish`}
+              contentFit="cover"
+              source={place.image}
+              style={StyleSheet.absoluteFill}
+              transition={180}
+            />
+          ) : (
+            <View
+              accessibilityLabel={`${place.name} has no photo`}
+              style={[
+                StyleSheet.absoluteFill,
+                styles.heroNoPhoto,
+                { backgroundColor: colors.surfaceElevated },
+              ]}>
+              <Ionicons
+                color={colors.textMuted}
+                name="restaurant-outline"
+                size={54}
+              />
+              <Text style={{ color: colors.textMuted, fontWeight: '800' }}>
+                No restaurant photo available
+              </Text>
+            </View>
+          )}
           <View style={[StyleSheet.absoluteFill, styles.heroShade]} />
           <View style={styles.heroCopy}>
             <Text style={styles.name}>{place.name}</Text>
@@ -179,8 +218,31 @@ export function PlaceDetailsScreen() {
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}>
             <View style={styles.openLabel}>
-              <Ionicons color={colors.success} name="time-outline" size={19} />
-              <Text style={[styles.open, { color: colors.success }]}>Open now</Text>
+              <Ionicons
+                color={
+                  openingStatus.tone === 'success'
+                    ? colors.success
+                    : openingStatus.tone === 'warning'
+                      ? colors.warning
+                      : colors.textMuted
+                }
+                name="time-outline"
+                size={19}
+              />
+              <Text
+                style={[
+                  styles.open,
+                  {
+                    color:
+                      openingStatus.tone === 'success'
+                        ? colors.success
+                        : openingStatus.tone === 'warning'
+                          ? colors.warning
+                          : colors.textMuted,
+                  },
+                ]}>
+                {openingStatus.label}
+              </Text>
               <Text style={[styles.openingNote, { color: colors.textMuted }]}>
                 • {place.openingNote}
               </Text>
@@ -215,44 +277,56 @@ export function PlaceDetailsScreen() {
               {saveError}
             </Text>
           ) : null}
+          {actionError ? (
+            <Text accessibilityRole="alert" style={{ color: colors.warning }}>
+              {actionError}
+            </Text>
+          ) : null}
 
-          <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Popular picks
-              </Text>
-              <Text style={[styles.sectionNote, { color: colors.textMuted }]}>
-                The regulars keep ordering these
-              </Text>
-            </View>
-            <Ionicons color={colors.supper} name="flame" size={24} />
-          </View>
-
-          <ScrollView
-            contentContainerStyle={styles.picks}
-            horizontal
-            showsHorizontalScrollIndicator={false}>
-            {place.popularPicks.map((pick) => (
-              <View
-                key={pick.name}
-                style={[
-                  styles.pickCard,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}>
-                <Image
-                  accessibilityLabel={pick.name}
-                  contentFit="cover"
-                  source={pick.image}
-                  style={styles.pickImage}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={[styles.pickName, { color: colors.text }]}>
-                  {pick.name}
-                </Text>
+          {place.popularPicks.length > 0 ? (
+            <>
+              <View style={styles.sectionTitleRow}>
+                <View>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    Popular picks
+                  </Text>
+                  <Text style={[styles.sectionNote, { color: colors.textMuted }]}>
+                    The regulars keep ordering these
+                  </Text>
+                </View>
+                <Ionicons color={colors.supper} name="flame" size={24} />
               </View>
-            ))}
-          </ScrollView>
+
+              <ScrollView
+                contentContainerStyle={styles.picks}
+                horizontal
+                showsHorizontalScrollIndicator={false}>
+                {place.popularPicks.map((pick) => (
+                  <View
+                    key={pick.name}
+                    style={[
+                      styles.pickCard,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                    ]}>
+                    <Image
+                      accessibilityLabel={pick.name}
+                      contentFit="cover"
+                      source={pick.image}
+                      style={styles.pickImage}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.pickName, { color: colors.text }]}>
+                      {pick.name}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
 
           <View
             style={[
@@ -292,6 +366,7 @@ export function PlaceDetailsScreen() {
             backgroundColor="rgba(8,10,9,0.82)"
             color={saved ? '#C6FF00' : '#FFFFFF'}
             icon={saved ? 'bookmark' : 'bookmark-outline'}
+            disabled={pendingIds.has(place.id)}
             onPress={toggleSave}
             testID="save-place-button"
           />
@@ -317,7 +392,7 @@ export function PlaceDetailsScreen() {
         <Pressable
           accessibilityLabel={`Distance ${formatDistance(place.distanceMeters)}`}
           accessibilityRole="button"
-          onPress={openDirections}
+          onPress={() => void openDirections()}
           style={[
             styles.distanceButton,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -333,7 +408,7 @@ export function PlaceDetailsScreen() {
             color={colors.accentText}
             icon="arrow-forward"
             label="Directions"
-            onPress={openDirections}
+            onPress={() => void openDirections()}
             testID="directions-button"
           />
         </View>
@@ -352,6 +427,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   hero: { height: 390, justifyContent: 'flex-end' },
+  heroNoPhoto: { alignItems: 'center', gap: 10, justifyContent: 'center' },
   heroShade: { backgroundColor: 'rgba(0,0,0,0.28)' },
   heroCopy: { padding: 20, paddingBottom: 24 },
   name: {

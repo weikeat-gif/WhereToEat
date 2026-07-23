@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 
 import { SavedScreen } from './saved-screen';
 
@@ -34,7 +40,9 @@ jest.mock('@/theme/theme-provider', () => ({
 
 describe('SavedScreen', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
+    mockToggle.mockResolvedValue(true);
     mockUseAuth.mockReturnValue({ user: null });
     mockUseSavedPlaces.mockReturnValue({
       savedIds: new Set(),
@@ -47,6 +55,13 @@ describe('SavedScreen', () => {
       name: 'Klang Supper Club',
       subtitle: 'Klang, Selangor',
     });
+  });
+
+  afterEach(() => {
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+    jest.useRealTimers();
   });
 
   it('gates a guest and routes Sign in to the auth screen', () => {
@@ -80,7 +95,22 @@ describe('SavedScreen', () => {
     expect(screen.getByText('No saved restaurants yet.')).toBeTruthy();
   });
 
+  it('labels saved-place loading for assistive technology', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
+    mockUseSavedPlaces.mockReturnValue({
+      savedIds: new Set(),
+      isLoading: true,
+      error: null,
+      toggle: mockToggle,
+    });
+
+    render(<SavedScreen />);
+
+    expect(screen.getByLabelText('Loading saved restaurants')).toBeTruthy();
+  });
+
   it('removes a saved place through the saved repository hook', () => {
+    mockGetPlaceDetails.mockReturnValue(new Promise(() => undefined));
     mockUseAuth.mockReturnValue({
       user: { id: 'user-1', email: 'test@example.com' },
     });
@@ -120,5 +150,38 @@ describe('SavedScreen', () => {
       pathname: '/place/[id]',
       params: { id: 'place-1' },
     });
+  });
+
+  it('uses a virtualized list and only resolves newly saved IDs', async () => {
+    const firstState = {
+      savedIds: new Set(['place-1']),
+      isLoading: false,
+      error: null,
+      toggle: mockToggle,
+    };
+    mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
+    mockUseSavedPlaces.mockReturnValue(firstState);
+    mockGetPlaceDetails.mockImplementation(async (id: string) => ({
+      id,
+      name: id === 'place-1' ? 'Klang Supper Club' : 'New Place',
+      subtitle: 'Klang, Selangor',
+    }));
+    const view = render(<SavedScreen />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Klang Supper Club')).toBeTruthy(),
+    );
+    expect(screen.getByTestId('saved-places-list')).toBeTruthy();
+
+    mockUseSavedPlaces.mockReturnValue({
+      ...firstState,
+      savedIds: new Set(['place-1', 'place-2']),
+    });
+    view.rerender(<SavedScreen />);
+
+    await waitFor(() => expect(screen.getByText('New Place')).toBeTruthy());
+    expect(mockGetPlaceDetails).toHaveBeenCalledTimes(2);
+    expect(mockGetPlaceDetails).toHaveBeenNthCalledWith(1, 'place-1');
+    expect(mockGetPlaceDetails).toHaveBeenNthCalledWith(2, 'place-2');
   });
 });

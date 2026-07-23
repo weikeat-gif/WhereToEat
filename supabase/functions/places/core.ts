@@ -35,6 +35,44 @@ export class UpstreamError extends Error {
   }
 }
 
+export function setBoundedMapValue<Key, Value>(
+  map: Map<Key, Value>,
+  maxEntries: number,
+  key: Key,
+  value: Value,
+) {
+  if (!Number.isInteger(maxEntries) || maxEntries < 1) {
+    throw new Error('maxEntries must be a positive integer.');
+  }
+  map.delete(key);
+  while (map.size >= maxEntries) {
+    const oldestKey = map.keys().next().value as Key | undefined;
+    if (oldestKey === undefined) break;
+    map.delete(oldestKey);
+  }
+  map.set(key, value);
+}
+
+export async function fetchWithTimeout<Result>(
+  fetcher: typeof fetch,
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  consume: (response: Response) => Promise<Result>,
+  timeoutMs = 10_000,
+) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetcher(input, {
+      ...init,
+      signal: controller.signal,
+    });
+    return await consume(response);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

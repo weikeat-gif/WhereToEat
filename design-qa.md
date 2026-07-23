@@ -103,6 +103,11 @@ are acceptable responsive adaptations at the 393 px viewport.
 - Pass 1: no actionable P0, P1, or P2 differences were found. No visual fixes
   were required. The approved Nearby/Surprise priority and native-system font are
   intentional product adaptations, not fidelity defects.
+- Pass 2: the final 393 x 852 warm-light render was rechecked after integration.
+  Lime remains on filled actions while the brand, tabs, icons, and semantic chip
+  labels use darker accessible foregrounds. Automated pair checks are at least
+  4.5:1, images loaded at full quality, theme radios expose checked state, and
+  inactive web tab scenes are marked `aria-hidden`.
 
 ## Follow-up polish
 

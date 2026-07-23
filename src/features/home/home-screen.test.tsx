@@ -116,11 +116,34 @@ describe('HomeScreen', () => {
     );
   });
 
+  it('lets the Open now chip disable and re-enable the filter', () => {
+    mockSearch.mockResolvedValue(undefined);
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByText('Open now'));
+    expect(mockSearch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ openNow: false }),
+    );
+
+    fireEvent.press(screen.getByText('Open now'));
+    expect(mockSearch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ openNow: true }),
+    );
+  });
+
   it('does not substitute demo restaurants for an empty completed search', () => {
     mockStatus = 'empty';
     const screen = renderScreen();
 
     expect(screen.queryByText('Jalan 21 Burger')).toBeNull();
     expect(screen.getByText('No places match these filters yet.')).toBeTruthy();
+  });
+
+  it('opens the map from the current area control', () => {
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByLabelText('Location: Klang Valley'));
+
+    expect(mockPush).toHaveBeenCalledWith('/map');
   });
 });

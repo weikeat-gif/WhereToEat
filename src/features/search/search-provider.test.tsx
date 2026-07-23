@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import type { PlaceDetails, PlaceSummary } from '@/contracts/place';
@@ -65,10 +71,11 @@ function Harness() {
 }
 
 function AreaHarness() {
-  const { criteria, selectArea } = useSearch();
+  const { criteria, error, selectArea, status } = useSearch();
   return (
     <View>
       <Text testID="area">{criteria.areaLabel}</Text>
+      <Text testID="area-status">{`${status}:${error ?? 'none'}`}</Text>
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel="Select Klang"
@@ -91,6 +98,17 @@ function LocationRaceHarness() {
         accessibilityLabel="Use location"
         onPress={() => void searchCurrentLocation()}>
         <Text>Location</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Choose slow area"
+        onPress={() =>
+          void selectArea({
+            id: 'slow-1',
+            label: 'Slow area',
+          })
+        }>
+        <Text>Slow area</Text>
       </TouchableOpacity>
       <TouchableOpacity
         accessibilityRole="button"
@@ -176,5 +194,61 @@ describe('SearchProvider synchronization', () => {
       ),
     );
     expect(locationClient.getCurrentPositionAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let slow area resolution overwrite a newer manual area', async () => {
+    let resolveDetails!: (value: PlaceDetails) => void;
+    const service = new FakePlacesService();
+    jest.spyOn(service, 'getPlaceDetails').mockImplementation(
+      () =>
+        new Promise<PlaceDetails>((resolve) => {
+          resolveDetails = resolve;
+        }),
+    );
+    render(
+      <SearchProvider service={service}>
+        <LocationRaceHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Choose slow area' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Choose manual area' }));
+    await act(async () => {
+      resolveDetails({
+        ...result,
+        id: 'slow-1',
+        coordinates: { latitude: 3.01, longitude: 101.4 },
+        address: 'Slow area',
+        openingHours: [],
+        photoUrls: [],
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('race-area')).toHaveTextContent(
+      'Petaling Jaya',
+    );
+  });
+
+  it('reports area-resolution failures through shared search state', async () => {
+    const service = new FakePlacesService();
+    jest
+      .spyOn(service, 'getPlaceDetails')
+      .mockRejectedValue(new Error('Unable to resolve that area.'));
+    render(
+      <SearchProvider service={service}>
+        <AreaHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Select Klang' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('area-status')).toHaveTextContent(
+        'error:Unable to resolve that area.',
+      ),
+    );
+    expect(screen.getByTestId('area')).toHaveTextContent('Klang Valley');
   });
 });

@@ -1,6 +1,8 @@
 import {
   createPlacesHandler,
+  fetchWithTimeout,
   filterCurrentHalalRecords,
+  setBoundedMapValue,
   type PlacesDependencies,
   UpstreamError,
   validatePlacesRequest,
@@ -20,6 +22,10 @@ function dependencies(
 }
 
 describe('places Edge Function core', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('rejects invalid nearby input', () => {
     expect(() =>
       validatePlacesRequest({
@@ -99,5 +105,47 @@ describe('places Edge Function core', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: 'invalid_request' },
     });
+  });
+
+  it('bounds fallback cache and rate-limit maps', () => {
+    const values = new Map<string, number>([
+      ['oldest', 1],
+      ['newer', 2],
+    ]);
+
+    setBoundedMapValue(values, 2, 'newest', 3);
+
+    expect([...values.entries()]).toEqual([
+      ['newer', 2],
+      ['newest', 3],
+    ]);
+  });
+
+  it('aborts stalled upstream response bodies at the configured deadline', async () => {
+    jest.useFakeTimers();
+    const fetcher = jest.fn(
+      async (_input: string | URL | Request, init?: RequestInit) =>
+        ({
+          ok: true,
+          status: 200,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () =>
+                reject(new DOMException('Aborted', 'AbortError')),
+              );
+            }),
+        }) as Response,
+    );
+
+    const failure = fetchWithTimeout(
+      fetcher,
+      'https://places.example.test',
+      {},
+      (response) => response.json(),
+      25,
+    ).catch((error) => error);
+    await jest.advanceTimersByTimeAsync(25);
+
+    await expect(failure).resolves.toMatchObject({ name: 'AbortError' });
   });
 });

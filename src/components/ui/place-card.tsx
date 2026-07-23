@@ -11,7 +11,7 @@ import { useAppTheme } from '@/theme/theme-provider';
 
 type PlaceCardProps = {
   place: PlaceSummary;
-  image: ImageSource;
+  image?: ImageSource;
   onPress: () => void;
 };
 
@@ -31,13 +31,24 @@ export function PlaceCard({ place, image, onPress }: PlaceCardProps) {
           opacity: pressed ? 0.82 : 1,
         },
       ]}>
-      <Image
-        accessibilityLabel={`${place.name} food`}
-        contentFit="cover"
-        source={place.photoUrl ?? image}
-        style={styles.image}
-        transition={180}
-      />
+      {place.photoUrl || image ? (
+        <Image
+          accessibilityLabel={`${place.name} food`}
+          contentFit="cover"
+          source={place.photoUrl ? { uri: place.photoUrl } : image}
+          style={styles.image}
+          transition={180}
+        />
+      ) : (
+        <View
+          accessibilityLabel={`${place.name} has no photo`}
+          style={[styles.image, styles.noPhoto, { backgroundColor: colors.surfaceElevated }]}>
+          <Ionicons color={colors.textMuted} name="restaurant-outline" size={34} />
+          <Text style={[styles.noPhotoText, { color: colors.textMuted }]}>
+            No photo
+          </Text>
+        </View>
+      )}
       <View style={styles.body}>
         <View style={styles.titleRow}>
           <View style={styles.titleBlock}>
@@ -85,6 +96,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   image: { width: 132, minHeight: 132 },
+  noPhoto: { alignItems: 'center', gap: 6, justifyContent: 'center' },
+  noPhotoText: { fontSize: 12, fontWeight: '700' },
   body: { flex: 1, justifyContent: 'center', padding: 14 },
   titleRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   titleBlock: { flex: 1 },

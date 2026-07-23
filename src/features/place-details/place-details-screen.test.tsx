@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Linking, Share } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { PlaceDetailsScreen } from './place-details-screen';
@@ -49,6 +50,10 @@ describe('PlaceDetailsScreen', () => {
     mockSavedIds = new Set();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('sends a guest to sign in before saving', () => {
     const screen = render(
       <SafeAreaProvider
@@ -84,5 +89,35 @@ describe('PlaceDetailsScreen', () => {
     fireEvent.press(screen.getByTestId('save-place-button'));
 
     expect(mockToggle).toHaveBeenCalledWith('jalan-21-burger');
+  });
+
+  it('announces Share and Directions failures without unhandled rejections', async () => {
+    jest.spyOn(Share, 'share').mockRejectedValue(new Error('share unavailable'));
+    jest
+      .spyOn(Linking, 'openURL')
+      .mockRejectedValue(new Error('maps unavailable'));
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Share place'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Unable to share this restaurant.',
+      ),
+    );
+
+    fireEvent.press(screen.getByTestId('directions-button'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Unable to open directions.',
+      ),
+    );
   });
 });

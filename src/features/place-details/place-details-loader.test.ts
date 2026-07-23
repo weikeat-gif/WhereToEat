@@ -32,7 +32,8 @@ describe('loadDisplayPlace', () => {
       name: 'Klang Supper Club',
       openingNote: 'Monday: 6:00 PM – 1:00 AM',
     });
-    expect(place.popularPicks.length).toBeGreaterThan(0);
+    expect(place.image).toBeUndefined();
+    expect(place.popularPicks).toEqual([]);
   });
 
   it('rejects a missing route id instead of showing the wrong restaurant', async () => {

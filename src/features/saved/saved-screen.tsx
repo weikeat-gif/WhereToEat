@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,24 +20,61 @@ export function SavedScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
   const { user } = useAuth();
-  const { savedIds, isLoading, error, toggle } = useSavedPlaces();
+  const {
+    savedIds,
+    pendingIds = new Set<string>(),
+    isLoading,
+    error,
+    toggle,
+  } = useSavedPlaces();
   const savedIdList = useMemo(() => [...savedIds], [savedIds]);
   const [placeNames, setPlaceNames] = useState<Record<string, string>>({});
+  const placeNameCache = useRef(new Map<string, string>());
 
   useEffect(() => {
     let active = true;
-    void Promise.all(
-      savedIdList.map(async (id) => {
-        try {
-          const place = await placesService.getPlaceDetails(id);
-          return [id, place.name] as const;
-        } catch {
-          return [id, 'Saved restaurant'] as const;
+    const currentIds = new Set(savedIdList);
+    for (const cachedId of placeNameCache.current.keys()) {
+      if (!currentIds.has(cachedId)) placeNameCache.current.delete(cachedId);
+    }
+    if (savedIdList.length === 0) {
+      setPlaceNames({});
+      return () => {
+        active = false;
+      };
+    }
+    const missingIds = savedIdList.filter(
+      (id) => !placeNameCache.current.has(id),
+    );
+    const loadNames = async () => {
+      for (let index = 0; index < missingIds.length; index += 4) {
+        const entries = await Promise.all(
+          missingIds.slice(index, index + 4).map(async (id) => {
+            try {
+              const place = await placesService.getPlaceDetails(id);
+              return [id, place.name] as const;
+            } catch {
+              return [id, 'Saved restaurant'] as const;
+            }
+          }),
+        );
+        if (!active) return;
+        for (const [id, name] of entries) {
+          placeNameCache.current.set(id, name);
         }
-      }),
-    ).then((entries) => {
-      if (active) setPlaceNames(Object.fromEntries(entries));
-    });
+      }
+      if (active) {
+        setPlaceNames(
+          Object.fromEntries(
+            savedIdList.map((id) => [
+              id,
+              placeNameCache.current.get(id) ?? 'Saved restaurant',
+            ]),
+          ),
+        );
+      }
+    };
+    void loadNames();
     return () => {
       active = false;
     };
@@ -65,7 +102,10 @@ export function SavedScreen() {
       title="Saved"
       description="Restaurants saved to your MakanMana account.">
       {isLoading ? (
-        <ActivityIndicator color={colors.accentForeground} />
+        <ActivityIndicator
+          accessibilityLabel="Loading saved restaurants"
+          color={colors.accentForeground}
+        />
       ) : null}
       {error ? (
         <Text accessibilityRole="alert" style={{ color: colors.warning }}>
@@ -78,8 +118,9 @@ export function SavedScreen() {
         </Text>
       ) : (
         <FlatList
+          contentContainerStyle={styles.listContent}
           data={savedIdList}
-          keyExtractor={(id) => id}
+          keyExtractor={(item) => item}
           renderItem={({ item }) => (
             <View
               style={[
@@ -108,7 +149,13 @@ export function SavedScreen() {
               <Pressable
                 accessibilityLabel={`Remove saved place ${item}`}
                 accessibilityRole="button"
-                onPress={() => void toggle(item).catch(() => undefined)}>
+                accessibilityState={{ disabled: pendingIds.has(item) }}
+                disabled={pendingIds.has(item)}
+                onPress={() => void toggle(item).catch(() => undefined)}
+                style={[
+                  styles.remove,
+                  { opacity: pendingIds.has(item) ? 0.5 : 1 },
+                ]}>
                 <Text style={{ color: colors.warning, fontWeight: '700' }}>
                   Remove
                 </Text>
@@ -116,6 +163,7 @@ export function SavedScreen() {
             </View>
           )}
           style={styles.list}
+          testID="saved-places-list"
         />
       )}
     </ScreenPlaceholder>
@@ -130,7 +178,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  list: { marginTop: 16, width: '100%' },
+  list: { marginTop: 16, maxHeight: '70%', width: '100%' },
+  listContent: { paddingBottom: 12 },
   row: {
     alignItems: 'center',
     borderRadius: 14,
@@ -143,4 +192,10 @@ const styles = StyleSheet.create({
   },
   id: { flex: 1 },
   openPlace: { flex: 1, minHeight: 44, justifyContent: 'center' },
+  remove: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 64,
+  },
 });

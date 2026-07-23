@@ -62,4 +62,41 @@ describe('secure Supabase session storage', () => {
       expect.anything(),
     );
   });
+
+  it('retries plaintext cleanup when a secure session already exists', async () => {
+    const secure = memoryStore({ 'supabase-session': 'secure-session' });
+    const legacy = {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('temporary cleanup failure'))
+        .mockResolvedValueOnce(undefined),
+    };
+    const storage = createSecureStorage(secure, legacy);
+
+    await expect(storage.getItem('supabase-session')).resolves.toBe(
+      'secure-session',
+    );
+    await expect(storage.getItem('supabase-session')).resolves.toBe(
+      'secure-session',
+    );
+
+    expect(legacy.removeItem).toHaveBeenCalledTimes(2);
+    expect(legacy.getItem).not.toHaveBeenCalled();
+  });
+
+  it('cleans up a legacy plaintext session after a secure write', async () => {
+    const secure = memoryStore();
+    const legacy = {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn().mockResolvedValue(undefined),
+    };
+    const storage = createSecureStorage(secure, legacy);
+
+    await storage.setItem('supabase-session', 'secure-session');
+
+    expect(legacy.removeItem).toHaveBeenCalledWith('supabase-session');
+  });
 });

@@ -212,6 +212,7 @@ export class LivePlacesService implements PlacesService {
   constructor(
     proxyUrl: string | undefined,
     private readonly fetcher = fetch,
+    private readonly timeoutMs = 10_000,
   ) {
     this.proxyUrl = proxyUrl?.replace(/\/+$/, '') ?? '';
   }
@@ -285,35 +286,52 @@ export class LivePlacesService implements PlacesService {
       );
     }
 
-    let response: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      response = await this.fetcher(this.proxyUrl, {
+      const response = await this.fetcher(this.proxyUrl, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(input),
+        signal: controller.signal,
       });
-    } catch {
+      if (!response.ok) throw errorForStatus(response.status);
+      try {
+        return await response.json();
+      } catch {
+        if (controller.signal.aborted) {
+          throw new PlacesServiceError(
+            'The places request timed out.',
+            'network',
+            true,
+          );
+        }
+        throw new PlacesServiceError(
+          'The places service returned an invalid response.',
+          'invalid-response',
+          false,
+          response.status,
+        );
+      }
+    } catch (requestError) {
+      if (requestError instanceof PlacesServiceError) throw requestError;
+      if (controller.signal.aborted) {
+        throw new PlacesServiceError(
+          'The places request timed out.',
+          'network',
+          true,
+        );
+      }
       throw new PlacesServiceError(
         'Unable to reach the places service.',
         'network',
         true,
       );
-    }
-
-    if (!response.ok) throw errorForStatus(response.status);
-
-    try {
-      return await response.json();
-    } catch {
-      throw new PlacesServiceError(
-        'The places service returned an invalid response.',
-        'invalid-response',
-        false,
-        response.status,
-      );
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

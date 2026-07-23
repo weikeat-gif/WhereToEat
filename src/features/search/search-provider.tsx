@@ -143,14 +143,31 @@ export function SearchProvider({
 
   const selectArea = useCallback(
     async (area: AreaSuggestion) => {
-      const coordinates =
-        area.coordinates ??
-        (await service.getPlaceDetails(area.id)).coordinates;
-      return search({
-        ...criteriaRef.current,
-        center: coordinates,
-        areaLabel: area.label,
-      });
+      const operationId = ++requestIdRef.current;
+      setStatus('loading');
+      setError(null);
+      try {
+        const coordinates =
+          area.coordinates ??
+          (await service.getPlaceDetails(area.id)).coordinates;
+        if (operationId !== requestIdRef.current) return undefined;
+        return search({
+          ...criteriaRef.current,
+          center: coordinates,
+          areaLabel: area.label,
+        });
+      } catch (areaError) {
+        if (operationId !== requestIdRef.current) return undefined;
+        setResults([]);
+        setSearchResults(null);
+        setStatus('error');
+        setError(
+          areaError instanceof Error
+            ? areaError.message
+            : 'Unable to resolve that area.',
+        );
+        return undefined;
+      }
     },
     [search, service],
   );

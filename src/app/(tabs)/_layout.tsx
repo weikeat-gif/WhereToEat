@@ -1,5 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { Tabs } from 'expo-router';
+import type { PropsWithChildren } from 'react';
+import { View } from 'react-native';
 
 import { useAppTheme } from '@/theme/theme-provider';
 
@@ -10,11 +13,27 @@ const ICONS = {
   profile: ['person-outline', 'person'],
 } as const;
 
+function AccessibleTabScene({ children }: PropsWithChildren) {
+  const focused = useIsFocused();
+  return (
+    <View
+      aria-hidden={!focused}
+      accessibilityElementsHidden={!focused}
+      importantForAccessibility={focused ? 'auto' : 'no-hide-descendants'}
+      style={{ flex: 1 }}>
+      {children}
+    </View>
+  );
+}
+
 export default function TabsLayout() {
   const { colors } = useAppTheme();
 
   return (
     <Tabs
+      screenLayout={({ children }) => (
+        <AccessibleTabScene>{children}</AccessibleTabScene>
+      )}
       screenOptions={({ route }) => {
         const icons = ICONS[route.name as keyof typeof ICONS] ?? ICONS.index;
         return {

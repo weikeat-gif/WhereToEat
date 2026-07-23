@@ -25,6 +25,14 @@ export function createSecureStorage(
   secure: SecureStorage = SecureStore,
   legacy: LegacyStorage = AsyncStorage,
 ) {
+  async function removeLegacyValue(key: string) {
+    try {
+      await legacy.removeItem(key);
+    } catch {
+      // A later secure read/write retries cleanup without blocking auth.
+    }
+  }
+
   async function removeSecureValue(key: string) {
     const manifest = await secure.getItemAsync(`${key}${MANIFEST_SUFFIX}`);
     if (manifest) {
@@ -45,6 +53,7 @@ export function createSecureStorage(
     await removeSecureValue(key);
     if (value.length <= CHUNK_SIZE) {
       await secure.setItemAsync(key, value, secureOptions);
+      await removeLegacyValue(key);
       return;
     }
 
@@ -62,6 +71,7 @@ export function createSecureStorage(
       String(chunks.length),
       secureOptions,
     );
+    await removeLegacyValue(key);
   }
 
   async function getSecureValue(key: string) {
@@ -85,12 +95,14 @@ export function createSecureStorage(
   return {
     async getItem(key: string) {
       const secured = await getSecureValue(key);
-      if (secured !== null) return secured;
+      if (secured !== null) {
+        await removeLegacyValue(key);
+        return secured;
+      }
 
       const legacyValue = await legacy.getItem(key);
       if (legacyValue === null) return null;
       await setItem(key, legacyValue);
-      await legacy.removeItem(key);
       return legacyValue;
     },
     setItem,

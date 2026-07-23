@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -41,6 +41,7 @@ export function HomeScreen() {
   } = useSearch();
   const { width } = useWindowDimensions();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [openNowActive, setOpenNowActive] = useState(criteria.openNow);
   const [notice, setNotice] = useState<string | null>(null);
   const visiblePlaces = searchStatus === 'idle' ? DISCOVERY_PLACES : results;
 
@@ -75,12 +76,19 @@ export function HomeScreen() {
     [colors],
   );
 
-  async function applyDiscovery(category?: string | null) {
+  useEffect(() => {
+    setOpenNowActive(criteria.openNow);
+  }, [criteria.openNow]);
+
+  async function applyDiscovery(
+    category?: string | null,
+    openNow = openNowActive,
+  ) {
     const nextCategory =
       category === undefined ? selectedCategory : category;
     const searchResults = await search({
       ...criteria,
-      openNow: true,
+      openNow,
       categories:
         nextCategory &&
         nextCategory !== 'Halal' &&
@@ -103,6 +111,12 @@ export function HomeScreen() {
   }
 
   function handleFilter(category: string) {
+    if (category === 'Open now') {
+      const nextOpenNow = !openNowActive;
+      setOpenNowActive(nextOpenNow);
+      void applyDiscovery(selectedCategory, nextOpenNow);
+      return;
+    }
     const next = selectedCategory === category ? null : category;
     setSelectedCategory(next);
     void applyDiscovery(next);
@@ -140,6 +154,7 @@ export function HomeScreen() {
           <Pressable
             accessibilityLabel={`Location: ${COPY.area}`}
             accessibilityRole="button"
+            onPress={() => router.push('/map')}
             style={[styles.location, { borderColor: colors.border }]}>
             <Ionicons
               color={colors.accentForeground}
@@ -221,7 +236,11 @@ export function HomeScreen() {
               key={filter.label}
               label={filter.label}
               onPress={() => handleFilter(filter.category)}
-              selected={selectedCategory === filter.category}
+              selected={
+                filter.category === 'Open now'
+                  ? openNowActive
+                  : selectedCategory === filter.category
+              }
             />
           ))}
         </ScrollView>
@@ -266,12 +285,11 @@ export function HomeScreen() {
               {searchError ?? 'Unable to load nearby restaurants.'}
             </Text>
           ) : null}
-          {visiblePlaces.map((place, index) => (
+          {visiblePlaces.map((place) => (
             <PlaceCard
               image={
                 DISCOVERY_PLACES.find((candidate) => candidate.id === place.id)
-                  ?.image ??
-                DISCOVERY_PLACES[index % DISCOVERY_PLACES.length].image
+                  ?.image
               }
               key={place.id}
               onPress={() => openPlace(place.id)}
