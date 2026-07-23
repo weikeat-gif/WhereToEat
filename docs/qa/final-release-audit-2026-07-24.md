@@ -1,217 +1,102 @@
 # MakanMana final QA and release audit
 
 Date: 2026-07-24
-Audited commit: `dda09ce` (`main`)
-Decision: **NO-GO for production beta distribution**
 
-The mock-mode app is suitable for an internal web demo, but the live Places
-path, cross-screen place flow, accessibility contrast, and release environment
-must be corrected before TestFlight or Play closed testing.
+Integrated application commit: `784fcaa`
+
+Decision: **GO for local/mock testing; credentials required for store beta**
+
+The English-first Expo application now has a connected Home → Map → Details →
+Saved flow, matching warm-light and cinematic-dark themes, and a working
+mock-data mode. The source is ready for local iOS, Android, and web testing.
+TestFlight and Play closed testing remain external release steps because this
+workspace does not contain the user's Apple, Google, EAS, Maps, or production
+Supabase credentials.
 
 ## Executable verification
 
 | Check | Result |
 | --- | --- |
-| `pnpm lint` | Pass |
-| `pnpm typecheck` | Pass |
-| `pnpm test` before QA additions | Pass: 13 suites, 23 tests |
-| Focused Map and Saved tests | Pass: 2 suites, 7 tests |
-| `pnpm exec expo config --type public` | Pass; SDK 55 config resolves |
-| `pnpm exec expo install --check` | Fail: React Native patch mismatch |
-| `pnpm dlx expo-doctor@latest` | Fail: 18/19 checks pass; same mismatch |
-| `pnpm exec expo export --platform all` | Pass: iOS, Android, and web bundles plus 12 static routes |
+| `pnpm verify` | Pass: lint, TypeScript, 21 suites, 73 tests |
+| `pnpm exec expo install --check` | Pass: dependencies match Expo SDK 55 |
+| `pnpm dlx expo-doctor@latest` | Pass: 19/19 checks |
+| `pnpm exec expo export --platform all --output-dir dist-qa` | Pass: iOS, Android, web, 12 static routes |
+| `pnpm audit --prod --audit-level high` | Pass: no high/critical findings |
 
-The initial parallel lint/typecheck/test invocation exceeded the command
-orchestration timeout and returned no trustworthy result. Each command was then
-run individually and passed.
+The dependency audit reports one moderate advisory in Expo's transitive
+build-time `xcode > uuid@7.0.3` path. There is no direct safe application-level
+upgrade without moving outside Expo SDK 55's supported dependency graph.
 
-The full Jest run emits repeated React `act(...)` warnings from asynchronous
-Expo vector-icon loading. Focused tests also expose the React Native 0.83
-`SafeAreaView` deprecation in Map and `ScreenPlaceholder`. The web development
-runtime emits only the known Expo Router `pointerEvents` deprecation warning;
-no JavaScript errors were observed.
+## Closed QA findings
 
-## Runtime coverage
+- The live Places client and Supabase function now use one POST action-envelope
+  contract, normalize raw Google payloads, and have an end-to-end handler/client
+  contract test.
+- Autocomplete now returns prediction labels in one request and resolves
+  coordinates only after selection, avoiding request amplification while typing.
+- Home renders shared search results and applies open, price, category, and
+  verified-only Halal criteria instead of injecting fixtures after a search.
+- Home and Map share criteria/results; Map cards and map pins open Details.
+- Details loads unknown/live IDs through `PlacesService`, reports loading/error
+  states, never substitutes an unrelated restaurant, gates guests through Auth,
+  and persists signed-in saves through the shared Saved provider.
+- Saved state is shared across screens, owner-tagged state hides the previous
+  account synchronously, stale loads/mutation rollbacks are rejected, and a
+  bounded-concurrency virtualized list caches resolved restaurant names with
+  links back to Details.
+- Mobile Supabase sessions use chunked Expo SecureStore storage, migrate legacy
+  AsyncStorage sessions, and retry plaintext cleanup after secure reads/writes.
+- iOS uses Expo's native Apple Authentication button.
+- Profile provides a reachable account route for sign-in and sign-out management.
+- Auth restore, theme hydration, manual-area selection, slow area resolution,
+  and slow current-location races have regression coverage.
+- Failed area resolution enters the shared error state, and mobile-to-proxy plus
+  Edge-to-upstream Places requests use explicit 10-second abort deadlines.
+- Details uses real open/closed/unknown status and a labelled no-photo state
+  instead of unrelated fixture imagery.
+- Share and Directions failures are announced safely without unhandled OS
+  promise rejections.
+- Halal enrichment accepts only current `JAKIM Halal Malaysia` records on exact
+  `halal.gov.my` hosts; missing, expired, malformed, or lookalike records are not
+  presented as verified.
+- Edge Function fallback cache and rate-limit maps have hard entry caps; shared
+  production enforcement remains required across function isolates.
+- React Native is aligned to Expo's expected `0.83.6`.
+- Light-theme accent and semantic label foregrounds meet automated WCAG AA
+  contrast assertions while lime remains the filled-action colour.
+- Theme radios expose checked state on web, inactive tab scenes are hidden from
+  assistive technology, and primary chips/removal controls meet 44 px targets.
+- Core safe-area imports use `react-native-safe-area-context`; test icon loading
+  is stabilized to keep the suite warning-free.
 
-Current browser QA used the mock adapter at a 393 x 852 mobile web viewport.
+## Remaining production setup
 
-- Home rendered in dark mode and retained the intended four-tab layout.
-- Web Map fallback rendered current coordinates, result pins, filters, and
-  Search this area.
-- Location denial produced an alert and manual-area guidance.
-- Typing and selecting Klang worked and produced the expected empty state.
-- Surprise me selected a current result; Try another selected a different one.
-- Saved gated a guest and opened the mock-disabled Auth screen.
-- System/Light/Dark controls changed appearance and persisted Light on web.
-- An unknown Details URL incorrectly rendered Jalan 21 Burger.
-- A guest could toggle Save on that unknown Details URL without authentication.
-- Home's Halal chip left all three discovery cards visible and reported
-  "3 late-night picks ready."
+These are credential/infrastructure tasks, not local code failures:
 
-iOS and Android coverage is limited to Metro/Hermes export, Expo config, unit
-tests, and static review. No physical device or simulator run was performed.
-Native maps, OS permission approval, Apple sign-in, Google sign-in, and Supabase
-session/persistence behavior remain unverified with production credentials.
-The granted-location branch is covered by a unit test; denial/manual fallback
-is covered by both a unit test and the web runtime.
+- Link the EAS project and provide `EAS_PROJECT_ID`.
+- Set production Supabase URL/anon key and deploy the Places Edge Function.
+- Put production rate limiting/cache in shared infrastructure and add platform
+  attestation or another abuse-control layer before exposing guest Places search.
+- Configure restricted iOS/Android Google Maps keys.
+- Configure Supabase Google/Apple/email providers, redirect allowlists, CAPTCHA,
+  and universal links.
+- Run native accessibility checks for screen reader, Dynamic Type, touch targets,
+  location approval/denial, maps, and provider authentication.
+- Run `eas build`/`eas submit` with the user's Apple Developer/App Store Connect
+  and Google Play accounts, then complete TestFlight and Play closed testing.
 
-## Release blockers
+## Acceptance status
 
-### P0 — Live Places client and function contracts do not match
-
-The client calls three REST-style endpoints and expects normalized app models:
-
-- `POST /autocomplete` with `{ input, sessionToken }`
-- `POST /search` with `{ criteria }`
-- `GET /places/:id`
-
-The Supabase function accepts only `POST` action envelopes at one URL:
-
-- `{ action: "autocomplete", input, sessionToken }`
-- `{ action: "nearby", latitude, longitude, radiusMeters, includedTypes }`
-- `{ action: "details", placeId }`
-
-The function also returns raw Google fields such as `displayName` and
-`location`; it does not return the normalized `SearchResults` or `PlaceDetails`
-shape expected by `LivePlacesService`. Live autocomplete, search, and details
-therefore cannot pass together.
-
-Required fix: establish one canonical endpoint contract, normalize Google
-payloads to shared app models, apply all filters, and add an integration test
-that wires `LivePlacesService` to the function handler.
-
-### P0 — Discovery, Details, and Saved are not connected end to end
-
-- Home always renders and writes `DISCOVERY_PLACES`; it does not call the active
-  mock/live adapter.
-- Home filters do not filter the rendered cards. This includes verified-only
-  Halal.
-- Map result cards and markers cannot navigate to Details.
-- Details reads only `DISCOVERY_PLACES` and silently substitutes the first demo
-  place for any unknown/live place ID.
-- Details Save is local component state. It bypasses the guest auth gate and
-  never reads or writes the Supabase saved repository.
-
-Required fix: render shared search results on Home; route Map results to
-Details; load Details through `PlacesService.getPlaceDetails`; add
-loading/not-found/network/rate-limit states; and wire Save to Auth plus the
-saved repository.
-
-### P1 — Expo SDK dependency validation fails
-
-Expo `55.0.28` expects `react-native@0.83.6`; the project pins
-`react-native@0.83.10`. Both `expo install --check` and Expo Doctor fail.
-
-Required fix: use Expo's SDK-aware installer to align React Native, commit the
-package and lockfile changes, and rerun the full verification/export matrix.
-
-### P1 — Light-theme contrast fails WCAG AA
-
-Measured contrast:
-
-| Pair | Ratio |
-| --- | ---: |
-| Light accent on page background | 1.32:1 |
-| Light accent on navigation background | 1.37:1 |
-| Light Halal chip label on tint | 3.85:1 |
-| Light price chip label on tint | 4.22:1 |
-| Light supper chip label on tint | 3.61:1 |
-| Light cafe chip label on tint | 4.25:1 |
-| Dark accent on background | 16.64:1 |
-| Dark muted text on background | 8.73:1 |
-
-The light failures affect meaningful small text and icons, including the active
-tab and semantic filters. Keep lime for filled surfaces with dark
-`accentText`, but add a darker light-theme foreground token and darken semantic
-label colors or their backgrounds. Add contrast assertions for actual
-foreground/background pairings.
-
-### P1 — Release environment is not resolved locally
-
-Resolved public config has no EAS project ID, Google Maps keys, or live backend
-configuration. Without build-environment values, the app defaults to mock data
-and Auth remains disabled. Android's production Google map also requires its
-external Maps API key.
-
-Required before build:
-
-- link/verify the EAS project and production environment;
-- set live Supabase URL/anon key and Places function URL;
-- set platform map keys where required;
-- configure Supabase Google/Apple providers and redirect allow lists;
-- verify Apple Developer/App Store Connect and Google Play credentials.
-
-TestFlight and Play closed-testing builds/uploads require external credentials
-and were not attempted.
-
-## Additional functional findings
-
-- **P1:** `filterCurrentHalalRecords` accepts any HTTPS source, and the database
-  has no JAKIM source/domain allowlist. Enforce the same trusted-source policy at
-  ingestion/function/UI boundaries before claiming "Verified Halal."
-- **P1:** Auth operations set an error and then rethrow, while press handlers
-  discard the promise with `void`; cancellation and backend failures can become
-  unhandled promise rejections.
-- **P2:** Signed-in users have no discoverable sign-out path in Profile. Sign
-  out exists only on the direct Auth route.
-- **P2:** Home's location control has button semantics but no action.
-- **P2:** Map's top location button is announced as "◎" rather than by purpose.
-- **P2:** Saved loading has no accessible label/status announcement, and Remove
-  has no explicit minimum 44 x 44 target or hit slop.
-- **P2:** On web, previously visited tab screens remain in the accessibility
-  tree after navigation. After Home → Map → Saved, all three screen contents
-  were exposed together even though only the active screen was visible.
-- **P2:** Theme radios have no `aria-checked` state in the rendered web DOM, so
-  the selected option is not announced reliably.
-- **P2:** Several 36px chips are below the recommended 44px touch target.
-- **P2:** Large-text risk remains in the fixed-height Home hero and tab bar,
-  Details open-status row/fixed footer, and the non-scrollable Auth placeholder.
-- **P3:** Map and `ScreenPlaceholder` import deprecated React Native
-  `SafeAreaView` instead of `react-native-safe-area-context`.
-
-## State coverage
-
-| Area | Status | Evidence |
-| --- | --- | --- |
-| Home visual/navigation | Pass in mock web | Runtime at 393 x 852 |
-| Home adapter/filter behavior | Fail | Static + Halal runtime check |
-| Map mock results | Pass | Runtime + unit tests |
-| Web map fallback | Pass | Runtime + all-platform export |
-| Location granted | Pass in unit test only | `location.test.ts` |
-| Location denied/manual | Pass | Unit + runtime |
-| Surprise/Try another | Pass | Unit + runtime |
-| Loading/empty/error/retry | Pass for Map | Existing UI + focused tests |
-| Rate-limit/offline mapping | Pass at service/Map UI level | Existing + focused tests |
-| Details loading/error/live | Fail | No adapter/state path |
-| Saved guest gate | Pass on Saved tab | Runtime + focused test |
-| Details guest save gate | Fail | Runtime |
-| Supabase session restore | Pass in unit test | `auth-provider.test.tsx` |
-| Live Auth providers/session | Blocked | External configuration |
-| Verified-only Halal | Partial/fail | Mock service passes; Home/live fail |
-| Light/dark/system switching | Functional | Runtime + profile test |
-| Theme accessibility | Fail | Contrast + web radio-state audit |
-| iOS/Android bundle export | Pass | Credential-free Expo export |
-| Native device behavior | Not run | No simulator/device credentials |
-
-## Acceptance checklist
-
-- [x] Lint passes.
-- [x] TypeScript passes.
-- [x] Full unit suite passes.
-- [x] iOS, Android, and web exports complete without credentials.
-- [x] Mock web Home, Map fallback, empty, denial/manual, Surprise, Saved gate,
-      Auth-disabled, Details, and theme controls were exercised.
-- [ ] Expo Doctor passes all checks.
-- [ ] Live Places client/function integration passes.
-- [ ] Home, Map, Details, and Saved share one place-data flow.
-- [ ] Unknown place IDs show not-found instead of unrelated content.
-- [ ] Guest save routes to Auth; signed-in save persists and reloads.
-- [ ] Verified Halal is enforced from a trusted JAKIM source at every boundary.
-- [ ] Light-theme text/icon contrast meets WCAG AA.
-- [ ] Web tabs and radios expose correct accessibility state.
-- [ ] Dynamic Type/large text and 44px targets pass on representative devices.
-- [ ] Production EAS project, live backend, Maps, and Auth environments resolve.
-- [ ] iOS native map, permissions, Apple/Google Auth, and session restore pass.
-- [ ] Android native map, permissions, Google Auth, and session restore pass.
-- [ ] TestFlight build/upload succeeds with Apple credentials.
-- [ ] Play closed-testing build/upload succeeds with Google Play credentials.
+- [x] English-first Home, Map, Saved, Profile, Auth, and Details.
+- [x] Warm light, cinematic dark, and system theme selection.
+- [x] Colourful labels use text/icons and pass automated light contrast checks.
+- [x] Current-location denial/manual fallback and stale-result protection.
+- [x] Shared list/map search criteria, filters, and results.
+- [x] Surprise me uses only current valid results.
+- [x] Guest save gate and account-scoped saved repository/RLS.
+- [x] Trusted-only Halal rules at app and function boundaries.
+- [x] Offline, empty, missing-photo, invalid-details, API, and rate-limit states.
+- [x] Lint, TypeScript, unit/integration tests, Expo Doctor, and all-platform export.
+- [ ] Production credentials and live service deployment.
+- [ ] Physical iOS/Android accessibility and provider testing.
+- [ ] TestFlight and Play closed-testing builds/uploads.
