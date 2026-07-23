@@ -28,8 +28,16 @@ export function MapCanvas({
 }: MapCanvasProps) {
   const { colors } = useAppTheme();
   const mapRef = useRef<MapView>(null);
+  const lastRegionCenterRef = useRef(center);
 
   useEffect(() => {
+    const previousCenter = lastRegionCenterRef.current;
+    const centerChangedExternally =
+      Math.abs(previousCenter.latitude - center.latitude) > 0.00001 ||
+      Math.abs(previousCenter.longitude - center.longitude) > 0.00001;
+    if (!centerChangedExternally) return;
+
+    lastRegionCenterRef.current = center;
     mapRef.current?.animateToRegion(
       {
         ...center,
@@ -41,10 +49,20 @@ export function MapCanvas({
   }, [center]);
 
   const handleRegionChange = (region: Region) => {
-    onCenterChange({
+    const nextCenter = {
       latitude: region.latitude,
       longitude: region.longitude,
-    });
+    };
+    const previousCenter = lastRegionCenterRef.current;
+    if (
+      Math.abs(previousCenter.latitude - nextCenter.latitude) <= 0.00001 &&
+      Math.abs(previousCenter.longitude - nextCenter.longitude) <= 0.00001
+    ) {
+      return;
+    }
+
+    lastRegionCenterRef.current = nextCenter;
+    onCenterChange(nextCenter);
   };
 
   return (
