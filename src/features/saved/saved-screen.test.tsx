@@ -1,8 +1,11 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { SavedScreen } from './saved-screen';
 
 const mockPush = jest.fn();
+const mockToggle = jest.fn();
+const mockUseAuth = jest.fn();
+const mockUseSavedPlaces = jest.fn();
 const mockGetPlaceDetails = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -10,16 +13,11 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/features/auth/auth-provider', () => ({
-  useAuth: () => ({ user: { id: 'user-1' } }),
+  useAuth: () => mockUseAuth(),
 }));
 
 jest.mock('./use-saved-places', () => ({
-  useSavedPlaces: () => ({
-    savedIds: new Set(['place-1']),
-    isLoading: false,
-    error: null,
-    toggle: jest.fn(),
-  }),
+  useSavedPlaces: () => mockUseSavedPlaces(),
 }));
 
 jest.mock('@/services/places', () => ({
@@ -35,13 +33,81 @@ jest.mock('@/theme/theme-provider', () => ({
 }));
 
 describe('SavedScreen', () => {
-  it('resolves saved IDs into restaurants and opens their details', async () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: null });
+    mockUseSavedPlaces.mockReturnValue({
+      savedIds: new Set(),
+      isLoading: false,
+      error: null,
+      toggle: mockToggle,
+    });
     mockGetPlaceDetails.mockResolvedValue({
       id: 'place-1',
       name: 'Klang Supper Club',
       subtitle: 'Klang, Selangor',
     });
-    const screen = render(<SavedScreen />);
+  });
+
+  it('gates a guest and routes Sign in to the auth screen', () => {
+    render(<SavedScreen />);
+
+    expect(
+      screen.getByText(
+        'Sign in to save restaurants and sync them across devices.',
+      ),
+    ).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
+    expect(mockPush).toHaveBeenCalledWith('/auth');
+  });
+
+  it('shows a signed-in persistence error and empty state', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-1', email: 'test@example.com' },
+    });
+    mockUseSavedPlaces.mockReturnValue({
+      savedIds: new Set(),
+      isLoading: false,
+      error: 'Unable to load saved places.',
+      toggle: mockToggle,
+    });
+
+    render(<SavedScreen />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Unable to load saved places.',
+    );
+    expect(screen.getByText('No saved restaurants yet.')).toBeTruthy();
+  });
+
+  it('removes a saved place through the saved repository hook', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-1', email: 'test@example.com' },
+    });
+    mockUseSavedPlaces.mockReturnValue({
+      savedIds: new Set(['place-1']),
+      isLoading: false,
+      error: null,
+      toggle: mockToggle,
+    });
+
+    render(<SavedScreen />);
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Remove saved place place-1' }),
+    );
+    expect(mockToggle).toHaveBeenCalledWith('place-1');
+  });
+
+  it('resolves saved IDs into restaurants and opens their details', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-1' } });
+    mockUseSavedPlaces.mockReturnValue({
+      savedIds: new Set(['place-1']),
+      isLoading: false,
+      error: null,
+      toggle: mockToggle,
+    });
+    render(<SavedScreen />);
 
     await waitFor(() =>
       expect(screen.getByText('Klang Supper Club')).toBeTruthy(),
