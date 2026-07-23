@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
+import { useAuth } from '@/features/auth/auth-provider';
 import { toUserMessage } from '@/services/supabase/errors';
 
 import {
@@ -8,7 +17,7 @@ import {
   type SavedPlacesRepository,
 } from './saved-service';
 
-export function useSavedPlaces(
+function useSavedPlacesState(
   userId: string | null,
   repository: SavedPlacesRepository = savedPlacesRepository,
 ) {
@@ -71,4 +80,33 @@ export function useSavedPlaces(
   );
 
   return { savedIds, isLoading, error, toggle };
+}
+
+type SavedPlacesContextValue = ReturnType<typeof useSavedPlacesState>;
+
+const SavedPlacesContext = createContext<SavedPlacesContextValue | undefined>(
+  undefined,
+);
+
+export function SavedPlacesProvider({
+  children,
+  repository = savedPlacesRepository,
+}: PropsWithChildren<{ repository?: SavedPlacesRepository }>) {
+  const { user } = useAuth();
+  const value = useSavedPlacesState(user?.id ?? null, repository);
+  return (
+    <SavedPlacesContext.Provider value={value}>
+      {children}
+    </SavedPlacesContext.Provider>
+  );
+}
+
+export function useSavedPlaces() {
+  const context = useContext(SavedPlacesContext);
+  if (!context) {
+    throw new Error(
+      'useSavedPlaces must be used inside SavedPlacesProvider',
+    );
+  }
+  return context;
 }

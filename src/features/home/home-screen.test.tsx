@@ -1,11 +1,13 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { HomeScreen } from './home-screen';
 
 const mockPush = jest.fn();
-const mockSetCriteria = jest.fn();
-const mockSetResults = jest.fn();
+const mockSearch = jest.fn();
+const mockSurpriseMe = jest.fn();
+let mockResults: { id: string; name?: string }[] = [];
+let mockStatus = 'idle';
 
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockPush(...args) },
@@ -27,8 +29,10 @@ jest.mock('@/features/search/search-provider', () => ({
       categories: [],
       verifiedHalalOnly: false,
     },
-    setCriteria: mockSetCriteria,
-    setResults: mockSetResults,
+    results: mockResults,
+    status: mockStatus,
+    search: mockSearch,
+    surpriseMe: mockSurpriseMe,
   }),
 }));
 
@@ -53,33 +57,70 @@ function renderScreen() {
 describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResults = [];
+    mockStatus = 'idle';
+    mockSearch.mockResolvedValue({
+      places: [{ id: 'mock-seri-klang-kitchen' }],
+    });
+    mockSurpriseMe.mockReturnValue({
+      id: 'mock-seri-klang-kitchen',
+    });
   });
 
-  it('populates shared search state from Nearby now', () => {
+  it('runs the shared nearby search instead of injecting fixture results', async () => {
     const screen = renderScreen();
 
     fireEvent.press(screen.getByTestId('nearby-now-button'));
 
-    expect(mockSetCriteria).toHaveBeenCalledWith(
+    expect(mockSearch).toHaveBeenCalledWith(
       expect.objectContaining({ openNow: true }),
     );
-    expect(mockSetResults).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'jalan-21-burger' }),
-      ]),
+    await waitFor(() =>
+      expect(screen.getByText('1 nearby place ready')).toBeTruthy(),
     );
-    expect(screen.getByText('3 late-night picks ready')).toBeTruthy();
   });
 
-  it('opens a real place from Surprise me', () => {
-    jest.spyOn(Math, 'random').mockReturnValue(0);
+  it('opens only a place selected from current shared results', () => {
     const screen = renderScreen();
 
     fireEvent.press(screen.getByTestId('surprise-me-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/place/[id]',
-      params: { id: 'jalan-21-burger' },
+      params: { id: 'mock-seri-klang-kitchen' },
     });
+  });
+
+  it('runs verified-only Halal through the shared search service', async () => {
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByText('Halal'));
+
+    expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        verifiedHalalOnly: true,
+        categories: [],
+      }),
+    );
+
+    fireEvent.press(screen.getByText('Halal'));
+
+    expect(mockSearch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        verifiedHalalOnly: false,
+        categories: [],
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('1 nearby place ready')).toBeTruthy(),
+    );
+  });
+
+  it('does not substitute demo restaurants for an empty completed search', () => {
+    mockStatus = 'empty';
+    const screen = renderScreen();
+
+    expect(screen.queryByText('Jalan 21 Burger')).toBeNull();
+    expect(screen.getByText('No places match these filters yet.')).toBeTruthy();
   });
 });

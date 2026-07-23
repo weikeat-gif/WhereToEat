@@ -36,8 +36,15 @@ describe('places Edge Function core', () => {
       [
         {
           google_place_id: 'current',
-          source_name: 'JAKIM',
-          source_url: 'https://example.com/current',
+          source_name: 'JAKIM Halal Malaysia',
+          source_url: 'https://www.halal.gov.my/current',
+          verified_at: '2026-01-01T00:00:00Z',
+          expires_at: '2027-01-01T00:00:00Z',
+        },
+        {
+          google_place_id: 'lookalike',
+          source_name: 'JAKIM Halal Malaysia',
+          source_url: 'https://halal.gov.my.example.com/current',
           verified_at: '2026-01-01T00:00:00Z',
           expires_at: '2027-01-01T00:00:00Z',
         },

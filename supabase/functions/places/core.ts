@@ -121,8 +121,19 @@ export function filterCurrentHalalRecords(
   return rows.filter((row) => {
     const verifiedAt = Date.parse(row.verified_at);
     const expiresAt = Date.parse(row.expires_at);
+    let trustedSource = false;
+    try {
+      const source = new URL(row.source_url);
+      trustedSource =
+        source.protocol === 'https:' &&
+        (source.hostname === 'halal.gov.my' ||
+          source.hostname === 'www.halal.gov.my') &&
+        row.source_name === 'JAKIM Halal Malaysia';
+    } catch {
+      trustedSource = false;
+    }
     return (
-      row.source_url.startsWith('https://') &&
+      trustedSource &&
       Number.isFinite(verifiedAt) &&
       Number.isFinite(expiresAt) &&
       verifiedAt <= timestamp &&

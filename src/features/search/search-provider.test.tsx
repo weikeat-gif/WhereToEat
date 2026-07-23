@@ -64,6 +64,50 @@ function Harness() {
   );
 }
 
+function AreaHarness() {
+  const { criteria, selectArea } = useSearch();
+  return (
+    <View>
+      <Text testID="area">{criteria.areaLabel}</Text>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Select Klang"
+        onPress={() =>
+          void selectArea({ id: 'klang-1', label: 'Klang, Selangor' })
+        }>
+        <Text>Select</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function LocationRaceHarness() {
+  const { criteria, searchCurrentLocation, selectArea } = useSearch();
+  return (
+    <View>
+      <Text testID="race-area">{criteria.areaLabel}</Text>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Use location"
+        onPress={() => void searchCurrentLocation()}>
+        <Text>Location</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Choose manual area"
+        onPress={() =>
+          void selectArea({
+            id: 'manual-1',
+            label: 'Petaling Jaya',
+            coordinates: { latitude: 3.1073, longitude: 101.6067 },
+          })
+        }>
+        <Text>Manual</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 describe('SearchProvider synchronization', () => {
   it('keeps criteria and result state synchronized across consumers', async () => {
     render(
@@ -75,5 +119,62 @@ describe('SearchProvider synchronization', () => {
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('open:success:1'));
     fireEvent.press(screen.getByRole('button', { name: 'Show closed too' }));
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('any:empty:0'));
+  });
+
+  it('resolves coordinates only after an autocomplete prediction is selected', async () => {
+    const service = new FakePlacesService();
+    jest.spyOn(service, 'getPlaceDetails').mockResolvedValue({
+      ...result,
+      id: 'klang-1',
+      coordinates: { latitude: 3.0449, longitude: 101.4456 },
+      address: 'Klang, Selangor',
+      openingHours: [],
+      photoUrls: [],
+    });
+    render(
+      <SearchProvider service={service}>
+        <AreaHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Select Klang' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('area')).toHaveTextContent('Klang, Selangor'),
+    );
+    expect(service.getPlaceDetails).toHaveBeenCalledWith('klang-1');
+  });
+
+  it('does not let a late location result overwrite a newer manual area', async () => {
+    let resolvePermission!: (value: { status: string }) => void;
+    const locationClient = {
+      requestForegroundPermissionsAsync: jest.fn(
+        () =>
+          new Promise<{ status: string }>((resolve) => {
+            resolvePermission = resolve;
+          }),
+      ),
+      getCurrentPositionAsync: jest.fn().mockResolvedValue({
+        coords: { latitude: 3.2, longitude: 101.7 },
+      }),
+    };
+    render(
+      <SearchProvider
+        locationClient={locationClient}
+        service={new FakePlacesService()}>
+        <LocationRaceHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Use location' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Choose manual area' }));
+    resolvePermission({ status: 'granted' });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('race-area')).toHaveTextContent(
+        'Petaling Jaya',
+      ),
+    );
+    expect(locationClient.getCurrentPositionAsync).toHaveBeenCalledTimes(1);
   });
 });

@@ -27,15 +27,22 @@ const COPY = {
   headline: 'Jom cari makan.',
   searchPlaceholder: 'Search places, cuisines, dishes',
   trending: 'Trending near you',
-  allReady: '3 late-night picks ready',
 };
 
 export function HomeScreen() {
   const { colors } = useAppTheme();
-  const { criteria, setCriteria, setResults } = useSearch();
+  const {
+    criteria,
+    error: searchError,
+    results,
+    search,
+    status: searchStatus,
+    surpriseMe,
+  } = useSearch();
   const { width } = useWindowDimensions();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const visiblePlaces = searchStatus === 'idle' ? DISCOVERY_PLACES : results;
 
   const compact = width < 360;
   const filters = useMemo(
@@ -68,37 +75,45 @@ export function HomeScreen() {
     [colors],
   );
 
-  function applyDiscovery(category?: string) {
-    const nextCategory = category ?? selectedCategory;
-    setCriteria({
+  async function applyDiscovery(category?: string | null) {
+    const nextCategory =
+      category === undefined ? selectedCategory : category;
+    const searchResults = await search({
       ...criteria,
       openNow: true,
       categories:
-        nextCategory && nextCategory !== 'Open now' && nextCategory !== 'Under RM20'
+        nextCategory &&
+        nextCategory !== 'Halal' &&
+        nextCategory !== 'Open now' &&
+        nextCategory !== 'Under RM20'
           ? [nextCategory]
           : [],
       verifiedHalalOnly: nextCategory === 'Halal',
-      priceLevels: nextCategory === 'Under RM20' ? [1] : criteria.priceLevels,
+      priceLevels:
+        nextCategory === 'Under RM20'
+          ? [1]
+          : selectedCategory === 'Under RM20'
+            ? [1, 2]
+            : criteria.priceLevels,
     });
-    setResults(DISCOVERY_PLACES);
-    setStatus(COPY.allReady);
+    if (searchResults) {
+      const count = searchResults.places.length;
+      setNotice(`${count} nearby ${count === 1 ? 'place' : 'places'} ready`);
+    }
   }
 
   function handleFilter(category: string) {
     const next = selectedCategory === category ? null : category;
     setSelectedCategory(next);
-    applyDiscovery(next ?? undefined);
+    void applyDiscovery(next);
   }
 
   function handleSurprise() {
-    const picked =
-      DISCOVERY_PLACES[Math.floor(Math.random() * DISCOVERY_PLACES.length)];
-    setCriteria({
-      ...criteria,
-      categories: picked.categories.slice(0, 1),
-      openNow: true,
-    });
-    setResults(DISCOVERY_PLACES);
+    const picked = surpriseMe();
+    if (!picked) {
+      setNotice('Search nearby first, then try Surprise me.');
+      return;
+    }
     router.push({ pathname: '/place/[id]', params: { id: picked.id } });
   }
 
@@ -115,7 +130,7 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <View>
-            <Text style={[styles.brand, { color: colors.accent }]}>
+            <Text style={[styles.brand, { color: colors.accentForeground }]}>
               {i18n.t('appName')}?
             </Text>
             <Text style={[styles.brandNote, { color: colors.textMuted }]}>
@@ -126,7 +141,11 @@ export function HomeScreen() {
             accessibilityLabel={`Location: ${COPY.area}`}
             accessibilityRole="button"
             style={[styles.location, { borderColor: colors.border }]}>
-            <Ionicons color={colors.accent} name="location-outline" size={20} />
+            <Ionicons
+              color={colors.accentForeground}
+              name="location-outline"
+              size={20}
+            />
             {!compact && (
               <Text style={[styles.locationText, { color: colors.text }]}>
                 {COPY.area}
@@ -155,7 +174,7 @@ export function HomeScreen() {
               color={colors.accentText}
               icon="navigate"
               label={i18n.t('nearbyNow')}
-              onPress={() => applyDiscovery()}
+              onPress={() => void applyDiscovery()}
               testID="nearby-now-button"
             />
             <ActionButton
@@ -173,7 +192,7 @@ export function HomeScreen() {
         <Pressable
           accessibilityHint="Finds open food near your current area"
           accessibilityRole="search"
-          onPress={() => applyDiscovery()}
+          onPress={() => void applyDiscovery()}
           style={[
             styles.search,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -183,7 +202,11 @@ export function HomeScreen() {
             {COPY.searchPlaceholder}
           </Text>
           <View style={[styles.tune, { backgroundColor: colors.surfaceElevated }]}>
-            <Ionicons color={colors.accent} name="options-outline" size={19} />
+            <Ionicons
+              color={colors.accentForeground}
+              name="options-outline"
+              size={19}
+            />
           </View>
         </Pressable>
 
@@ -203,10 +226,16 @@ export function HomeScreen() {
           ))}
         </ScrollView>
 
-        {status && (
+        {notice && (
           <View style={[styles.status, { backgroundColor: `${colors.accent}1A` }]}>
-            <Ionicons color={colors.accent} name="checkmark-circle" size={18} />
-            <Text style={[styles.statusText, { color: colors.text }]}>{status}</Text>
+            <Ionicons
+              color={colors.accentForeground}
+              name="checkmark-circle"
+              size={18}
+            />
+            <Text style={[styles.statusText, { color: colors.text }]}>
+              {notice}
+            </Text>
           </View>
         )}
 
@@ -219,12 +248,31 @@ export function HomeScreen() {
               Open late, loved locally
             </Text>
           </View>
-          <Ionicons color={colors.accent} name="trending-up" size={24} />
+          <Ionicons
+            color={colors.accentForeground}
+            name="trending-up"
+            size={24}
+          />
         </View>
 
         <View style={styles.cards}>
-          {DISCOVERY_PLACES.map((place) => (
+          {searchStatus === 'empty' ? (
+            <Text style={[styles.empty, { color: colors.textMuted }]}>
+              No places match these filters yet.
+            </Text>
+          ) : null}
+          {searchStatus === 'error' ? (
+            <Text accessibilityRole="alert" style={[styles.empty, { color: colors.warning }]}>
+              {searchError ?? 'Unable to load nearby restaurants.'}
+            </Text>
+          ) : null}
+          {visiblePlaces.map((place, index) => (
             <PlaceCard
+              image={
+                DISCOVERY_PLACES.find((candidate) => candidate.id === place.id)
+                  ?.image ??
+                DISCOVERY_PLACES[index % DISCOVERY_PLACES.length].image
+              }
               key={place.id}
               onPress={() => openPlace(place.id)}
               place={place}
@@ -324,4 +372,5 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 23, fontWeight: '900', letterSpacing: -0.6 },
   sectionSubtitle: { fontSize: 13, marginTop: 3 },
   cards: { gap: 10, paddingHorizontal: 14 },
+  empty: { fontSize: 15, lineHeight: 22, paddingHorizontal: 4, paddingVertical: 18 },
 });

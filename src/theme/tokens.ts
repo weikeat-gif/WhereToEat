@@ -10,6 +10,7 @@ export type ThemeColors = {
   textMuted: string;
   border: string;
   accent: string;
+  accentForeground: string;
   accentText: string;
   success: string;
   warning: string;
@@ -30,6 +31,7 @@ export const themeColors: Record<ResolvedThemeMode, ThemeColors> = {
     textMuted: '#A8AEA8',
     border: '#303630',
     accent: '#C6FF00',
+    accentForeground: '#C6FF00',
     accentText: '#111500',
     success: '#7DE36B',
     warning: '#FFB020',
@@ -48,13 +50,14 @@ export const themeColors: Record<ResolvedThemeMode, ThemeColors> = {
     textMuted: '#606760',
     border: '#DDD5C4',
     accent: '#B7EC00',
+    accentForeground: '#4F6600',
     accentText: '#151A00',
     success: '#2D8E46',
     warning: '#A96300',
-    halal: '#208A42',
-    supper: '#D94F00',
-    cafe: '#087F73',
-    price: '#9A6800',
+    halal: '#126B30',
+    supper: '#9B3500',
+    cafe: '#006B61',
+    price: '#7A5000',
     mapWater: '#CFEAF2',
   },
 };

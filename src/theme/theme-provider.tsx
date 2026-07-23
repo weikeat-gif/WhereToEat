@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useColorScheme } from 'react-native';
@@ -30,18 +31,32 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 export function AppThemeProvider({ children }: PropsWithChildren) {
   const systemMode = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('system');
+  const userSelectedRef = useRef(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((savedMode) => {
-      if (savedMode === 'system' || savedMode === 'light' || savedMode === 'dark') {
-        setModeState(savedMode);
-      }
-    });
+    let active = true;
+    void AsyncStorage.getItem(STORAGE_KEY)
+      .then((savedMode) => {
+        if (
+          active &&
+          !userSelectedRef.current &&
+          (savedMode === 'system' ||
+            savedMode === 'light' ||
+            savedMode === 'dark')
+        ) {
+          setModeState(savedMode);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
   const setMode = useCallback(async (nextMode: ThemeMode) => {
+    userSelectedRef.current = true;
     setModeState(nextMode);
-    await AsyncStorage.setItem(STORAGE_KEY, nextMode);
+    await AsyncStorage.setItem(STORAGE_KEY, nextMode).catch(() => undefined);
   }, []);
 
   const resolvedMode: ResolvedThemeMode =

@@ -19,7 +19,7 @@ export default function TabsLayout() {
         const icons = ICONS[route.name as keyof typeof ICONS] ?? ICONS.index;
         return {
           headerShown: false,
-          tabBarActiveTintColor: colors.accent,
+          tabBarActiveTintColor: colors.accentForeground,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarStyle: {
             backgroundColor: colors.navBackground,

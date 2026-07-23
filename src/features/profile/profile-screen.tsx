@@ -44,7 +44,7 @@ export function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={[styles.eyebrow, { color: colors.accent }]}>
+            <Text style={[styles.eyebrow, { color: colors.accentForeground }]}>
               Your MakanMana
             </Text>
             <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
@@ -117,7 +117,9 @@ export function ProfileScreen() {
                     backgroundColor: selected
                       ? `${colors.accent}18`
                       : colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
+                    borderColor: selected
+                      ? colors.accentForeground
+                      : colors.border,
                     opacity: pressed ? 0.78 : 1,
                   },
                 ]}>
@@ -126,7 +128,7 @@ export function ProfileScreen() {
                     styles.optionIcon,
                     {
                       backgroundColor: selected
-                        ? colors.accent
+                        ? colors.accentForeground
                         : colors.surfaceElevated,
                     },
                   ]}>

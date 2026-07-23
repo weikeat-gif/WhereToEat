@@ -14,7 +14,7 @@ export type AreaSuggestion = {
   id: string;
   label: string;
   secondaryLabel?: string;
-  coordinates: Coordinates;
+  coordinates?: Coordinates;
 };
 
 export type SearchResults = {

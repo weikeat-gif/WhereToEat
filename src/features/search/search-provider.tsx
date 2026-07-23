@@ -142,19 +142,25 @@ export function SearchProvider({
   );
 
   const selectArea = useCallback(
-    (area: AreaSuggestion) =>
-      search({
+    async (area: AreaSuggestion) => {
+      const coordinates =
+        area.coordinates ??
+        (await service.getPlaceDetails(area.id)).coordinates;
+      return search({
         ...criteriaRef.current,
-        center: area.coordinates,
+        center: coordinates,
         areaLabel: area.label,
-      }),
-    [search],
+      });
+    },
+    [search, service],
   );
 
   const searchCurrentLocation = useCallback(async () => {
+    const operationId = ++requestIdRef.current;
     setLocationStatus('requesting');
     setLocationMessage(null);
     const location = await requestSearchLocation(locationClient);
+    if (operationId !== requestIdRef.current) return undefined;
     if (location.kind === 'manual') {
       setLocationStatus('manual');
       setLocationMessage(

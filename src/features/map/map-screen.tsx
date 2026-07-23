@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Coordinates, PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
@@ -92,7 +93,6 @@ export function MapScreen() {
   const chooseArea = (area: AreaSuggestion) => {
     setSuggestions([]);
     setAreaInput(area.label);
-    setMapCenter(area.coordinates);
     void selectArea(area);
   };
 
@@ -123,6 +123,7 @@ export function MapScreen() {
             value={areaInput}
           />
           <TouchableOpacity
+            accessibilityLabel="Use my current location"
             accessibilityRole="button"
             onPress={() => void searchCurrentLocation()}
             style={[styles.iconButton, { backgroundColor: colors.surface }]}>
@@ -193,6 +194,9 @@ export function MapScreen() {
           loading={status === 'loading'}
           onCenterChange={setMapCenter}
           onCurrentLocation={() => void searchCurrentLocation()}
+          onPlacePress={(placeId) =>
+            router.push({ pathname: '/place/[id]', params: { id: placeId } })
+          }
           onSearchArea={() =>
             void search({
               ...criteria,
@@ -219,7 +223,10 @@ export function MapScreen() {
         </View>
 
         {status === 'loading' ? (
-          <ActivityIndicator accessibilityLabel="Loading places" color={colors.accent} />
+          <ActivityIndicator
+            accessibilityLabel="Loading places"
+            color={colors.accentForeground}
+          />
         ) : null}
         {status === 'error' ? (
           <View style={styles.state}>
@@ -250,8 +257,15 @@ export function MapScreen() {
           horizontal
           keyExtractor={(place) => place.id}
           renderItem={({ item, index }) => (
-            <View
+            <TouchableOpacity
               accessibilityLabel={`${index + 1}. ${item.name}`}
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: '/place/[id]',
+                  params: { id: item.id },
+                })
+              }
               style={[
                 styles.resultCard,
                 { backgroundColor: colors.surface, borderColor: colors.border },
@@ -268,7 +282,7 @@ export function MapScreen() {
               {hasTrustedHalalVerification(item.halalVerification) ? (
                 <Text style={{ color: colors.halal }}>Verified Halal</Text>
               ) : null}
-            </View>
+            </TouchableOpacity>
           )}
           scrollEnabled={results.length > 0}
           showsHorizontalScrollIndicator={false}

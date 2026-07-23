@@ -49,8 +49,10 @@ export function AuthProvider({
 
   useEffect(() => {
     let active = true;
+    let authEventSeen = false;
     const unsubscribe = gateway.subscribe((session) => {
       if (!active) return;
+      authEventSeen = true;
       setMockUser(session?.user ?? null);
       setIsLoading(false);
     });
@@ -58,7 +60,7 @@ export function AuthProvider({
     gateway
       .restoreSession()
       .then((session) => {
-        if (active) setMockUser(session?.user ?? null);
+        if (active && !authEventSeen) setMockUser(session?.user ?? null);
       })
       .catch((restoreError: unknown) => {
         if (active) setError(toUserMessage(restoreError));

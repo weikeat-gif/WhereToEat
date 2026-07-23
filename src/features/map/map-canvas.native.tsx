@@ -25,6 +25,7 @@ export function MapCanvas({
   onCenterChange,
   onSearchArea,
   onCurrentLocation,
+  onPlacePress,
 }: MapCanvasProps) {
   const { colors } = useAppTheme();
   const mapRef = useRef<MapView>(null);
@@ -86,6 +87,7 @@ export function MapCanvas({
             accessibilityLabel={`${place.name}, ${Math.round(place.distanceMeters)} metres away`}
             coordinate={place.coordinates}
             description={place.subtitle}
+            onPress={() => onPlacePress(place.id)}
             pinColor={pinColor(place, colors)}
             title={place.name}
           />

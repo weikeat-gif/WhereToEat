@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Image, type ImageSource } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { DiscoveryPlace } from '@/features/home/discovery-data';
+import type { PlaceSummary } from '@/contracts/place';
 import {
   formatDistance,
   formatPrice,
@@ -10,11 +10,12 @@ import {
 import { useAppTheme } from '@/theme/theme-provider';
 
 type PlaceCardProps = {
-  place: DiscoveryPlace;
+  place: PlaceSummary;
+  image: ImageSource;
   onPress: () => void;
 };
 
-export function PlaceCard({ place, onPress }: PlaceCardProps) {
+export function PlaceCard({ place, image, onPress }: PlaceCardProps) {
   const { colors } = useAppTheme();
 
   return (
@@ -33,7 +34,7 @@ export function PlaceCard({ place, onPress }: PlaceCardProps) {
       <Image
         accessibilityLabel={`${place.name} food`}
         contentFit="cover"
-        source={place.image}
+        source={place.photoUrl ?? image}
         style={styles.image}
         transition={180}
       />
@@ -55,7 +56,7 @@ export function PlaceCard({ place, onPress }: PlaceCardProps) {
         </View>
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Ionicons color={colors.accent} name="star" size={15} />
+            <Ionicons color={colors.accentForeground} name="star" size={15} />
             <Text style={[styles.metaStrong, { color: colors.text }]}>
               {place.rating.toFixed(1)}
             </Text>

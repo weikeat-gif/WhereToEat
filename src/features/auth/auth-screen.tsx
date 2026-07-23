@@ -13,9 +13,10 @@ import { ScreenPlaceholder } from '@/components/screen-placeholder';
 import { useAppTheme } from '@/theme/theme-provider';
 
 import { useAuth } from './auth-provider';
+import { AppleSignInButton } from './apple-sign-in-button';
 
 export function AuthScreen() {
-  const { colors } = useAppTheme();
+  const { colors, resolvedMode } = useAppTheme();
   const {
     user,
     isLoading,
@@ -32,12 +33,16 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
 
+  function run(operation: () => Promise<void>) {
+    void operation().catch(() => undefined);
+  }
+
   if (isLoading) {
     return (
       <ScreenPlaceholder
         title="Sign in"
         description="Restoring your account…">
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={colors.accentForeground} />
       </ScreenPlaceholder>
     );
   }
@@ -50,7 +55,7 @@ export function AuthScreen() {
         <AuthButton
           label="Sign out"
           disabled={isBusy}
-          onPress={() => void signOut()}
+          onPress={() => run(signOut)}
         />
         {error ? <ErrorText message={error} /> : null}
       </ScreenPlaceholder>
@@ -71,13 +76,13 @@ export function AuthScreen() {
         <AuthButton
           label="Continue with Google"
           disabled={isBusy || backendMode === 'mock'}
-          onPress={() => void signInWithGoogle()}
+          onPress={() => run(signInWithGoogle)}
         />
         {Platform.OS === 'ios' ? (
-          <AuthButton
-            label="Continue with Apple"
+          <AppleSignInButton
             disabled={isBusy || backendMode === 'mock'}
-            onPress={() => void signInWithApple()}
+            onPress={() => run(signInWithApple)}
+            theme={resolvedMode}
           />
         ) : null}
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -123,7 +128,7 @@ export function AuthScreen() {
             <AuthButton
               label="Verify code"
               disabled={isBusy || code.trim().length < 6}
-              onPress={() => void verifyEmailCode(email, code)}
+              onPress={() => run(() => verifyEmailCode(email, code))}
             />
           </>
         ) : (
@@ -132,10 +137,12 @@ export function AuthScreen() {
             disabled={
               isBusy || backendMode === 'mock' || !email.trim().includes('@')
             }
-            onPress={() => void requestEmailCode(email)}
+            onPress={() => run(() => requestEmailCode(email))}
           />
         )}
-        {isBusy ? <ActivityIndicator color={colors.accent} /> : null}
+        {isBusy ? (
+          <ActivityIndicator color={colors.accentForeground} />
+        ) : null}
         {error ? <ErrorText message={error} /> : null}
       </View>
     </ScreenPlaceholder>

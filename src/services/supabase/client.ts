@@ -1,9 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, processLock } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
 import { env } from '@/config/env';
+import { secureSessionStorage } from '@/services/supabase/secure-storage';
 
 export const isSupabaseConfigured =
   env.EXPO_PUBLIC_DATA_MODE === 'live' &&
@@ -15,7 +15,7 @@ export const supabase = isSupabaseConfigured
       env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
       {
         auth: {
-          ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),
+          ...(Platform.OS !== 'web' ? { storage: secureSessionStorage } : {}),
           autoRefreshToken: true,
           persistSession: true,
           detectSessionInUrl: false,

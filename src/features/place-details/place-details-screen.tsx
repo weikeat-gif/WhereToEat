@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
@@ -16,13 +17,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { SemanticChip } from '@/components/ui/semantic-chip';
+import { useAuth } from '@/features/auth/auth-provider';
 import {
   DISCOVERY_PLACES,
   formatDistance,
   formatPrice,
   formatReviews,
 } from '@/features/home/discovery-data';
+import { useSavedPlaces } from '@/features/saved/use-saved-places';
+import { useSearch } from '@/features/search/search-provider';
 import { useAppTheme } from '@/theme/theme-provider';
+
+import { loadDisplayPlace } from './place-details-loader';
 
 const CATEGORY_ICONS = [
   'fast-food-outline',
@@ -34,12 +40,55 @@ export function PlaceDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const [saved, setSaved] = useState(false);
-  const place =
-    DISCOVERY_PLACES.find((candidate) => candidate.id === id) ??
-    DISCOVERY_PLACES[0];
+  const { user } = useAuth();
+  const { savedIds, error: saveError, toggle } = useSavedPlaces();
+  const { results } = useSearch();
+  const initialPlace = DISCOVERY_PLACES.find((candidate) => candidate.id === id);
+  const [loadedPlace, setLoadedPlace] = useState(initialPlace);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const summary = results.find((candidate) => candidate.id === loadedPlace?.id);
+  const place = loadedPlace && summary
+    ? { ...loadedPlace, ...summary }
+    : loadedPlace;
+  const saved = place ? savedIds.has(place.id) : false;
+
+  useEffect(() => {
+    let active = true;
+    const fixture = DISCOVERY_PLACES.find((candidate) => candidate.id === id);
+    if (fixture) {
+      setLoadedPlace(fixture);
+      setLoadError(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoadedPlace(undefined);
+    setLoadError(null);
+    void loadDisplayPlace(id)
+      .then((loaded) => {
+        if (!active) return;
+        setLoadedPlace(loaded);
+      })
+      .catch(() => {
+        if (active) setLoadError('Unable to load this restaurant.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  function toggleSave() {
+    if (!place) return;
+    if (!user) {
+      router.push('/auth');
+      return;
+    }
+    void toggle(place.id).catch(() => undefined);
+  }
 
   async function sharePlace() {
+    if (!place) return;
     await Share.share({
       message: `${place.name} — ${place.subtitle}. ${place.address}`,
       title: place.name,
@@ -47,8 +96,42 @@ export function PlaceDetailsScreen() {
   }
 
   function openDirections() {
+    if (!place) return;
     const query = encodeURIComponent(`${place.name}, ${place.address}`);
     void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+  }
+
+  if (!place) {
+    return (
+      <View
+        style={[
+          styles.loadingRoot,
+          { backgroundColor: colors.background, paddingTop: insets.top + 24 },
+        ]}>
+        <IconButton
+          accessibilityLabel="Go back"
+          backgroundColor={colors.surface}
+          color={colors.text}
+          icon="chevron-back"
+          onPress={() => router.back()}
+        />
+        {loadError ? (
+          <Text accessibilityRole="alert" style={{ color: colors.warning }}>
+            {loadError}
+          </Text>
+        ) : (
+          <>
+            <ActivityIndicator
+              accessibilityLabel="Loading restaurant"
+              color={colors.accentForeground}
+            />
+            <Text style={{ color: colors.textMuted }}>
+              Loading restaurant…
+            </Text>
+          </>
+        )}
+      </View>
+    );
   }
 
   return (
@@ -102,7 +185,7 @@ export function PlaceDetailsScreen() {
                 • {place.openingNote}
               </Text>
             </View>
-            <Text style={[styles.hoursLink, { color: colors.accent }]}>
+            <Text style={[styles.hoursLink, { color: colors.accentForeground }]}>
               See all hours
             </Text>
           </View>
@@ -127,6 +210,11 @@ export function PlaceDetailsScreen() {
           <Text style={[styles.description, { color: colors.text }]}>
             {place.description}
           </Text>
+          {saveError ? (
+            <Text accessibilityRole="alert" style={{ color: colors.warning }}>
+              {saveError}
+            </Text>
+          ) : null}
 
           <View style={styles.sectionTitleRow}>
             <View>
@@ -172,7 +260,11 @@ export function PlaceDetailsScreen() {
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}>
             <View style={[styles.addressIcon, { backgroundColor: colors.surfaceElevated }]}>
-              <Ionicons color={colors.accent} name="location" size={22} />
+              <Ionicons
+                color={colors.accentForeground}
+                name="location"
+                size={22}
+              />
             </View>
             <View style={styles.addressCopy}>
               <Text style={[styles.addressLabel, { color: colors.textMuted }]}>
@@ -200,7 +292,7 @@ export function PlaceDetailsScreen() {
             backgroundColor="rgba(8,10,9,0.82)"
             color={saved ? '#C6FF00' : '#FFFFFF'}
             icon={saved ? 'bookmark' : 'bookmark-outline'}
-            onPress={() => setSaved((current) => !current)}
+            onPress={toggleSave}
             testID="save-place-button"
           />
           <IconButton
@@ -252,6 +344,13 @@ export function PlaceDetailsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  loadingRoot: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 18,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
   hero: { height: 390, justifyContent: 'flex-end' },
   heroShade: { backgroundColor: 'rgba(0,0,0,0.28)' },
   heroCopy: { padding: 20, paddingBottom: 24 },

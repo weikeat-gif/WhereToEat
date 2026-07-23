@@ -11,6 +11,7 @@ export type MapCanvasProps = {
   onCenterChange: (center: Coordinates) => void;
   onSearchArea: () => void;
   onCurrentLocation: () => void;
+  onPlacePress: (placeId: string) => void;
 };
 
 export function MapCanvas({
@@ -19,6 +20,7 @@ export function MapCanvas({
   loading,
   onSearchArea,
   onCurrentLocation,
+  onPlacePress,
 }: MapCanvasProps) {
   const { colors } = useAppTheme();
 
@@ -38,9 +40,11 @@ export function MapCanvas({
       </Text>
       <View style={styles.pinRow}>
         {places.slice(0, 8).map((place, index) => (
-          <View
+          <TouchableOpacity
             key={place.id}
             accessibilityLabel={`${place.name} map pin`}
+            accessibilityRole="button"
+            onPress={() => onPlacePress(place.id)}
             style={[
               styles.pin,
               {
@@ -53,7 +57,7 @@ export function MapCanvas({
               },
             ]}>
             <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{index + 1}</Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
       <View style={styles.actions}>
