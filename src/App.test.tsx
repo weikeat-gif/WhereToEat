@@ -112,6 +112,21 @@ describe('App', () => {
     expect(screen.queryByText('Recommended Nearby')).not.toBeInTheDocument()
   })
 
+  it('lets the development test account enter with asd credentials', async () => {
+    const user = userEvent.setup()
+    window.localStorage.removeItem(authUserKey)
+    window.localStorage.removeItem(authUsersKey)
+    setGeolocation(undefined)
+
+    render(<App />)
+
+    await user.type(screen.getByLabelText('Username'), 'asd')
+    await user.type(screen.getByLabelText('Password'), 'asd')
+    await user.click(screen.getByRole('button', { name: 'Log in with password' }))
+
+    expect(screen.getByText('Recommended Nearby')).toBeInTheDocument()
+  })
+
   it('lets Google sign up and Google login enter without username and password', async () => {
     const user = userEvent.setup()
     window.localStorage.removeItem(authUserKey)

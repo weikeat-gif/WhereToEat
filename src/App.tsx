@@ -73,6 +73,8 @@ const savedRestaurantsKey = 'makanmana.saved-restaurants'
 const authUserKey = 'makanmana.auth-user'
 const authUsersKey = 'makanmana.auth-users'
 const demoOtpCode = '123456'
+const developmentTestUsername = 'asd'
+const developmentTestPassword = 'asd'
 
 type Preferences = {
   radiusKm: number
@@ -551,6 +553,35 @@ function App() {
   }
 
   async function signInWithPassword(username: string, password: string) {
+    const normalizedUsername = username.trim().toLowerCase()
+
+    if (
+      import.meta.env.DEV &&
+      normalizedUsername === developmentTestUsername &&
+      password === developmentTestPassword
+    ) {
+      const users = readAuthUsers()
+      const existingTestUser = users.find(
+        (user) => user.username.toLowerCase() === developmentTestUsername,
+      )
+      const testUser =
+        existingTestUser ??
+        createAuthUser({
+          authProvider: 'password',
+          name: developmentTestUsername,
+          username: developmentTestUsername,
+          phone: '',
+          password: developmentTestPassword,
+        })
+
+      if (!existingTestUser) {
+        saveAuthUsers([testUser, ...users])
+      }
+
+      completeAuth(testUser)
+      return
+    }
+
     const firebaseAuth = await import('@/lib/firebaseAuth')
 
     if (firebaseAuth.isFirebaseAuthConfigured()) {
@@ -574,7 +605,6 @@ function App() {
     }
 
     const users = readAuthUsers()
-    const normalizedUsername = username.trim().toLowerCase()
     const user = users.find(
       (storedUser) =>
         storedUser.username.toLowerCase() === normalizedUsername &&
