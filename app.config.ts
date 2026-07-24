@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'MakanMana',
   slug: 'makanmana',
+  owner: 'holymoly0',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
@@ -61,7 +62,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: process.env.EAS_PROJECT_ID,
+      projectId:
+        process.env.EAS_PROJECT_ID ??
+        'e6e92b04-c175-4b12-8461-1d60555438da',
     },
   },
 });
