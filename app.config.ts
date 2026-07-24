@@ -1,5 +1,56 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
+type BuildEnvironment = Record<string, string | undefined>;
+
+export function assertMapsBuildConfiguration(
+  environment: BuildEnvironment,
+): void {
+  if (environment.EAS_BUILD !== 'true') return;
+
+  const platform = environment.EAS_BUILD_PLATFORM;
+  if (
+    (platform === 'ios' || !platform) &&
+    !environment.GOOGLE_MAPS_IOS_API_KEY
+  ) {
+    throw new Error(
+      'GOOGLE_MAPS_IOS_API_KEY is required for an EAS iOS build.',
+    );
+  }
+  if (
+    (platform === 'android' || !platform) &&
+    !environment.GOOGLE_MAPS_ANDROID_API_KEY
+  ) {
+    throw new Error(
+      'GOOGLE_MAPS_ANDROID_API_KEY is required for an EAS Android build.',
+    );
+  }
+}
+
+export function createMapsPlugin(
+  environment: BuildEnvironment,
+): NonNullable<ExpoConfig['plugins']>[number] | undefined {
+  return environment.GOOGLE_MAPS_IOS_API_KEY ||
+    environment.GOOGLE_MAPS_ANDROID_API_KEY
+    ? [
+        'react-native-maps',
+        {
+          ...(environment.GOOGLE_MAPS_IOS_API_KEY
+            ? { iosGoogleMapsApiKey: environment.GOOGLE_MAPS_IOS_API_KEY }
+            : {}),
+          ...(environment.GOOGLE_MAPS_ANDROID_API_KEY
+            ? {
+                androidGoogleMapsApiKey:
+                  environment.GOOGLE_MAPS_ANDROID_API_KEY,
+              }
+            : {}),
+        },
+      ]
+    : undefined;
+}
+
+assertMapsBuildConfiguration(process.env);
+const mapsPlugin = createMapsPlugin(process.env);
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'MakanMana',
@@ -14,9 +65,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: 'com.makanmana.app',
     icon: './assets/expo.icon',
-    config: process.env.GOOGLE_MAPS_IOS_API_KEY
-      ? { googleMapsApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY }
-      : undefined,
   },
   android: {
     package: 'com.makanmana.app',
@@ -27,9 +75,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
-    config: process.env.GOOGLE_MAPS_ANDROID_API_KEY
-      ? { googleMaps: { apiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY } }
-      : undefined,
   },
   web: {
     output: 'static',
@@ -40,11 +85,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-localization',
     'expo-secure-store',
     'expo-apple-authentication',
+    ...(mapsPlugin ? [mapsPlugin] : []),
     [
       'expo-location',
       {
         locationWhenInUsePermission:
-          'MakanMana uses your location to find restaurants nearby.',
+          'MakanMana sends your foreground location through our secure service to Google Maps to find nearby restaurants and build routes. We do not store precise GPS.',
       },
     ],
     [

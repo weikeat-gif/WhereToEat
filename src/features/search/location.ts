@@ -3,7 +3,10 @@ import * as Location from 'expo-location';
 import type { Coordinates } from '@/contracts/place';
 
 export type SearchLocationClient = {
-  requestForegroundPermissionsAsync: () => Promise<{ status: string }>;
+  requestForegroundPermissionsAsync: () => Promise<{
+    status: string;
+    canAskAgain?: boolean;
+  }>;
   getCurrentPositionAsync: (options?: {
     accuracy?: number;
   }) => Promise<{ coords: Coordinates }>;
@@ -11,7 +14,11 @@ export type SearchLocationClient = {
 
 export type SearchLocationResult =
   | { kind: 'granted'; coordinates: Coordinates }
-  | { kind: 'manual'; reason: 'denied' | 'unavailable' };
+  | {
+      kind: 'manual';
+      reason: 'denied' | 'unavailable';
+      canAskAgain?: boolean;
+    };
 
 export async function requestSearchLocation(
   client: SearchLocationClient = Location,
@@ -19,7 +26,11 @@ export async function requestSearchLocation(
   try {
     const permission = await client.requestForegroundPermissionsAsync();
     if (permission.status !== Location.PermissionStatus.GRANTED) {
-      return { kind: 'manual', reason: 'denied' };
+      return {
+        kind: 'manual',
+        reason: 'denied',
+        canAskAgain: permission.canAskAgain,
+      };
     }
 
     const location = await client.getCurrentPositionAsync({

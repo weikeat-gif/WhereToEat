@@ -5,6 +5,7 @@ const envSchema = z.object({
   EXPO_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   EXPO_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
   EXPO_PUBLIC_PLACES_PROXY_URL: z.string().url().optional(),
+  EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY: z.string().min(1).optional(),
 });
 
 export const env = envSchema.parse({
@@ -14,6 +15,8 @@ export const env = envSchema.parse({
     process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || undefined,
   EXPO_PUBLIC_PLACES_PROXY_URL:
     process.env.EXPO_PUBLIC_PLACES_PROXY_URL || undefined,
+  EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY:
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY || undefined,
 });
 
 export const hasLiveBackend =

@@ -2,6 +2,10 @@ import { LivePlacesService } from '@/services/places/live-places-service';
 import { PlacesServiceError } from '@/services/places/places-service';
 import { createPlacesHandler } from '../../../supabase/functions/places/core';
 
+const userJwt = `e30.${btoa(
+  JSON.stringify({ role: 'authenticated', sub: 'contract-user' }),
+).replaceAll('=', '')}.signature`;
+
 describe('LivePlacesService', () => {
   const criteria = {
     center: { latitude: 3.139, longitude: 101.6869 },
@@ -217,12 +221,13 @@ describe('LivePlacesService', () => {
       }),
       loadHalal: jest.fn().mockResolvedValue([]),
       allowRequest: () => true,
-      getCached: () => undefined,
-      setCached: () => undefined,
     });
     const service = new LivePlacesService(
       'https://project.supabase.co/functions/v1/places',
       (url, init) => handler(new Request(url, init)),
+      10_000,
+      'publishable-anon-key',
+      async () => userJwt,
     );
 
     const result = await service.searchNearby(criteria);

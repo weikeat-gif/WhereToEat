@@ -17,7 +17,8 @@ map, and either choose directly or let Surprise me make the final call.
 2. Search nearby restaurants through Google Places.
 3. Keep Home and Map synchronized to one location, result set, and filter set.
 4. Filter by open status, radius, price, category, and verified-only Halal.
-5. Open restaurant details, directions, hours, photos, and key metadata.
+5. Open restaurant details, hours, photos, and an in-app GPS driving route
+   without leaving MakanMana.
 6. Pick a random restaurant only from the current valid results.
 7. Sign in with Google, Apple, or email when saving.
 8. Sync saved places to the signed-in account.

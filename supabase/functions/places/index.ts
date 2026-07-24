@@ -12,14 +12,75 @@ declare const Deno: {
   serve(handler: (request: Request) => Promise<Response>): void;
 };
 
-const GOOGLE_API_KEY = Deno.env.get('GOOGLE_PLACES_API_KEY');
+const GOOGLE_API_KEY =
+  Deno.env.get('GOOGLE_MAPS_SERVER_API_KEY') ??
+  Deno.env.get('GOOGLE_PLACES_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const RATE_LIMIT_HMAC_SECRET = Deno.env.get('RATE_LIMIT_HMAC_SECRET');
 
-const cache = new Map<string, { expiresAt: number; value: unknown }>();
 const rate = new Map<string, { count: number; resetAt: number }>();
-const MAX_CACHE_ENTRIES = 500;
 const MAX_RATE_ENTRIES = 5_000;
+
+async function rateBucketKey(value: string) {
+  if (!RATE_LIMIT_HMAC_SECRET) {
+    throw new Error('RATE_LIMIT_HMAC_SECRET is not configured.');
+  }
+  const signingKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(RATE_LIMIT_HMAC_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const encoded = new TextEncoder().encode(value);
+  const signature = await crypto.subtle.sign('HMAC', signingKey, encoded);
+  return Array.from(new Uint8Array(signature))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function consumeDurableRateLimit(
+  key: string,
+  action: PlacesAction['action'],
+): Promise<boolean | undefined> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return undefined;
+  if (!RATE_LIMIT_HMAC_SECRET) return false;
+
+  const query = new URL(
+    '/rest/v1/rpc/consume_places_rate_limit',
+    SUPABASE_URL,
+  );
+  const bucket = await rateBucketKey(`${action}:${key}`);
+  const requestLimit = action === 'route' ? 12 : 60;
+
+  try {
+    return await fetchWithTimeout(
+      fetch,
+      query,
+      {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          p_bucket_key: bucket,
+          p_request_limit: requestLimit,
+          p_window_seconds: 60,
+        }),
+      },
+      async (response) => {
+        if (!response.ok) return false;
+        return (await response.json()) === true;
+      },
+    );
+  } catch {
+    return false;
+  }
+}
 
 const FIELD_MASKS = {
   nearby:
@@ -28,6 +89,8 @@ const FIELD_MASKS = {
     'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
   details:
     'id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
+  route:
+    'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
 } as const;
 
 async function googleRequest(input: PlacesAction): Promise<unknown> {
@@ -62,14 +125,39 @@ async function googleRequest(input: PlacesAction): Promise<unknown> {
       includedPrimaryTypes: ['(regions)'],
       regionCode: 'MY',
     });
-  } else {
+  } else if (input.action === 'details') {
     url = `https://places.googleapis.com/v1/places/${encodeURIComponent(input.placeId)}`;
     init = { method: 'GET', headers };
+  } else {
+    url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+    init.body = JSON.stringify({
+      origin: {
+        location: {
+          latLng: input.origin,
+        },
+      },
+      destination: {
+        location: {
+          latLng: input.destination,
+        },
+      },
+      travelMode: input.travelMode,
+      routingPreference: 'TRAFFIC_AWARE',
+      computeAlternativeRoutes: false,
+      polylineQuality: 'OVERVIEW',
+      languageCode: 'en-US',
+      units: 'METRIC',
+    });
   }
 
   return fetchWithTimeout(fetch, url, init, async (response) => {
     if (!response.ok) {
-      throw new UpstreamError('Google Places request failed.', response.status);
+      throw new UpstreamError(
+        input.action === 'route'
+          ? 'Google Routes request failed.'
+          : 'Google Places request failed.',
+        response.status,
+      );
     }
     return response.json();
   });
@@ -103,33 +191,21 @@ async function loadHalal(placeIds: string[]): Promise<HalalRecord[]> {
 const handler = createPlacesHandler({
   callGoogle: googleRequest,
   loadHalal,
-  allowRequest(key) {
+  async allowRequest(key, input) {
     const now = Date.now();
-    const window = rate.get(key);
+    const localKey = `${input.action}:${key}`;
+    const requestLimit = input.action === 'route' ? 12 : 60;
+    const window = rate.get(localKey);
     if (!window || window.resetAt <= now) {
-      setBoundedMapValue(rate, MAX_RATE_ENTRIES, key, {
+      setBoundedMapValue(rate, MAX_RATE_ENTRIES, localKey, {
         count: 1,
         resetAt: now + 60_000,
       });
-      return true;
+    } else {
+      window.count += 1;
+      if (window.count > requestLimit) return false;
     }
-    window.count += 1;
-    return window.count <= 60;
-  },
-  getCached(key) {
-    const hit = cache.get(key);
-    if (!hit) return undefined;
-    if (hit.expiresAt <= Date.now()) {
-      cache.delete(key);
-      return undefined;
-    }
-    return hit.value;
-  },
-  setCached(key, value) {
-    setBoundedMapValue(cache, MAX_CACHE_ENTRIES, key, {
-      expiresAt: Date.now() + 30_000,
-      value,
-    });
+    return (await consumeDurableRateLimit(key, input.action)) ?? true;
   },
 });
 

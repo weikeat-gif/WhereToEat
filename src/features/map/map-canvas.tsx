@@ -12,6 +12,7 @@ export type MapCanvasProps = {
   onSearchArea: () => void;
   onCurrentLocation: () => void;
   onPlacePress: (placeId: string) => void;
+  showsUserLocation: boolean;
 };
 
 export function MapCanvas({
@@ -21,6 +22,7 @@ export function MapCanvas({
   onSearchArea,
   onCurrentLocation,
   onPlacePress,
+  showsUserLocation: _showsUserLocation,
 }: MapCanvasProps) {
   const { colors } = useAppTheme();
 

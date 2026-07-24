@@ -221,6 +221,27 @@ export function ProfileScreen() {
             colour alone.
           </Text>
         </View>
+
+        <View style={[styles.legal, { borderColor: colors.border }]}>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push('/privacy')}
+            style={styles.legalLink}>
+            <Text style={[styles.legalText, { color: colors.text }]}>
+              Privacy notice
+            </Text>
+            <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push('/terms')}
+            style={styles.legalLink}>
+            <Text style={[styles.legalText, { color: colors.text }]}>
+              Terms of use
+            </Text>
+            <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -326,4 +347,12 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   noteText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  legal: { borderTopWidth: 1 },
+  legalLink: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 52,
+  },
+  legalText: { fontSize: 14, fontWeight: '800' },
 });

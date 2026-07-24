@@ -213,6 +213,8 @@ export class LivePlacesService implements PlacesService {
     proxyUrl: string | undefined,
     private readonly fetcher = fetch,
     private readonly timeoutMs = 10_000,
+    private readonly apiKey?: string,
+    private readonly getAccessToken?: () => Promise<string>,
   ) {
     this.proxyUrl = proxyUrl?.replace(/\/+$/, '') ?? '';
   }
@@ -289,11 +291,20 @@ export class LivePlacesService implements PlacesService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
+      const accessToken = await this.getAccessToken?.();
       const response = await this.fetcher(this.proxyUrl, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          ...(this.apiKey
+            ? {
+                apikey: this.apiKey,
+              }
+            : {}),
+          ...(accessToken
+            ? { Authorization: `Bearer ${accessToken}` }
+            : {}),
         },
         body: JSON.stringify(input),
         signal: controller.signal,

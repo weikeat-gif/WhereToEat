@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import type { Coordinates, PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
 import { MapCanvas } from '@/features/map/map-canvas';
@@ -30,7 +32,9 @@ export function MapScreen() {
     autocompleteArea,
     criteria,
     error,
+    locationCanAskAgain,
     locationMessage,
+    locationStatus,
     results,
     search,
     searchCurrentLocation,
@@ -43,6 +47,22 @@ export function MapScreen() {
   const [mapCenter, setMapCenter] = useState<Coordinates>(criteria.center);
   const [areaInput, setAreaInput] = useState(criteria.areaLabel);
   const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  const handleCurrentLocation = async () => {
+    setSettingsError(null);
+    if (locationCanAskAgain !== false) {
+      await searchCurrentLocation();
+      return;
+    }
+    try {
+      await Linking.openSettings();
+    } catch {
+      setSettingsError(
+        'Unable to open app settings. Open Settings on your phone and allow Location for MakanMana.',
+      );
+    }
+  };
 
   useEffect(() => {
     setMapCenter(criteria.center);
@@ -123,9 +143,13 @@ export function MapScreen() {
             value={areaInput}
           />
           <TouchableOpacity
-            accessibilityLabel="Use my current location"
+            accessibilityLabel={
+              locationCanAskAgain === false
+                ? 'Open app settings for location'
+                : 'Use my current location'
+            }
             accessibilityRole="button"
-            onPress={() => void searchCurrentLocation()}
+            onPress={() => void handleCurrentLocation()}
             style={[styles.iconButton, { backgroundColor: colors.surface }]}>
             <Text style={{ color: colors.text }}>◎</Text>
           </TouchableOpacity>
@@ -145,6 +169,78 @@ export function MapScreen() {
             {locationMessage}
           </Text>
         ) : null}
+        {settingsError ? (
+          <Text accessibilityRole="alert" style={{ color: colors.warning }}>
+            {settingsError}
+          </Text>
+        ) : null}
+
+        <View
+          style={[
+            styles.gpsCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}>
+          <View style={styles.gpsCopy}>
+            <Text style={[styles.gpsTitle, { color: colors.text }]}>
+              {locationStatus === 'granted'
+                ? 'GPS location active'
+                : 'Find food from your GPS'}
+            </Text>
+            <Text style={{ color: colors.textMuted }}>
+              {locationStatus === 'granted'
+                ? 'The map and nearby results are centred on your current location.'
+                : 'Your precise foreground location is sent through our Supabase service to Google Maps for nearby results. We do not store precise GPS.'}
+            </Text>
+            {locationStatus !== 'granted' ? (
+              <View style={styles.gpsLegal}>
+                <TouchableOpacity
+                  accessibilityRole="link"
+                  onPress={() => router.push('/privacy')}>
+                  <Text
+                    style={{
+                      color: colors.accentForeground,
+                      fontSize: 12,
+                      fontWeight: '800',
+                    }}>
+                    Privacy
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="link"
+                  onPress={() => router.push('/terms')}>
+                  <Text
+                    style={{
+                      color: colors.accentForeground,
+                      fontSize: 12,
+                      fontWeight: '800',
+                    }}>
+                    Terms
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+          <TouchableOpacity
+            accessibilityLabel={
+              locationCanAskAgain === false
+                ? 'Open app settings for location'
+                : 'Find food near me'
+            }
+            accessibilityRole="button"
+            disabled={locationStatus === 'requesting'}
+            onPress={() => void handleCurrentLocation()}
+            style={[styles.gpsButton, { backgroundColor: colors.accent }]}>
+            <Text style={{ color: colors.accentText, fontWeight: '900' }}>
+              {locationStatus === 'requesting'
+                ? 'Locating…'
+                : locationCanAskAgain === false
+                  ? 'Open Settings'
+                : locationStatus === 'granted'
+                  ? 'Refresh GPS'
+                  : 'Use GPS'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <ScrollView
           horizontal
@@ -193,7 +289,7 @@ export function MapScreen() {
           center={mapCenter}
           loading={status === 'loading'}
           onCenterChange={setMapCenter}
-          onCurrentLocation={() => void searchCurrentLocation()}
+          onCurrentLocation={() => void handleCurrentLocation()}
           onPlacePress={(placeId) =>
             router.push({ pathname: '/place/[id]', params: { id: placeId } })
           }
@@ -205,6 +301,7 @@ export function MapScreen() {
             })
           }
           places={results}
+          showsUserLocation={locationStatus === 'granted'}
         />
 
         <View style={styles.resultHeader}>
@@ -287,6 +384,7 @@ export function MapScreen() {
           scrollEnabled={results.length > 0}
           showsHorizontalScrollIndicator={false}
         />
+        <GoogleMapsAttribution />
       </ScrollView>
     </SafeAreaView>
   );
@@ -342,6 +440,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: spacing.md,
+  },
+  gpsCard: {
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  gpsCopy: { flex: 1, gap: spacing.xs },
+  gpsLegal: { flexDirection: 'row', gap: spacing.md },
+  gpsTitle: { fontSize: 16, fontWeight: '900' },
+  gpsButton: {
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   filters: { gap: spacing.sm },
   chip: {

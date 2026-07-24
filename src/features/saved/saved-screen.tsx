@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { ScreenPlaceholder } from '@/components/screen-placeholder';
+import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { useAuth } from '@/features/auth/auth-provider';
 import { placesService } from '@/services/places';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -166,6 +167,7 @@ export function SavedScreen() {
           testID="saved-places-list"
         />
       )}
+      <GoogleMapsAttribution />
     </ScreenPlaceholder>
   );
 }

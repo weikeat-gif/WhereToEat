@@ -1,5 +1,5 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Linking, Share } from 'react-native';
+import { Share } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { PlaceDetailsScreen } from './place-details-screen';
@@ -91,11 +91,8 @@ describe('PlaceDetailsScreen', () => {
     expect(mockToggle).toHaveBeenCalledWith('jalan-21-burger');
   });
 
-  it('announces Share and Directions failures without unhandled rejections', async () => {
+  it('announces Share failures and keeps Directions inside MakanMana', async () => {
     jest.spyOn(Share, 'share').mockRejectedValue(new Error('share unavailable'));
-    jest
-      .spyOn(Linking, 'openURL')
-      .mockRejectedValue(new Error('maps unavailable'));
     const screen = render(
       <SafeAreaProvider
         initialMetrics={{
@@ -114,10 +111,9 @@ describe('PlaceDetailsScreen', () => {
     );
 
     fireEvent.press(screen.getByTestId('directions-button'));
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Unable to open directions.',
-      ),
-    );
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/directions/[id]',
+      params: { id: 'jalan-21-burger' },
+    });
   });
 });

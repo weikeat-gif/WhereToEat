@@ -32,8 +32,8 @@ function toAppUser(user: User): AppUser {
   };
 }
 
-function toAuthSession(session: Session | null): AuthSession | null {
-  if (!session) return null;
+export function toAuthSession(session: Session | null): AuthSession | null {
+  if (!session || session.user.is_anonymous) return null;
   return {
     accessToken: session.access_token,
     user: toAppUser(session.user),

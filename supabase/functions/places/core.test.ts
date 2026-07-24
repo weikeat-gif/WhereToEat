@@ -14,11 +14,24 @@ function dependencies(
   return {
     callGoogle: jest.fn().mockResolvedValue({ places: [] }),
     loadHalal: jest.fn().mockResolvedValue([]),
-    allowRequest: jest.fn(() => true),
-    getCached: jest.fn(),
-    setCached: jest.fn(),
+    allowRequest: jest.fn(async () => true),
     ...overrides,
   };
+}
+
+function sessionToken(subject = 'test-user') {
+  const payload = btoa(
+    JSON.stringify({ role: 'authenticated', sub: subject }),
+  ).replaceAll('=', '');
+  return `e30.${payload}.signature`;
+}
+
+function authorizedRequest(body: unknown, subject = 'test-user') {
+  return new Request('https://example.test/places', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sessionToken(subject)}` },
+    body: JSON.stringify(body),
+  });
 }
 
 describe('places Edge Function core', () => {
@@ -35,6 +48,84 @@ describe('places Edge Function core', () => {
         radiusMeters: 500,
       }),
     ).toThrow('invalid');
+  });
+
+  it('accepts a bounded driving route and rejects invalid coordinates', () => {
+    expect(
+      validatePlacesRequest({
+        action: 'route',
+        origin: { latitude: 3.139, longitude: 101.6869 },
+        destination: { latitude: 3.0449, longitude: 101.4456 },
+        travelMode: 'DRIVE',
+      }),
+    ).toMatchObject({ action: 'route', travelMode: 'DRIVE' });
+
+    expect(() =>
+      validatePlacesRequest({
+        action: 'route',
+        origin: { latitude: 95, longitude: 101.6869 },
+        destination: { latitude: 3.0449, longitude: 101.4456 },
+        travelMode: 'DRIVE',
+      }),
+    ).toThrow('Route coordinates');
+
+    expect(() =>
+      validatePlacesRequest({
+        action: 'route',
+        origin: { latitude: 51.5072, longitude: -0.1276 },
+        destination: { latitude: 51.51, longitude: -0.12 },
+        travelMode: 'DRIVE',
+      }),
+    ).toThrow('Klang Valley service area');
+
+    expect(() =>
+      validatePlacesRequest({
+        action: 'route',
+        origin: { latitude: 2.71, longitude: 100.91 },
+        destination: { latitude: 3.59, longitude: 101.99 },
+        travelMode: 'DRIVE',
+      }),
+    ).toThrow('100 km');
+  });
+
+  it('rejects nearby searches outside the Klang Valley service area', () => {
+    expect(() =>
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 5.4141,
+        longitude: 100.3288,
+        radiusMeters: 3000,
+      }),
+    ).toThrow('Klang Valley service area');
+  });
+
+  it('does not cache Google content in the proxy', async () => {
+    const callGoogle = jest.fn().mockResolvedValue({
+      routes: [
+        {
+          distanceMeters: 1000,
+          duration: '300s',
+          polyline: { encodedPolyline: 'route' },
+        },
+      ],
+    });
+    const handler = createPlacesHandler(
+      dependencies({ callGoogle }),
+    );
+
+    const request = () =>
+      authorizedRequest({
+        action: 'route',
+        origin: { latitude: 3.139, longitude: 101.6869 },
+        destination: { latitude: 3.0449, longitude: 101.4456 },
+        travelMode: 'DRIVE',
+      });
+    const firstResponse = await handler(request());
+    const secondResponse = await handler(request());
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(callGoogle).toHaveBeenCalledTimes(2);
   });
 
   it('excludes expired Halal verification records', () => {
@@ -76,12 +167,9 @@ describe('places Edge Function core', () => {
       }),
     );
     const response = await handler(
-      new Request('https://example.test/places', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'details',
-          placeId: 'ChIJ12345',
-        }),
+      authorizedRequest({
+        action: 'details',
+        placeId: 'ChIJ12345',
       }),
     );
     expect(response.status).toBe(429);
@@ -96,10 +184,7 @@ describe('places Edge Function core', () => {
   it('returns a structured validation error', async () => {
     const handler = createPlacesHandler(dependencies());
     const response = await handler(
-      new Request('https://example.test/places', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'details', placeId: '../bad' }),
-      }),
+      authorizedRequest({ action: 'details', placeId: '../bad' }),
     );
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
@@ -107,7 +192,73 @@ describe('places Edge Function core', () => {
     });
   });
 
-  it('bounds fallback cache and rate-limit maps', () => {
+  it('preserves a safe route-specific upstream label', async () => {
+    const handler = createPlacesHandler(
+      dependencies({
+        callGoogle: jest
+          .fn()
+          .mockRejectedValue(new UpstreamError('Google Routes request failed.', 500)),
+      }),
+    );
+
+    const response = await handler(
+      authorizedRequest({
+        action: 'route',
+        origin: { latitude: 3.139, longitude: 101.6869 },
+        destination: { latitude: 3.0449, longitude: 101.4456 },
+        travelMode: 'DRIVE',
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: 'places_upstream',
+        message: 'Google Routes request failed.',
+      },
+    });
+  });
+
+  it('rate-limits by the JWT user subject when available', async () => {
+    const allowRequest = jest.fn().mockResolvedValue(true);
+    const handler = createPlacesHandler(dependencies({ allowRequest }));
+
+    const response = await handler(
+      authorizedRequest(
+        { action: 'details', placeId: 'ChIJ12345' },
+        'anonymous-user-123',
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(allowRequest).toHaveBeenCalledWith(
+      'user:anonymous-user-123',
+      expect.objectContaining({ action: 'details' }),
+    );
+  });
+
+  it('rejects a reusable project anon JWT without a user subject', async () => {
+    const payload = btoa(JSON.stringify({ role: 'anon' })).replaceAll('=', '');
+    const handler = createPlacesHandler(dependencies());
+
+    const response = await handler(
+      new Request('https://example.test/places', {
+        method: 'POST',
+        headers: { Authorization: `Bearer e30.${payload}.signature` },
+        body: JSON.stringify({
+          action: 'details',
+          placeId: 'ChIJ12345',
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: { code: 'user_session_required' },
+    });
+  });
+
+  it('bounds fallback rate-limit maps', () => {
     const values = new Map<string, number>([
       ['oldest', 1],
       ['newer', 2],

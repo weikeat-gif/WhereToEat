@@ -7,7 +7,13 @@ export type PlacesAction =
       includedTypes?: string[];
     }
   | { action: 'autocomplete'; input: string; sessionToken: string }
-  | { action: 'details'; placeId: string };
+  | { action: 'details'; placeId: string }
+  | {
+      action: 'route';
+      origin: { latitude: number; longitude: number };
+      destination: { latitude: number; longitude: number };
+      travelMode: 'DRIVE';
+    };
 
 export type HalalRecord = {
   google_place_id: string;
@@ -20,9 +26,7 @@ export type HalalRecord = {
 export interface PlacesDependencies {
   callGoogle(input: PlacesAction): Promise<unknown>;
   loadHalal(placeIds: string[]): Promise<HalalRecord[]>;
-  allowRequest(key: string): boolean;
-  getCached(key: string): unknown | undefined;
-  setCached(key: string, value: unknown): void;
+  allowRequest(key: string, input: PlacesAction): Promise<boolean> | boolean;
 }
 
 export class UpstreamError extends Error {
@@ -81,6 +85,58 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function validCoordinates(
+  value: unknown,
+): value is { latitude: number; longitude: number } {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.latitude) &&
+    value.latitude >= -90 &&
+    value.latitude <= 90 &&
+    isFiniteNumber(value.longitude) &&
+    value.longitude >= -180 &&
+    value.longitude <= 180
+  );
+}
+
+const SUPPORTED_KLANG_VALLEY_BOUNDS = {
+  minLatitude: 2.7,
+  maxLatitude: 3.6,
+  minLongitude: 100.9,
+  maxLongitude: 102,
+} as const;
+const MAX_ROUTE_DISTANCE_METERS = 100_000;
+
+function isSupportedServiceCoordinate(value: {
+  latitude: number;
+  longitude: number;
+}) {
+  return (
+    value.latitude >= SUPPORTED_KLANG_VALLEY_BOUNDS.minLatitude &&
+    value.latitude <= SUPPORTED_KLANG_VALLEY_BOUNDS.maxLatitude &&
+    value.longitude >= SUPPORTED_KLANG_VALLEY_BOUNDS.minLongitude &&
+    value.longitude <= SUPPORTED_KLANG_VALLEY_BOUNDS.maxLongitude
+  );
+}
+
+function straightLineDistanceMeters(
+  left: { latitude: number; longitude: number },
+  right: { latitude: number; longitude: number },
+) {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadius = 6_371_000;
+  const latitudeDelta = radians(right.latitude - left.latitude);
+  const longitudeDelta = radians(right.longitude - left.longitude);
+  const startLatitude = radians(left.latitude);
+  const endLatitude = radians(right.latitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(startLatitude) *
+      Math.cos(endLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+  return 2 * earthRadius * Math.asin(Math.sqrt(haversine));
+}
+
 export function validatePlacesRequest(value: unknown): PlacesAction {
   if (!isRecord(value) || typeof value.action !== 'string') {
     throw new Error('A valid action is required.');
@@ -96,9 +152,17 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
       value.longitude > 180 ||
       !isFiniteNumber(value.radiusMeters) ||
       value.radiusMeters < 100 ||
-      value.radiusMeters > 50000
+      value.radiusMeters > 20000
     ) {
       throw new Error('Nearby search coordinates or radius are invalid.');
+    }
+    if (
+      !isSupportedServiceCoordinate({
+        latitude: value.latitude,
+        longitude: value.longitude,
+      })
+    ) {
+      throw new Error('Nearby search must stay inside the Klang Valley service area.');
     }
     const includedTypes =
       value.includedTypes === undefined
@@ -148,6 +212,40 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
     return { action: 'details', placeId: value.placeId };
   }
 
+  if (value.action === 'route') {
+    if (
+      !validCoordinates(value.origin) ||
+      !validCoordinates(value.destination) ||
+      value.travelMode !== 'DRIVE'
+    ) {
+      throw new Error('Route coordinates or travel mode are invalid.');
+    }
+    if (
+      !isSupportedServiceCoordinate(value.origin) ||
+      !isSupportedServiceCoordinate(value.destination)
+    ) {
+      throw new Error('Routes must stay inside the Klang Valley service area.');
+    }
+    if (
+      straightLineDistanceMeters(value.origin, value.destination) >
+      MAX_ROUTE_DISTANCE_METERS
+    ) {
+      throw new Error('Routes must be within 100 km.');
+    }
+    return {
+      action: 'route',
+      origin: {
+        latitude: value.origin.latitude,
+        longitude: value.origin.longitude,
+      },
+      destination: {
+        latitude: value.destination.latitude,
+        longitude: value.destination.longitude,
+      },
+      travelMode: value.travelMode,
+    };
+  }
+
   throw new Error('Unsupported places action.');
 }
 
@@ -194,7 +292,9 @@ async function enrichHalal(
   action: PlacesAction,
   loadHalal: PlacesDependencies['loadHalal'],
 ): Promise<unknown> {
-  if (action.action === 'autocomplete') return value;
+  if (action.action === 'autocomplete' || action.action === 'route') {
+    return value;
+  }
   const places =
     action.action === 'nearby' && isRecord(value) && Array.isArray(value.places)
       ? value.places
@@ -237,6 +337,38 @@ function json(status: number, body: unknown): Response {
   });
 }
 
+function jwtIdentity(
+  request: Request,
+): { role: 'authenticated'; subject: string } | null {
+  const authorization = request.headers.get('authorization');
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const payload = token?.split('.')[1];
+  if (!payload) return null;
+
+  try {
+    const normalized = payload.replaceAll('-', '+').replaceAll('_', '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
+    const decoded = JSON.parse(atob(padded)) as unknown;
+    if (
+      !isRecord(decoded) ||
+      decoded.role !== 'authenticated' ||
+      typeof decoded.sub !== 'string' ||
+      decoded.sub.trim().length === 0
+    ) {
+      return null;
+    }
+    return {
+      role: 'authenticated',
+      subject: decoded.sub.slice(0, 128),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function createPlacesHandler(dependencies: PlacesDependencies) {
   return async (request: Request): Promise<Response> => {
     if (request.method === 'OPTIONS') return json(200, { ok: true });
@@ -244,11 +376,9 @@ export function createPlacesHandler(dependencies: PlacesDependencies) {
       return json(405, { error: { code: 'method_not_allowed' } });
     }
 
-    const requestKey =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-      'anonymous';
-    if (!dependencies.allowRequest(requestKey)) {
-      return json(429, { error: { code: 'rate_limited' } });
+    const identity = jwtIdentity(request);
+    if (!identity) {
+      return json(401, { error: { code: 'user_session_required' } });
     }
 
     let input: PlacesAction;
@@ -263,9 +393,14 @@ export function createPlacesHandler(dependencies: PlacesDependencies) {
       });
     }
 
-    const cacheKey = JSON.stringify(input);
-    const cached = dependencies.getCached(cacheKey);
-    if (cached !== undefined) return json(200, cached);
+    if (
+      !(await dependencies.allowRequest(
+        `user:${identity.subject}`,
+        input,
+      ))
+    ) {
+      return json(429, { error: { code: 'rate_limited' } });
+    }
 
     try {
       const googleResult = await dependencies.callGoogle(input);
@@ -274,7 +409,6 @@ export function createPlacesHandler(dependencies: PlacesDependencies) {
         input,
         dependencies.loadHalal,
       );
-      dependencies.setCached(cacheKey, result);
       return json(200, result);
     } catch (error) {
       if (error instanceof UpstreamError) {

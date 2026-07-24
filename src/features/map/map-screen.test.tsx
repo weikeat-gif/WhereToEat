@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 
 import type { PlaceSummary } from '@/contracts/place';
 
@@ -60,7 +61,9 @@ function searchState(overrides: Record<string, unknown> = {}) {
       verifiedHalalOnly: false,
     },
     error: null,
+    locationCanAskAgain: true,
     locationMessage: null,
+    locationStatus: 'idle',
     results: [trustedPlace],
     search: jest.fn(),
     searchCurrentLocation: jest.fn(),
@@ -89,6 +92,63 @@ describe('MapScreen states', () => {
       params: { id: 'trusted-place' },
     });
     expect(screen.getByLabelText('Use my current location')).toBeTruthy();
+  });
+
+  it('requests GPS and nearby food from the in-app map', () => {
+    const searchCurrentLocation = jest.fn();
+    mockUseSearch.mockReturnValue(searchState({ searchCurrentLocation }));
+
+    render(<MapScreen />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Find food near me' }));
+
+    expect(searchCurrentLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens app settings after location permission is permanently denied', () => {
+    const openSettings = jest
+      .spyOn(Linking, 'openSettings')
+      .mockResolvedValue(undefined);
+    mockUseSearch.mockReturnValue(
+      searchState({
+        locationCanAskAgain: false,
+        locationMessage: 'Location permission was denied.',
+        locationStatus: 'manual',
+      }),
+    );
+
+    render(<MapScreen />);
+
+    fireEvent.press(
+      screen.getAllByRole('button', {
+        name: 'Open app settings for location',
+      })[0],
+    );
+
+    expect(openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows recovery guidance when app settings cannot open', async () => {
+    jest
+      .spyOn(Linking, 'openSettings')
+      .mockRejectedValue(new Error('settings unavailable'));
+    mockUseSearch.mockReturnValue(
+      searchState({
+        locationCanAskAgain: false,
+        locationStatus: 'manual',
+      }),
+    );
+
+    render(<MapScreen />);
+    fireEvent.press(
+      screen.getAllByRole('button', {
+        name: 'Open app settings for location',
+      })[0],
+    );
+
+    expect(
+      await screen.findByText(/Unable to open app settings/i),
+    ).toBeTruthy();
   });
 
   it.each([

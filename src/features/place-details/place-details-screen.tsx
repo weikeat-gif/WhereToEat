@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -15,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { IconButton } from '@/components/ui/icon-button';
 import { SemanticChip } from '@/components/ui/semantic-chip';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -108,17 +108,13 @@ export function PlaceDetailsScreen() {
     }
   }
 
-  async function openDirections() {
+  function openDirections() {
     if (!place) return;
-    const query = encodeURIComponent(`${place.name}, ${place.address}`);
     setActionError(null);
-    try {
-      await Linking.openURL(
-        `https://www.google.com/maps/search/?api=1&query=${query}`,
-      );
-    } catch {
-      setActionError('Unable to open directions.');
-    }
+    router.push({
+      pathname: '/directions/[id]',
+      params: { id: place.id },
+    });
   }
 
   if (!place) {
@@ -349,6 +345,7 @@ export function PlaceDetailsScreen() {
               </Text>
             </View>
           </View>
+          <GoogleMapsAttribution />
         </View>
       </ScrollView>
 
@@ -392,7 +389,7 @@ export function PlaceDetailsScreen() {
         <Pressable
           accessibilityLabel={`Distance ${formatDistance(place.distanceMeters)}`}
           accessibilityRole="button"
-          onPress={() => void openDirections()}
+          onPress={openDirections}
           style={[
             styles.distanceButton,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -408,7 +405,7 @@ export function PlaceDetailsScreen() {
             color={colors.accentText}
             icon="arrow-forward"
             label="Directions"
-            onPress={() => void openDirections()}
+            onPress={openDirections}
             testID="directions-button"
           />
         </View>

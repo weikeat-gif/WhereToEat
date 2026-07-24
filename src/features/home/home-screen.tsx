@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { PlaceCard } from '@/components/ui/place-card';
 import { SemanticChip } from '@/components/ui/semantic-chip';
 import { useSearch } from '@/features/search/search-provider';
@@ -297,6 +298,7 @@ export function HomeScreen() {
             />
           ))}
         </View>
+        <GoogleMapsAttribution />
       </ScrollView>
     </SafeAreaView>
   );

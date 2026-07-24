@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, type Region } from 'react-native-maps';
+import MapView, {
+  Marker,
+  PROVIDER_GOOGLE,
+  type Region,
+} from 'react-native-maps';
 
 import type { PlaceSummary } from '@/contracts/place';
 import type { MapCanvasProps } from '@/features/map/map-canvas';
@@ -26,6 +30,7 @@ export function MapCanvas({
   onSearchArea,
   onCurrentLocation,
   onPlacePress,
+  showsUserLocation,
 }: MapCanvasProps) {
   const { colors } = useAppTheme();
   const mapRef = useRef<MapView>(null);
@@ -77,9 +82,10 @@ export function MapCanvas({
           longitudeDelta: LATITUDE_DELTA,
         }}
         onRegionChangeComplete={handleRegionChange}
+        provider={PROVIDER_GOOGLE}
         showsCompass
         showsMyLocationButton={false}
-        showsUserLocation
+        showsUserLocation={showsUserLocation}
         style={StyleSheet.absoluteFill}>
         {places.map((place) => (
           <Marker

@@ -41,6 +41,7 @@ type SearchContextValue = {
   error: string | null;
   locationStatus: 'idle' | 'requesting' | 'granted' | 'manual';
   locationMessage: string | null;
+  locationCanAskAgain: boolean | null;
   surprise: PlaceSummary | undefined;
   setCriteria: (criteria: SearchCriteria) => void;
   setResults: (places: PlaceSummary[]) => void;
@@ -74,6 +75,9 @@ export function SearchProvider({
   const [locationStatus, setLocationStatus] =
     useState<SearchContextValue['locationStatus']>('idle');
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [locationCanAskAgain, setLocationCanAskAgain] = useState<
+    boolean | null
+  >(null);
   const [surprise, setSurprise] = useState<PlaceSummary>();
   const criteriaRef = useRef(criteria);
   const requestIdRef = useRef(0);
@@ -176,10 +180,12 @@ export function SearchProvider({
     const operationId = ++requestIdRef.current;
     setLocationStatus('requesting');
     setLocationMessage(null);
+    setLocationCanAskAgain(null);
     const location = await requestSearchLocation(locationClient);
     if (operationId !== requestIdRef.current) return undefined;
     if (location.kind === 'manual') {
       setLocationStatus('manual');
+      setLocationCanAskAgain(location.canAskAgain ?? true);
       setLocationMessage(
         location.reason === 'denied'
           ? 'Location permission was denied. Search by area instead.'
@@ -189,6 +195,7 @@ export function SearchProvider({
     }
 
     setLocationStatus('granted');
+    setLocationCanAskAgain(true);
     return search({
       ...criteriaRef.current,
       center: location.coordinates,
@@ -215,6 +222,7 @@ export function SearchProvider({
       error,
       locationStatus,
       locationMessage,
+      locationCanAskAgain,
       surprise,
       setCriteria: setSynchronizedCriteria,
       setResults: setSynchronizedResults,
@@ -230,6 +238,7 @@ export function SearchProvider({
       criteria,
       error,
       locationMessage,
+      locationCanAskAgain,
       locationStatus,
       results,
       search,
