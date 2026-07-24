@@ -8,6 +8,7 @@ import {
   formatPrice,
 } from '@/features/home/discovery-data';
 import { useAppTheme } from '@/theme/theme-provider';
+import { fontFamily } from '@/theme/tokens';
 
 type PlaceCardProps = {
   place: PlaceSummary;
@@ -28,7 +29,7 @@ export function PlaceCard({ place, image, onPress }: PlaceCardProps) {
         {
           backgroundColor: colors.surface,
           borderColor: colors.border,
-          opacity: pressed ? 0.82 : 1,
+          transform: [{ scale: pressed ? 0.99 : 1 }],
         },
       ]}>
       {place.photoUrl || image ? (
@@ -61,9 +62,6 @@ export function PlaceCard({ place, image, onPress }: PlaceCardProps) {
               {place.subtitle}
             </Text>
           </View>
-          <View style={[styles.chevron, { backgroundColor: colors.surfaceElevated }]}>
-            <Ionicons color={colors.text} name="chevron-forward" size={18} />
-          </View>
         </View>
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
@@ -89,7 +87,7 @@ export function PlaceCard({ place, image, onPress }: PlaceCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
     minHeight: 132,
@@ -97,22 +95,20 @@ const styles = StyleSheet.create({
   },
   image: { width: 132, minHeight: 132 },
   noPhoto: { alignItems: 'center', gap: 6, justifyContent: 'center' },
-  noPhotoText: { fontSize: 12, fontWeight: '700' },
+  noPhotoText: { fontFamily: fontFamily.semibold, fontSize: 12 },
   body: { flex: 1, justifyContent: 'center', padding: 14 },
   titleRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   titleBlock: { flex: 1 },
-  title: { fontSize: 18, fontWeight: '800' },
-  subtitle: { fontSize: 13, marginTop: 4 },
-  chevron: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    borderRadius: 17,
-    justifyContent: 'center',
+  title: { fontFamily: fontFamily.semibold, fontSize: 17, lineHeight: 22 },
+  subtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 3,
   },
   metaRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginTop: 14 },
   metaItem: { alignItems: 'center', flexDirection: 'row', gap: 4 },
-  metaStrong: { fontSize: 13, fontWeight: '800' },
-  meta: { fontSize: 13, fontWeight: '600' },
-  price: { fontSize: 13, fontWeight: '900' },
+  metaStrong: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  meta: { fontFamily: fontFamily.medium, fontSize: 13 },
+  price: { fontFamily: fontFamily.semibold, fontSize: 13 },
 });

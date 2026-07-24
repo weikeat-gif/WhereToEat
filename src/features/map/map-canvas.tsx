@@ -1,18 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { env } from '@/config/env';
 import type { Coordinates, PlaceSummary } from '@/contracts/place';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
-import { radius, spacing } from '@/theme/tokens';
+import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 export type MapCanvasProps = {
   center: Coordinates;
   places: PlaceSummary[];
-  loading: boolean;
   onCenterChange: (center: Coordinates) => void;
-  onSearchArea: () => void;
+  onMapPress: () => void;
   onPlacePress: (placeId: string) => void;
   showsUserLocation: boolean;
 };
@@ -90,9 +89,8 @@ function coordinatesChanged(left: Coordinates, right: Coordinates) {
 export function MapCanvas({
   center,
   places,
-  loading,
   onCenterChange,
-  onSearchArea,
+  onMapPress,
   onPlacePress,
   showsUserLocation: _showsUserLocation,
 }: MapCanvasProps) {
@@ -100,10 +98,12 @@ export function MapCanvas({
   const hostRef = useRef<View>(null);
   const mapRef = useRef<WebMap | null>(null);
   const mapListenerRef = useRef<MapsListener | null>(null);
+  const mapPressListenerRef = useRef<MapsListener | null>(null);
   const markerRefs = useRef<WebMarker[]>([]);
   const lastCenterRef = useRef(center);
   const latestCenterRef = useRef(center);
   const onCenterChangeRef = useRef(onCenterChange);
+  const onMapPressRef = useRef(onMapPress);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -113,6 +113,10 @@ export function MapCanvas({
   useEffect(() => {
     onCenterChangeRef.current = onCenterChange;
   }, [onCenterChange]);
+
+  useEffect(() => {
+    onMapPressRef.current = onMapPress;
+  }, [onMapPress]);
 
   useEffect(() => {
     if (!webKey) return;
@@ -148,6 +152,9 @@ export function MapCanvas({
           lastCenterRef.current = nextCenter;
           onCenterChangeRef.current(nextCenter);
         });
+        mapPressListenerRef.current = map.addListener('click', () => {
+          onMapPressRef.current();
+        });
         setMapReady(true);
       })
       .catch(() => {
@@ -158,6 +165,8 @@ export function MapCanvas({
       active = false;
       mapListenerRef.current?.remove();
       mapListenerRef.current = null;
+      mapPressListenerRef.current?.remove();
+      mapPressListenerRef.current = null;
       mapRef.current = null;
     };
   }, [retryNonce, webKey]);
@@ -211,53 +220,45 @@ export function MapCanvas({
       <View ref={hostRef} style={StyleSheet.absoluteFill} />
 
       {!webKey || mapError ? (
-        <View
-          style={[
-            styles.webNotice,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}>
-          <Text style={[styles.webNoticeTitle, { color: colors.text }]}>
-            {i18n.t('mapWebUnavailableTitle')}
-          </Text>
-          <Text style={[styles.webNoticeBody, { color: colors.textMuted }]}>
-            {mapError ?? i18n.t('mapWebUnavailableBody')}
-          </Text>
-          {mapError ? (
-            <TouchableOpacity
-              accessibilityLabel={i18n.t('mapTryAgain')}
-              accessibilityRole="button"
-              onPress={() => {
-                setMapError(null);
-                setRetryNonce((value) => value + 1);
-              }}
-              style={[
-                styles.retryButton,
-                { backgroundColor: colors.surfaceElevated },
-              ]}>
-              <Text style={{ color: colors.text, fontWeight: '800' }}>
-                {i18n.t('mapTryAgain')}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <>
+          <Pressable
+            accessibilityLabel={i18n.t('mapFocusAccessibility')}
+            accessibilityRole="button"
+            onPress={onMapPress}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            style={[
+              styles.webNotice,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+            <Text style={[styles.webNoticeTitle, { color: colors.text }]}>
+              {i18n.t('mapWebUnavailableTitle')}
+            </Text>
+            <Text style={[styles.webNoticeBody, { color: colors.textMuted }]}>
+              {mapError ?? i18n.t('mapWebUnavailableBody')}
+            </Text>
+            {mapError ? (
+              <TouchableOpacity
+                accessibilityLabel={i18n.t('mapTryAgain')}
+                accessibilityRole="button"
+                onPress={() => {
+                  setMapError(null);
+                  setRetryNonce((value) => value + 1);
+                }}
+                style={[
+                  styles.retryButton,
+                  { backgroundColor: colors.surfaceElevated },
+                ]}>
+                <Text style={{ color: colors.text, fontFamily: fontFamily.semibold }}>
+                  {i18n.t('mapTryAgain')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </>
       ) : null}
 
-      <TouchableOpacity
-        accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
-        accessibilityRole="button"
-        disabled={loading || !mapReady}
-        onPress={onSearchArea}
-        style={[
-          styles.searchButton,
-          {
-            backgroundColor: colors.accent,
-            opacity: loading || !mapReady ? 0.64 : 1,
-          },
-        ]}>
-        <Text style={{ color: colors.accentText, fontWeight: '800' }}>
-          {loading ? i18n.t('mapSearching') : i18n.t('mapSearchArea')}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -276,8 +277,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.lg,
   },
-  webNoticeTitle: { fontSize: 15, fontWeight: '900' },
-  webNoticeBody: { fontSize: 12, marginTop: spacing.xs },
+  webNoticeTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  webNoticeBody: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
   retryButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -286,15 +291,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     minHeight: 44,
     paddingHorizontal: spacing.lg,
-  },
-  searchButton: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: radius.pill,
-    bottom: spacing.md,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: spacing.xl,
-    position: 'absolute',
   },
 });

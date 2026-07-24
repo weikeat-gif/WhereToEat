@@ -27,6 +27,7 @@ import {
 import { useSavedPlaces } from '@/features/saved/use-saved-places';
 import { useSearch } from '@/features/search/search-provider';
 import { useAppTheme } from '@/theme/theme-provider';
+import { fontFamily } from '@/theme/tokens';
 
 import { loadDisplayPlace } from './place-details-loader';
 import { placeOpeningStatus } from './place-status';
@@ -177,7 +178,7 @@ export function PlaceDetailsScreen() {
                 name="restaurant-outline"
                 size={54}
               />
-              <Text style={{ color: colors.textMuted, fontWeight: '800' }}>
+              <Text style={{ color: colors.textMuted, fontFamily: fontFamily.semibold }}>
                 No restaurant photo available
               </Text>
             </View>
@@ -429,17 +430,22 @@ const styles = StyleSheet.create({
   heroCopy: { padding: 20, paddingBottom: 24 },
   name: {
     color: '#FFFFFF',
-    fontSize: 38,
-    fontWeight: '900',
-    letterSpacing: -1.4,
-    lineHeight: 41,
+    fontFamily: fontFamily.display,
+    fontSize: 40,
+    letterSpacing: -0.6,
+    lineHeight: 43,
   },
-  subtitle: { color: '#D7DAD5', fontSize: 19, fontWeight: '600', marginTop: 4 },
+  subtitle: {
+    color: '#D7DAD5',
+    fontFamily: fontFamily.medium,
+    fontSize: 18,
+    marginTop: 4,
+  },
   heroMeta: { alignItems: 'center', flexDirection: 'row', gap: 9, marginTop: 14 },
   heroMetaItem: { alignItems: 'center', flexDirection: 'row', gap: 5 },
-  heroRating: { color: '#C6FF00', fontSize: 16, fontWeight: '900' },
-  heroMuted: { color: '#E0E2DE', fontSize: 14, fontWeight: '600' },
-  heroPrice: { color: '#C6FF00', fontSize: 15, fontWeight: '900' },
+  heroRating: { color: '#D7F36A', fontFamily: fontFamily.semibold, fontSize: 16 },
+  heroMuted: { color: '#E0E2DE', fontFamily: fontFamily.medium, fontSize: 14 },
+  heroPrice: { color: '#D7F36A', fontFamily: fontFamily.semibold, fontSize: 15 },
   body: { gap: 22, padding: 16 },
   openRow: {
     minHeight: 54,
@@ -451,18 +457,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   openLabel: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  open: { fontSize: 14, fontWeight: '900' },
-  openingNote: { fontSize: 13, fontWeight: '600' },
-  hoursLink: { fontSize: 12, fontWeight: '800' },
+  open: { fontFamily: fontFamily.semibold, fontSize: 14 },
+  openingNote: { fontFamily: fontFamily.regular, fontSize: 13 },
+  hoursLink: { fontFamily: fontFamily.semibold, fontSize: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  description: { fontSize: 16, lineHeight: 25 },
+  description: { fontFamily: fontFamily.regular, fontSize: 16, lineHeight: 25 },
   sectionTitleRow: {
     alignItems: 'flex-end',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  sectionTitle: { fontSize: 23, fontWeight: '900', letterSpacing: -0.5 },
-  sectionNote: { fontSize: 13, marginTop: 3 },
+  sectionTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 26,
+    letterSpacing: -0.2,
+  },
+  sectionNote: { fontFamily: fontFamily.regular, fontSize: 13, marginTop: 3 },
   picks: { gap: 10, paddingRight: 16 },
   pickCard: {
     borderRadius: 18,
@@ -471,7 +481,7 @@ const styles = StyleSheet.create({
     width: 156,
   },
   pickImage: { height: 112, width: '100%' },
-  pickName: { fontSize: 14, fontWeight: '800', padding: 12 },
+  pickName: { fontFamily: fontFamily.semibold, fontSize: 14, padding: 12 },
   addressCard: {
     alignItems: 'center',
     borderRadius: 18,
@@ -488,8 +498,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addressCopy: { flex: 1 },
-  addressLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  address: { fontSize: 15, fontWeight: '700', lineHeight: 21, marginTop: 3 },
+  addressLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+  },
+  address: {
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    lineHeight: 21,
+    marginTop: 3,
+  },
   topActions: {
     left: 16,
     right: 16,
@@ -520,6 +539,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  distanceText: { fontSize: 15, fontWeight: '800' },
+  distanceText: { fontFamily: fontFamily.semibold, fontSize: 15 },
   directionAction: { flex: 1 },
 });

@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppTheme } from '@/theme/theme-provider';
+import { fontFamily } from '@/theme/tokens';
 
 type ScreenPlaceholderProps = {
   title: string;
@@ -33,6 +34,10 @@ export function ScreenPlaceholder({
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   content: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { fontSize: 34, fontWeight: '800', marginBottom: 8 },
-  description: { fontSize: 16, lineHeight: 24 },
+  title: { fontFamily: fontFamily.display, fontSize: 38, marginBottom: 8 },
+  description: {
+    fontFamily: fontFamily.regular,
+    fontSize: 16,
+    lineHeight: 24,
+  },
 });

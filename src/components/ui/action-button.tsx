@@ -1,6 +1,8 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { fontFamily } from '@/theme/tokens';
 
 type ActionButtonProps = {
   label: string;
@@ -30,25 +32,55 @@ export function ActionButton({
       testID={testID}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor, borderColor, opacity: pressed ? 0.78 : 1 },
+        {
+          backgroundColor,
+          borderColor,
+          transform: [{ scale: pressed ? 0.985 : 1 }],
+        },
       ]}>
-      <Ionicons color={color} name={icon} size={21} />
+      <View
+        style={[
+          styles.iconTile,
+          {
+            backgroundColor:
+              borderColor === 'transparent'
+                ? 'rgba(255,255,255,0.22)'
+                : 'rgba(255,255,255,0.10)',
+          },
+        ]}>
+        <Ionicons color={color} name={icon} size={19} />
+      </View>
       <Text style={[styles.label, { color }]}>{label}</Text>
-      {trailing}
+      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
+    minHeight: 54,
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 15,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
+    gap: 12,
+    paddingHorizontal: 8,
+    paddingRight: 20,
   },
-  label: { fontSize: 17, fontWeight: '800' },
+  iconTile: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    borderRadius: 11,
+    justifyContent: 'center',
+  },
+  label: {
+    flex: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: 15,
+    letterSpacing: 0.1,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  trailing: { marginLeft: 'auto' },
 });

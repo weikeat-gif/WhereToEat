@@ -69,6 +69,8 @@ describe('DirectionsScreen location disclosure', () => {
 
     expect(mockLoadDirections).not.toHaveBeenCalled();
     expect(screen.getByText(/precise foreground location/i)).toBeTruthy();
+    expect(screen.queryByText('Privacy notice')).toBeNull();
+    expect(screen.queryByText('Terms')).toBeNull();
 
     fireEvent.press(
       screen.getByRole('button', { name: 'Allow GPS and build route' }),

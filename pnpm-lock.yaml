@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@expo-google-fonts/dm-serif-display':
+        specifier: ^0.4.2
+        version: 0.4.2
+      '@expo-google-fonts/manrope':
+        specifier: ^0.4.2
+        version: 0.4.2
       '@expo/vector-icons':
         specifier: ^15.1.1
         version: 15.1.1(expo-font@55.0.8)(react-native@0.83.6(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.0))(react@19.2.0)
@@ -754,6 +760,12 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@expo-google-fonts/dm-serif-display@0.4.2':
+    resolution: {integrity: sha512-onlO8xAzsgMbKcwUE+fAgJ5AFHhk06VtaDN7eQOJwjV65QIciDKTiSNu1ymHc4m6g/x6D9OqPIYPXdTNIfaEaA==}
+
+  '@expo-google-fonts/manrope@0.4.2':
+    resolution: {integrity: sha512-BZsKe8d9BJrVnIQIZcTS7/Kac0TbXnqs/+8EBSiQxrmK6GoCO6eTkmr50D1weIk/EoF20pTmAkpWICnovATr/g==}
 
   '@expo-google-fonts/material-symbols@0.4.41':
     resolution: {integrity: sha512-BKNSJ6oFGWi+aXu6PF+1EdI43J8Ag+Sm7Ste1SXYmC2eYOJasyjXHkKjgkIieBB1eDZQJSPWuPv421Vg6N5tCQ==}
@@ -5708,6 +5720,10 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@expo-google-fonts/dm-serif-display@0.4.2': {}
+
+  '@expo-google-fonts/manrope@0.4.2': {}
 
   '@expo-google-fonts/material-symbols@0.4.41': {}
 

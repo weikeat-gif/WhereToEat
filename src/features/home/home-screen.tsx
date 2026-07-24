@@ -19,10 +19,11 @@ import { SemanticChip } from '@/components/ui/semantic-chip';
 import { useSearch } from '@/features/search/search-provider';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
+import { fontFamily } from '@/theme/tokens';
 
 import { DISCOVERY_PLACES, heroImage } from './discovery-data';
 
-const brandMark = require('../../../assets/images/icon.png');
+const brandMark = require('../../../assets/images/brand/makanmana-mark.png');
 
 export function HomeScreen() {
   const { colors } = useAppTheme();
@@ -161,24 +162,9 @@ export function HomeScreen() {
               accessibilityIgnoresInvertColors
               contentFit="contain"
               source={brandMark}
+              testID="brand-mark"
               style={styles.brandMark}
             />
-            <View style={styles.brandCopy}>
-              <Text
-                maxFontSizeMultiplier={1.3}
-                numberOfLines={1}
-                style={[styles.brand, { color: colors.accentForeground }]}>
-                {i18n.t('appName')}
-              </Text>
-              {!compact && (
-                <Text
-                  maxFontSizeMultiplier={1.3}
-                  numberOfLines={1}
-                  style={[styles.brandNote, { color: colors.textMuted }]}>
-                  {i18n.t('homeBrandNote')}
-                </Text>
-              )}
-            </View>
           </View>
           <Pressable
             accessibilityLabel={`Location: ${i18n.t('homeArea')}`}
@@ -358,10 +344,7 @@ const styles = StyleSheet.create({
     gap: 8,
     minWidth: 0,
   },
-  brandCopy: { flexShrink: 1, minWidth: 0 },
-  brandMark: { borderRadius: 10, height: 38, width: 38 },
-  brand: { fontSize: 25, fontWeight: '900', letterSpacing: -1 },
-  brandNote: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  brandMark: { height: 42, width: 38 },
   location: {
     minHeight: 44,
     alignItems: 'center',
@@ -371,7 +354,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
   },
-  locationText: { fontSize: 13, fontWeight: '700' },
+  locationText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   hero: {
     minHeight: 410,
     justifyContent: 'space-between',
@@ -384,25 +367,25 @@ const styles = StyleSheet.create({
   heroShade: { backgroundColor: 'rgba(0,0,0,0.36)' },
   heroCopy: { marginTop: 28 },
   eyebrow: {
-    color: '#C6FF00',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 1.2,
+    color: '#D7F36A',
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 1.6,
     textTransform: 'uppercase',
   },
   headline: {
     color: '#FFFFFF',
-    fontSize: 46,
-    fontWeight: '900',
-    letterSpacing: -1.8,
-    lineHeight: 48,
-    marginTop: 8,
+    fontFamily: fontFamily.display,
+    fontSize: 48,
+    letterSpacing: -0.8,
+    lineHeight: 50,
+    marginTop: 10,
     maxWidth: 330,
   },
   headlineCompact: {
-    fontSize: 40,
-    letterSpacing: -1.4,
-    lineHeight: 43,
+    fontSize: 42,
+    letterSpacing: -0.5,
+    lineHeight: 44,
     maxWidth: 270,
   },
   heroActions: { gap: 9 },
@@ -418,7 +401,12 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     paddingVertical: 6,
   },
-  searchText: { flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  searchText: {
+    flex: 1,
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    lineHeight: 20,
+  },
   tune: {
     width: 44,
     height: 44,
@@ -435,7 +423,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     padding: 12,
   },
-  statusText: { fontSize: 13, fontWeight: '700' },
+  statusText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   sectionHeading: {
     alignItems: 'flex-end',
     flexDirection: 'row',
@@ -443,8 +431,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 4,
   },
-  sectionTitle: { fontSize: 25, fontWeight: '900', letterSpacing: -0.8 },
-  sectionSubtitle: { fontSize: 13, fontWeight: '500', marginTop: 3 },
+  sectionTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 28,
+    letterSpacing: -0.3,
+  },
+  sectionSubtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    marginTop: 3,
+  },
   cards: { gap: 10, paddingHorizontal: 14 },
-  empty: { fontSize: 15, lineHeight: 22, paddingHorizontal: 4, paddingVertical: 18 },
+  empty: {
+    fontFamily: fontFamily.regular,
+    fontSize: 15,
+    lineHeight: 22,
+    paddingHorizontal: 4,
+    paddingVertical: 18,
+  },
 });

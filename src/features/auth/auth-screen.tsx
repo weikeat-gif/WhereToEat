@@ -11,6 +11,7 @@ import {
 
 import { ScreenPlaceholder } from '@/components/screen-placeholder';
 import { useAppTheme } from '@/theme/theme-provider';
+import { fontFamily } from '@/theme/tokens';
 
 import { useAuth } from './auth-provider';
 import { AppleSignInButton } from './apple-sign-in-button';
@@ -174,7 +175,7 @@ function AuthButton({
       <Text
         style={{
           color: disabled ? colors.textMuted : colors.accentText,
-          fontWeight: '800',
+          fontFamily: fontFamily.semibold,
         }}>
         {label}
       </Text>
@@ -195,18 +196,20 @@ const styles = StyleSheet.create({
   stack: { gap: 12, marginTop: 24, width: '100%' },
   button: {
     alignItems: 'center',
-    borderRadius: 999,
+    borderRadius: 15,
     borderWidth: 1,
+    minHeight: 54,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   input: {
     borderRadius: 14,
     borderWidth: 1,
+    fontFamily: fontFamily.regular,
     fontSize: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   divider: { height: 1, marginVertical: 4 },
-  notice: { lineHeight: 20 },
+  notice: { fontFamily: fontFamily.regular, lineHeight: 20 },
 });

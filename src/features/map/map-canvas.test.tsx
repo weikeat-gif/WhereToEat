@@ -27,13 +27,16 @@ describe('web MapCanvas', () => {
     let mapOptions: Record<string, unknown> | undefined;
     let currentCenter = { lat: () => 3.2, lng: () => 101.7 };
     let idleListener: (() => void) | undefined;
+    let mapPressListener: (() => void) | undefined;
     const onCenterChange = jest.fn();
+    const onMapPress = jest.fn();
     class FakeMap {
       constructor(_element: HTMLElement, options: Record<string, unknown>) {
         mapOptions = options;
       }
-      addListener(_event: string, listener: () => void) {
-        idleListener = listener;
+      addListener(event: string, listener: () => void) {
+        if (event === 'idle') idleListener = listener;
+        if (event === 'click') mapPressListener = listener;
         return { remove: jest.fn() };
       }
       getCenter() {
@@ -60,9 +63,8 @@ describe('web MapCanvas', () => {
     const props = {
       center: firstCenter,
       places: [],
-      loading: false,
       onCenterChange,
-      onSearchArea: jest.fn(),
+      onMapPress,
       onPlacePress: jest.fn(),
       showsUserLocation: true,
     };
@@ -92,5 +94,8 @@ describe('web MapCanvas', () => {
       latitude: 3.06,
       longitude: 101.46,
     });
+
+    act(() => mapPressListener?.());
+    expect(onMapPress).toHaveBeenCalledTimes(1);
   });
 });

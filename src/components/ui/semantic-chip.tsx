@@ -2,6 +2,8 @@ import type { ComponentProps } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { fontFamily } from '@/theme/tokens';
+
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 type SemanticChipProps = {
@@ -52,7 +54,7 @@ export function SemanticChip({
         {
           borderColor: color,
           backgroundColor: `${color}${selected ? '2B' : '10'}`,
-          opacity: pressed ? 0.72 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
         },
       ]}>
       {content}
@@ -71,5 +73,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  label: { fontSize: 13, fontWeight: '700' },
+  label: { fontFamily: fontFamily.semibold, fontSize: 13 },
 });

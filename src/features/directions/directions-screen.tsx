@@ -21,7 +21,7 @@ import {
 import type { DiscoveryPlace } from '@/features/home/discovery-data';
 import { formatDistance } from '@/features/home/discovery-data';
 import { useAppTheme } from '@/theme/theme-provider';
-import { radius, spacing } from '@/theme/tokens';
+import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 function formatDuration(seconds: number) {
   const minutes = Math.max(1, Math.round(seconds / 60));
@@ -119,7 +119,7 @@ export function DirectionsScreen() {
                     : void refresh()
                 }
                 style={[styles.retryButton, { backgroundColor: colors.accent }]}>
-                <Text style={{ color: colors.accentText, fontWeight: '900' }}>
+                <Text style={{ color: colors.accentText, fontFamily: fontFamily.semibold }}>
                   {canOpenSettings
                     ? 'Open app settings'
                     : retryNeedsGps
@@ -143,28 +143,12 @@ export function DirectionsScreen() {
                 MakanMana&apos;s Supabase service to Google Maps to calculate
                 this driving route. We do not store your precise GPS location.
               </Text>
-              <View style={styles.consentLinks}>
-                <TouchableOpacity
-                  accessibilityRole="link"
-                  onPress={() => router.push('/privacy')}>
-                  <Text style={{ color: colors.accentForeground, fontWeight: '800' }}>
-                    Privacy notice
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  accessibilityRole="link"
-                  onPress={() => router.push('/terms')}>
-                  <Text style={{ color: colors.accentForeground, fontWeight: '800' }}>
-                    Terms
-                  </Text>
-                </TouchableOpacity>
-              </View>
               <TouchableOpacity
                 accessibilityLabel="Allow GPS and build route"
                 accessibilityRole="button"
                 onPress={() => void refresh()}
                 style={[styles.retryButton, { backgroundColor: colors.accent }]}>
-                <Text style={{ color: colors.accentText, fontWeight: '900' }}>
+                <Text style={{ color: colors.accentText, fontFamily: fontFamily.semibold }}>
                   Allow GPS & build route
                 </Text>
               </TouchableOpacity>
@@ -263,15 +247,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
-  stateTitle: { fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  stateCopy: { lineHeight: 22, maxWidth: 320, textAlign: 'center' },
+  stateTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 25,
+    textAlign: 'center',
+  },
+  stateCopy: {
+    fontFamily: fontFamily.regular,
+    lineHeight: 22,
+    maxWidth: 320,
+    textAlign: 'center',
+  },
   retryButton: {
     borderRadius: radius.pill,
     marginTop: spacing.sm,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
   },
-  consentLinks: { flexDirection: 'row', gap: spacing.lg },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -284,11 +276,11 @@ const styles = StyleSheet.create({
   topCopy: { flex: 1 },
   eyebrow: {
     color: '#C6FF00',
+    fontFamily: fontFamily.semibold,
     fontSize: 11,
-    fontWeight: '900',
     letterSpacing: 1.2,
   },
-  topTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  topTitle: { color: '#FFFFFF', fontFamily: fontFamily.semibold, fontSize: 18 },
   summary: {
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
@@ -305,7 +297,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xl,
   },
-  metricValue: { fontSize: 24, fontWeight: '900' },
+  metricValue: { fontFamily: fontFamily.display, fontSize: 26 },
   divider: { height: 38, width: 1 },
   destinationRow: {
     alignItems: 'center',
@@ -316,6 +308,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   destinationCopy: { flex: 1 },
-  destinationName: { fontSize: 16, fontWeight: '900' },
+  destinationName: { fontFamily: fontFamily.semibold, fontSize: 16 },
   provider: { fontSize: 12, textAlign: 'center' },
 });

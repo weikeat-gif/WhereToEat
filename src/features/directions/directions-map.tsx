@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { env } from '@/config/env';
 import type { RoutePlan } from '@/contracts/route';
 import { useAppTheme } from '@/theme/theme-provider';
-import { radius, spacing } from '@/theme/tokens';
+import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 export type DirectionsMapProps = {
   destinationName: string;
@@ -79,6 +79,6 @@ const styles = StyleSheet.create({
     right: spacing.lg,
     top: 150,
   },
-  webNoticeTitle: { fontSize: 16, fontWeight: '900' },
+  webNoticeTitle: { fontFamily: fontFamily.semibold, fontSize: 16 },
   attribution: { fontSize: 12, marginTop: spacing.xs },
 });

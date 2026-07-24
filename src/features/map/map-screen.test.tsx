@@ -21,21 +21,21 @@ jest.mock('@/features/map/map-canvas', () => {
   return {
     MapCanvas: ({
       onCenterChange,
-      onSearchArea,
+      onMapPress,
     }: {
       onCenterChange: (center: { latitude: number; longitude: number }) => void;
-      onSearchArea: () => void;
+      onMapPress: () => void;
     }) => (
       <View accessibilityLabel="Map test canvas">
+        <TouchableOpacity
+          accessibilityLabel="Focus map test control"
+          onPress={onMapPress}
+        />
         <TouchableOpacity
           accessibilityLabel="Pan map test control"
           onPress={() =>
             onCenterChange({ latitude: 3.05, longitude: 101.45 })
           }
-        />
-        <TouchableOpacity
-          accessibilityLabel="Search this map area test control"
-          onPress={onSearchArea}
         />
       </View>
     ),
@@ -101,17 +101,58 @@ describe('MapScreen states', () => {
     mockUseSearch.mockReturnValue(searchState());
   });
 
-  it('keeps the map and vertical nearby results in a fixed split', () => {
+  it('focuses the full map on a deliberate tap and restores nearby results', () => {
     const { UNSAFE_getAllByType, UNSAFE_getByType } = render(<MapScreen />);
 
-    expect(screen.getByTestId('map-pane')).toHaveStyle({ flex: 47 });
-    expect(screen.getByTestId('results-pane')).toHaveStyle({ flex: 53 });
+    expect(screen.getByTestId('map-pane')).toHaveStyle({ flex: 1 });
+    expect(screen.getByTestId('results-pane')).toBeTruthy();
+    expect(screen.getByTestId('search-area-button')).toHaveStyle({
+      bottom: '52%',
+    });
+    expect(
+      screen.getByRole('button', { name: 'Focus map view' }),
+    ).toHaveProp('accessibilityState', { expanded: true });
     expect(UNSAFE_getByType(FlatList).props.horizontal).toBeFalsy();
     expect(
       UNSAFE_getAllByType(ScrollView).filter(
         (scrollView) => scrollView.props.horizontal !== true,
       ),
     ).toHaveLength(1);
+
+    fireEvent.press(screen.getByLabelText('Focus map test control'));
+
+    expect(screen.queryByTestId('results-pane')).toBeNull();
+    expect(screen.getByTestId('search-area-button')).toHaveStyle({
+      bottom: 96,
+    });
+    const nearbyDock = screen.getByRole('button', {
+      name: 'Show 1 place nearby',
+    });
+    expect(nearbyDock).toHaveProp('accessibilityState', { expanded: false });
+
+    fireEvent.press(nearbyDock);
+
+    expect(screen.getByTestId('results-pane')).toBeTruthy();
+  });
+
+  it('keeps Privacy and Terms navigation in Profile only', () => {
+    render(<MapScreen />);
+
+    expect(screen.queryByText('Privacy')).toBeNull();
+    expect(screen.queryByText('Terms')).toBeNull();
+  });
+
+  it('offers an explicit accessible control to focus the map', () => {
+    render(<MapScreen />);
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Focus map view' }),
+    );
+
+    expect(screen.queryByTestId('results-pane')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Show 1 place nearby' }),
+    ).toBeTruthy();
   });
 
   it('opens a shared result in place details', () => {
@@ -189,7 +230,11 @@ describe('MapScreen states', () => {
     fireEvent.press(screen.getByLabelText('Pan map test control'));
 
     expect(search).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByLabelText('Search this map area test control'));
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Search restaurants in this map area',
+      }),
+    );
     expect(search).toHaveBeenCalledWith(
       expect.objectContaining({
         areaLabel: 'Map area',

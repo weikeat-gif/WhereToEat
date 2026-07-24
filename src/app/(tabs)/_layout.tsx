@@ -5,6 +5,7 @@ import type { PropsWithChildren } from 'react';
 import { View } from 'react-native';
 
 import { useAppTheme } from '@/theme/theme-provider';
+import { fontFamily } from '@/theme/tokens';
 
 const ICONS = {
   index: ['home-outline', 'home'],
@@ -47,7 +48,7 @@ export default function TabsLayout() {
             paddingTop: 8,
             paddingBottom: 10,
           },
-          tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+          tabBarLabelStyle: { fontFamily: fontFamily.semibold, fontSize: 12 },
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               color={color}

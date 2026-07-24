@@ -1,9 +1,21 @@
+import { DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
+import {
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+} from '@expo-google-fonts/manrope';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
 import { AppProviders } from '@/providers/app-providers';
 import { useAppTheme } from '@/theme/theme-provider';
+
+void SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { resolvedMode } = useAppTheme();
@@ -52,6 +64,22 @@ function AppFrame() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    DMSerifDisplay_400Regular,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontError, fontsLoaded]);
+
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <AppProviders>
       <AppFrame />

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { useAppTheme } from '@/theme/theme-provider';
-import { radius, spacing } from '@/theme/tokens';
+import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 type LegalKind = 'privacy' | 'terms';
 
@@ -128,11 +128,15 @@ const styles = StyleSheet.create({
   content: { gap: spacing.xl, padding: spacing.lg, paddingBottom: spacing.xxl },
   header: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
   headerCopy: { flex: 1 },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
-  title: { fontSize: 30, fontWeight: '900', marginTop: 2 },
+  eyebrow: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 1.4,
+  },
+  title: { fontFamily: fontFamily.display, fontSize: 34, marginTop: 2 },
   section: { gap: spacing.sm },
-  sectionTitle: { fontSize: 19, fontWeight: '900' },
-  body: { fontSize: 15, lineHeight: 23 },
+  sectionTitle: { fontFamily: fontFamily.display, fontSize: 21 },
+  body: { fontFamily: fontFamily.regular, fontSize: 15, lineHeight: 23 },
   links: { borderTopWidth: 1, gap: spacing.sm, paddingTop: spacing.lg },
   link: {
     alignItems: 'center',
@@ -141,6 +145,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 48,
   },
-  linkText: { fontSize: 15, fontWeight: '800' },
-  updated: { fontSize: 12 },
+  linkText: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  updated: { fontFamily: fontFamily.regular, fontSize: 12 },
 });

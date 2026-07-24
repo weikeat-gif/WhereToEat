@@ -8,7 +8,7 @@ import MapView, {
 
 import type { DirectionsMapProps } from '@/features/directions/directions-map';
 import { useAppTheme } from '@/theme/theme-provider';
-import { radius, spacing } from '@/theme/tokens';
+import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 const EDGE_PADDING = { top: 110, right: 44, bottom: 250, left: 44 };
 
@@ -74,7 +74,9 @@ export function DirectionsMap({
           styles.fitButton,
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}>
-        <Text style={{ color: colors.text, fontWeight: '800' }}>Route</Text>
+        <Text style={{ color: colors.text, fontFamily: fontFamily.semibold }}>
+          Route
+        </Text>
       </TouchableOpacity>
     </View>
   );

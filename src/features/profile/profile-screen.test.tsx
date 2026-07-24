@@ -63,4 +63,19 @@ describe('ProfileScreen', () => {
     expect(screen.getByText('test@example.com')).toBeTruthy();
     expect(mockPush).toHaveBeenCalledWith('/auth');
   });
+
+  it('keeps Privacy and Terms available from Profile', () => {
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <ProfileScreen />
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByText('Privacy notice')).toBeTruthy();
+    expect(screen.getByText('Terms of use')).toBeTruthy();
+  });
 });

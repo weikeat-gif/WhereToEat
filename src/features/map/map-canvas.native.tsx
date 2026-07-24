@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
   PROVIDER_GOOGLE,
@@ -11,7 +11,6 @@ import type { MapCanvasProps } from '@/features/map/map-canvas';
 import { i18n } from '@/i18n';
 import { hasTrustedHalalVerification } from '@/services/places/mock-places-service';
 import { useAppTheme } from '@/theme/theme-provider';
-import { radius, spacing } from '@/theme/tokens';
 
 const LATITUDE_DELTA = 0.075;
 
@@ -26,9 +25,8 @@ function pinColor(place: PlaceSummary, colors: ReturnType<typeof useAppTheme>['c
 export function MapCanvas({
   center,
   places,
-  loading,
   onCenterChange,
-  onSearchArea,
+  onMapPress,
   onPlacePress,
   showsUserLocation,
 }: MapCanvasProps) {
@@ -81,6 +79,7 @@ export function MapCanvas({
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LATITUDE_DELTA,
         }}
+        onPress={onMapPress}
         onRegionChangeComplete={handleRegionChange}
         provider={PROVIDER_GOOGLE}
         showsCompass
@@ -102,16 +101,6 @@ export function MapCanvas({
           />
         ))}
       </MapView>
-      <TouchableOpacity
-        accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
-        accessibilityRole="button"
-        disabled={loading}
-        onPress={onSearchArea}
-        style={[styles.searchButton, { backgroundColor: colors.accent }]}>
-        <Text style={{ color: colors.accentText, fontWeight: '800' }}>
-          {loading ? i18n.t('mapSearching') : i18n.t('mapSearchArea')}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -120,16 +109,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     overflow: 'hidden',
-  },
-  searchButton: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: radius.pill,
-    bottom: spacing.md,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    position: 'absolute',
   },
 });

@@ -183,10 +183,19 @@ describe('HomeScreen', () => {
   it('uses MakanMana’s playful food-discovery voice for primary choices', () => {
     const screen = renderScreen();
 
-    expect(screen.getByText('What are we makan today?')).toBeTruthy();
-    expect(screen.getByText('Good food, close enough')).toBeTruthy();
-    expect(screen.getByText('Find makan near me')).toBeTruthy();
+    expect(screen.getByText('Tonight, eat well.')).toBeTruthy();
+    expect(screen.getByText('Klang Valley, handpicked')).toBeTruthy();
+    expect(screen.getByText('Find food near me')).toBeTruthy();
     expect(screen.getByText('Let MakanMana pick')).toBeTruthy();
+  });
+
+  it('uses the transparent icon-only brand mark', () => {
+    const screen = renderScreen();
+
+    expect(screen.getByTestId('brand-mark')).toHaveProp(
+      'source',
+      require('../../../assets/images/brand/makanmana-mark.png'),
+    );
   });
 
   it('keeps the unavailable surprise message clear and actionable', () => {

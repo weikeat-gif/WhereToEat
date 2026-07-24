@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/auth-provider';
 import { useAppTheme } from '@/theme/theme-provider';
-import type { ThemeMode } from '@/theme/tokens';
+import { fontFamily, type ThemeMode } from '@/theme/tokens';
 
 type ModeOption = {
   mode: ThemeMode;
@@ -222,6 +222,9 @@ export function ProfileScreen() {
           </Text>
         </View>
 
+        <Text style={[styles.legalHeading, { color: colors.textMuted }]}>
+          ABOUT &amp; LEGAL
+        </Text>
         <View style={[styles.legal, { borderColor: colors.border }]}>
           <Pressable
             accessibilityRole="link"
@@ -255,8 +258,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  eyebrow: { fontSize: 12, fontWeight: '900', letterSpacing: 1.1 },
-  title: { fontSize: 38, fontWeight: '900', letterSpacing: -1.2, marginTop: 2 },
+  eyebrow: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 1.5,
+  },
+  title: {
+    fontFamily: fontFamily.display,
+    fontSize: 40,
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
   avatar: {
     width: 52,
     height: 52,
@@ -281,8 +293,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   accountCopy: { flex: 1 },
-  accountLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  accountValue: { fontSize: 14, fontWeight: '800', marginTop: 4 },
+  accountLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  accountValue: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 14,
+    marginTop: 4,
+  },
   accountButton: {
     minHeight: 44,
     alignItems: 'center',
@@ -290,15 +310,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 14,
   },
-  accountButtonText: { fontSize: 13, fontWeight: '900' },
+  accountButtonText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   preview: { borderRadius: 24, borderWidth: 1, gap: 22, padding: 20 },
   previewTop: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  previewLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  previewTitle: { fontSize: 24, fontWeight: '900', marginTop: 4 },
+  previewLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  previewTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 26,
+    marginTop: 4,
+  },
   previewChips: { flexDirection: 'row', gap: 8 },
   previewChip: {
     alignItems: 'center',
@@ -308,9 +336,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 8,
   },
-  previewChipText: { fontSize: 12, fontWeight: '800' },
-  sectionTitle: { fontSize: 21, fontWeight: '900' },
-  sectionDescription: { fontSize: 14, lineHeight: 21, marginTop: 5 },
+  previewChipText: { fontFamily: fontFamily.semibold, fontSize: 12 },
+  sectionTitle: { fontFamily: fontFamily.display, fontSize: 25 },
+  sectionDescription: {
+    fontFamily: fontFamily.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 5,
+  },
   options: { gap: 10 },
   option: {
     minHeight: 78,
@@ -328,8 +361,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   optionCopy: { flex: 1, marginLeft: 13 },
-  optionLabel: { fontSize: 16, fontWeight: '900' },
-  optionDescription: { fontSize: 13, marginTop: 3 },
+  optionLabel: { fontFamily: fontFamily.semibold, fontSize: 16 },
+  optionDescription: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    marginTop: 3,
+  },
   radio: {
     width: 24,
     height: 24,
@@ -346,7 +383,18 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
   },
-  noteText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  noteText: {
+    flex: 1,
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  legalHeading: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    marginBottom: -14,
+  },
   legal: { borderTopWidth: 1 },
   legalLink: {
     alignItems: 'center',
@@ -354,5 +402,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 52,
   },
-  legalText: { fontSize: 14, fontWeight: '800' },
+  legalText: { fontFamily: fontFamily.semibold, fontSize: 14 },
 });

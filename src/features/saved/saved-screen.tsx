@@ -14,6 +14,7 @@ import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { useAuth } from '@/features/auth/auth-provider';
 import { placesService } from '@/services/places';
 import { useAppTheme } from '@/theme/theme-provider';
+import { fontFamily } from '@/theme/tokens';
 
 import { useSavedPlaces } from './use-saved-places';
 
@@ -90,7 +91,7 @@ export function SavedScreen() {
           accessibilityRole="button"
           onPress={() => router.push('/auth')}
           style={[styles.button, { backgroundColor: colors.accent }]}>
-          <Text style={{ color: colors.accentText, fontWeight: '800' }}>
+          <Text style={{ color: colors.accentText, fontFamily: fontFamily.semibold }}>
             Sign in
           </Text>
         </Pressable>
@@ -175,7 +176,8 @@ export function SavedScreen() {
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: 999,
+    borderRadius: 15,
+    minHeight: 54,
     marginTop: 20,
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     padding: 14,
   },
-  id: { flex: 1 },
+  id: { flex: 1, fontFamily: fontFamily.semibold },
   openPlace: { flex: 1, minHeight: 44, justifyContent: 'center' },
   remove: {
     alignItems: 'center',

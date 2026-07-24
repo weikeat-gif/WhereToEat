@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
   Linking,
+  PanResponder,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,7 +24,7 @@ import { MapCanvas } from '@/features/map/map-canvas';
 import { useSearch } from '@/features/search/search-provider';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
-import { radius, spacing } from '@/theme/tokens';
+import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 const CATEGORIES = [
   { value: 'Malaysian', labelKey: 'mapCategoryMalaysian' },
@@ -55,6 +58,18 @@ export function MapScreen() {
   const [areaInput, setAreaInput] = useState(criteria.areaLabel);
   const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [mapFocused, setMapFocused] = useState(false);
+  const nearbyDockPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          Math.abs(gesture.dy) > 8,
+        onPanResponderRelease: (_event, gesture) => {
+          if (gesture.dy < -18) setMapFocused(false);
+        },
+      }),
+    [],
+  );
 
   const openPlace = (placeId: string) => {
     router.push({ pathname: '/place/[id]', params: { id: placeId } });
@@ -133,6 +148,13 @@ export function MapScreen() {
     void selectArea(area);
   };
 
+  const searchMapArea = () =>
+    search({
+      ...criteria,
+      center: mapCenter,
+      areaLabel: i18n.t('mapAreaLabel'),
+    });
+
   const listHeader = (
     <View style={styles.listHeader}>
       <View style={styles.resultHeader}>
@@ -156,7 +178,7 @@ export function MapScreen() {
           hitSlop={4}
           onPress={surpriseMe}
           style={[styles.surpriseButton, { backgroundColor: colors.accent }]}>
-          <Text style={{ color: colors.accentText, fontWeight: '800' }}>
+          <Text style={{ color: colors.accentText, fontFamily: fontFamily.semibold }}>
             {surprise ? i18n.t('mapTryAnother') : i18n.t('mapSurprise')}
           </Text>
         </TouchableOpacity>
@@ -224,34 +246,6 @@ export function MapScreen() {
         </Text>
       ) : null}
 
-      {locationStatus !== 'granted' ? (
-        <View style={styles.gpsLegal}>
-          <Text style={[styles.gpsPrivacy, { color: colors.textMuted }]}>
-            {i18n.t('mapGpsPrivacy')}
-          </Text>
-          <TouchableOpacity
-            accessibilityLabel={i18n.t('privacyAccessibility')}
-            accessibilityRole="link"
-            hitSlop={8}
-            onPress={() => router.push('/privacy')}
-            style={styles.legalLinkButton}>
-            <Text style={[styles.legalLink, { color: colors.accentForeground }]}>
-              {i18n.t('privacy')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityLabel={i18n.t('termsAccessibility')}
-            accessibilityRole="link"
-            hitSlop={8}
-            onPress={() => router.push('/terms')}
-            style={styles.legalLinkButton}>
-            <Text style={[styles.legalLink, { color: colors.accentForeground }]}>
-              {i18n.t('terms')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
       {status === 'loading' ? (
         <ActivityIndicator
           accessibilityLabel={i18n.t('mapLoadingAccessibility')}
@@ -304,19 +298,39 @@ export function MapScreen() {
       <View testID="map-pane" style={styles.mapPane}>
         <MapCanvas
           center={mapCenter}
-          loading={status === 'loading'}
           onCenterChange={setMapCenter}
+          onMapPress={() => setMapFocused(true)}
           onPlacePress={openPlace}
-          onSearchArea={() =>
-            void search({
-              ...criteria,
-              center: mapCenter,
-              areaLabel: i18n.t('mapAreaLabel'),
-            })
-          }
           places={results}
           showsUserLocation={locationStatus === 'granted'}
         />
+
+        <TouchableOpacity
+          accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
+          accessibilityRole="button"
+          disabled={status === 'loading'}
+          onPress={() => void searchMapArea()}
+          style={[
+            styles.searchAreaButton,
+            mapFocused
+              ? styles.searchAreaButtonFocused
+              : styles.searchAreaButtonExpanded,
+            {
+              backgroundColor: colors.accent,
+              opacity: status === 'loading' ? 0.64 : 1,
+            },
+          ]}
+          testID="search-area-button">
+          <Text
+            style={{
+              color: colors.accentText,
+              fontFamily: fontFamily.semibold,
+            }}>
+            {status === 'loading'
+              ? i18n.t('mapSearching')
+              : i18n.t('mapSearchArea')}
+          </Text>
+        </TouchableOpacity>
 
         <View
           style={[
@@ -344,7 +358,7 @@ export function MapScreen() {
               disabled={status === 'loading'}
               onPress={submitQuery}
               style={[styles.submitButton, { backgroundColor: colors.accent }]}>
-              <Text style={{ color: colors.accentText, fontWeight: '900' }}>
+              <Text style={{ color: colors.accentText, fontFamily: fontFamily.semibold }}>
                 {i18n.t('mapQuerySubmit')}
               </Text>
             </TouchableOpacity>
@@ -423,25 +437,89 @@ export function MapScreen() {
         </View>
       </View>
 
-      <View testID="results-pane" style={styles.resultsPane}>
-        <FlatList
-          contentContainerStyle={styles.resultsContent}
-          data={results}
-          ItemSeparatorComponent={() => <View style={styles.resultGap} />}
-          keyboardShouldPersistTaps="handled"
-          keyExtractor={(place) => place.id}
-          ListFooterComponent={
-            <View style={styles.attribution}>
-              <GoogleMapsAttribution />
-            </View>
-          }
-          ListHeaderComponent={listHeader}
-          renderItem={({ item }) => (
-            <PlaceCard place={item} onPress={() => openPlace(item.id)} />
-          )}
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
+      {!mapFocused ? (
+        <View
+          testID="results-pane"
+          style={[
+            styles.resultsPane,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}>
+          <Pressable
+            accessibilityLabel={i18n.t('mapFocusViewAccessibility')}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: true }}
+            onPress={() => setMapFocused(true)}
+            style={({ pressed }) => [
+              styles.sheetCollapseControl,
+              { opacity: pressed ? 0.72 : 1 },
+            ]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+            <Text style={[styles.sheetCollapseText, { color: colors.textMuted }]}>
+              {i18n.t('mapFocusView')}
+            </Text>
+            <Ionicons color={colors.textMuted} name="chevron-down" size={18} />
+          </Pressable>
+          <FlatList
+            contentContainerStyle={styles.resultsContent}
+            data={results}
+            ItemSeparatorComponent={() => <View style={styles.resultGap} />}
+            keyboardShouldPersistTaps="handled"
+            keyExtractor={(place) => place.id}
+            ListFooterComponent={
+              <View style={styles.attribution}>
+                <GoogleMapsAttribution />
+              </View>
+            }
+            ListHeaderComponent={listHeader}
+            renderItem={({ item }) => (
+              <PlaceCard place={item} onPress={() => openPlace(item.id)} />
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
+      ) : (
+        <Pressable
+          {...nearbyDockPanResponder.panHandlers}
+          accessibilityHint={i18n.t('mapNearbyHint')}
+          accessibilityLabel={i18n.t('mapShowNearbyAccessibility', {
+            count: results.length,
+            placeLabel:
+              results.length === 1
+                ? i18n.t('mapNearbyPlace')
+                : i18n.t('mapNearbyPlaces'),
+          })}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: false }}
+          onPress={() => setMapFocused(false)}
+          style={({ pressed }) => [
+            styles.nearbyDock,
+            {
+              backgroundColor: colors.navBackground,
+              borderColor: colors.border,
+              transform: [{ scale: pressed ? 0.99 : 1 }],
+            },
+          ]}>
+          <View style={[styles.dockHandle, { backgroundColor: colors.border }]} />
+          <View style={styles.dockCopy}>
+            <Text style={[styles.dockTitle, { color: colors.text }]}>
+              {i18n.t('mapNearbyDock', {
+                count: results.length,
+                placeLabel:
+                  results.length === 1
+                    ? i18n.t('mapNearbyPlace')
+                    : i18n.t('mapNearbyPlaces'),
+              })}
+            </Text>
+            <Text style={[styles.dockHint, { color: colors.textMuted }]}>
+              {i18n.t('mapNearbyHint')}
+            </Text>
+          </View>
+          <Ionicons color={colors.accentForeground} name="chevron-up" size={21} />
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -466,11 +544,15 @@ function FilterChip({
       style={[
         styles.chip,
         {
-          backgroundColor: active ? colors.accent : colors.surface,
-          borderColor: active ? colors.accent : colors.border,
+          backgroundColor: active ? `${colors.accent}24` : colors.surface,
+          borderColor: active ? colors.accentForeground : colors.border,
         },
       ]}>
-      <Text style={{ color: active ? colors.accentText : colors.text }}>
+      <Text
+        style={{
+          color: active ? colors.accentForeground : colors.text,
+          fontFamily: fontFamily.semibold,
+        }}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -480,13 +562,21 @@ function FilterChip({
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   mapPane: {
-    flex: 47,
+    flex: 1,
     minHeight: 0,
     position: 'relative',
   },
   resultsPane: {
-    flex: 53,
-    minHeight: 0,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderTopWidth: 1,
+    bottom: 0,
+    height: '50%',
+    left: 0,
+    overflow: 'hidden',
+    position: 'absolute',
+    right: 0,
+    zIndex: 3,
   },
   searchOverlay: {
     borderRadius: radius.lg,
@@ -499,11 +589,23 @@ const styles = StyleSheet.create({
     top: spacing.sm,
     zIndex: 2,
   },
+  searchAreaButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderRadius: radius.pill,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.xl,
+    position: 'absolute',
+    zIndex: 2,
+  },
+  searchAreaButtonExpanded: { bottom: '52%' },
+  searchAreaButtonFocused: { bottom: 96 },
   queryRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs },
   queryInput: {
     flex: 1,
+    fontFamily: fontFamily.semibold,
     fontSize: 16,
-    fontWeight: '700',
     minHeight: 44,
     paddingHorizontal: spacing.sm,
   },
@@ -519,6 +621,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     flex: 1,
+    fontFamily: fontFamily.regular,
     minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -552,6 +655,24 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
   },
+  sheetHandle: {
+    borderRadius: radius.pill,
+    height: 4,
+    width: 38,
+  },
+  sheetCollapseControl: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+  },
+  sheetCollapseText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
   listHeader: {
     gap: spacing.md,
     paddingBottom: spacing.md,
@@ -564,7 +685,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   resultCopy: { flex: 1 },
-  resultTitle: { fontSize: 20, fontWeight: '900' },
+  resultTitle: { fontFamily: fontFamily.display, fontSize: 24 },
   surpriseButton: {
     borderRadius: radius.pill,
     justifyContent: 'center',
@@ -581,18 +702,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  gpsLegal: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  gpsPrivacy: { flex: 1, fontSize: 12 },
-  legalLink: { fontSize: 12, fontWeight: '800' },
-  legalLinkButton: { justifyContent: 'center', minHeight: 44 },
   recoveryButton: { justifyContent: 'center', minHeight: 44 },
   state: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   surpriseCard: { borderRadius: radius.md, gap: spacing.xs, padding: spacing.md },
-  cardName: { fontSize: 17, fontWeight: '800' },
+  cardName: { fontFamily: fontFamily.semibold, fontSize: 17 },
   resultGap: { height: spacing.md },
   attribution: { paddingTop: spacing.md },
+  nearbyDock: {
+    alignItems: 'center',
+    borderRadius: 20,
+    borderWidth: 1,
+    bottom: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.md,
+    left: spacing.md,
+    minHeight: 72,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    position: 'absolute',
+    right: spacing.md,
+    zIndex: 4,
+  },
+  dockHandle: {
+    borderRadius: radius.pill,
+    height: 4,
+    left: '50%',
+    marginLeft: -18,
+    position: 'absolute',
+    top: 7,
+    width: 36,
+  },
+  dockCopy: { flex: 1 },
+  dockTitle: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  dockHint: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 1,
+  },
 });
