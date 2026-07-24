@@ -1,4 +1,5 @@
 import {
+  buildGoogleRequest,
   createPlacesHandler,
   fetchWithTimeout,
   type HalalRecord,
@@ -42,8 +43,9 @@ async function rateBucketKey(value: string) {
 }
 
 async function consumeDurableRateLimit(
-  key: string,
+  bucket: string,
   action: PlacesAction['action'],
+  requestLimit: number,
 ): Promise<boolean | undefined> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return undefined;
   if (!RATE_LIMIT_HMAC_SECRET) return false;
@@ -52,9 +54,6 @@ async function consumeDurableRateLimit(
     '/rest/v1/rpc/consume_places_rate_limit',
     SUPABASE_URL,
   );
-  const bucket = await rateBucketKey(`${action}:${key}`);
-  const requestLimit = action === 'route' ? 12 : 60;
-
   try {
     return await fetchWithTimeout(
       fetch,
@@ -82,73 +81,9 @@ async function consumeDurableRateLimit(
   }
 }
 
-const FIELD_MASKS = {
-  nearby:
-    'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.types',
-  autocomplete:
-    'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
-  details:
-    'id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
-  route:
-    'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
-} as const;
-
 async function googleRequest(input: PlacesAction): Promise<unknown> {
   if (!GOOGLE_API_KEY) throw new Error('Google Places is not configured.');
-  const headers = {
-    'Content-Type': 'application/json',
-    'X-Goog-Api-Key': GOOGLE_API_KEY,
-    'X-Goog-FieldMask': FIELD_MASKS[input.action],
-  };
-  let url = 'https://places.googleapis.com/v1/places:searchNearby';
-  let init: RequestInit = { method: 'POST', headers };
-
-  if (input.action === 'nearby') {
-    init.body = JSON.stringify({
-      includedTypes: input.includedTypes,
-      maxResultCount: 20,
-      locationRestriction: {
-        circle: {
-          center: {
-            latitude: input.latitude,
-            longitude: input.longitude,
-          },
-          radius: input.radiusMeters,
-        },
-      },
-    });
-  } else if (input.action === 'autocomplete') {
-    url = 'https://places.googleapis.com/v1/places:autocomplete';
-    init.body = JSON.stringify({
-      input: input.input,
-      sessionToken: input.sessionToken,
-      includedPrimaryTypes: ['(regions)'],
-      regionCode: 'MY',
-    });
-  } else if (input.action === 'details') {
-    url = `https://places.googleapis.com/v1/places/${encodeURIComponent(input.placeId)}`;
-    init = { method: 'GET', headers };
-  } else {
-    url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-    init.body = JSON.stringify({
-      origin: {
-        location: {
-          latLng: input.origin,
-        },
-      },
-      destination: {
-        location: {
-          latLng: input.destination,
-        },
-      },
-      travelMode: input.travelMode,
-      routingPreference: 'TRAFFIC_AWARE',
-      computeAlternativeRoutes: false,
-      polylineQuality: 'OVERVIEW',
-      languageCode: 'en-US',
-      units: 'METRIC',
-    });
-  }
+  const { url, init } = buildGoogleRequest(GOOGLE_API_KEY, input);
 
   return fetchWithTimeout(fetch, url, init, async (response) => {
     if (!response.ok) {
@@ -193,8 +128,15 @@ const handler = createPlacesHandler({
   loadHalal,
   async allowRequest(key, input) {
     const now = Date.now();
-    const localKey = `${input.action}:${key}`;
-    const requestLimit = input.action === 'route' ? 12 : 60;
+    if (!RATE_LIMIT_HMAC_SECRET) return false;
+    const requestLimit =
+      input.action === 'route'
+        ? 12
+        : input.action === 'nearby' && input.query
+          ? 20
+          : 60;
+    const bucket = await rateBucketKey(`${input.action}:${key}`);
+    const localKey = `${input.action}:${bucket}`;
     const window = rate.get(localKey);
     if (!window || window.resetAt <= now) {
       setBoundedMapValue(rate, MAX_RATE_ENTRIES, localKey, {
@@ -205,7 +147,9 @@ const handler = createPlacesHandler({
       window.count += 1;
       if (window.count > requestLimit) return false;
     }
-    return (await consumeDurableRateLimit(key, input.action)) ?? true;
+    return (
+      (await consumeDurableRateLimit(bucket, input.action, requestLimit)) ?? true
+    );
   },
 });
 

@@ -5,6 +5,7 @@ import { HomeScreen } from './home-screen';
 
 const mockPush = jest.fn();
 const mockSearch = jest.fn();
+const mockSearchCurrentLocation = jest.fn();
 const mockSurpriseMe = jest.fn();
 let mockResults: { id: string; name?: string }[] = [];
 let mockStatus = 'idle';
@@ -32,6 +33,7 @@ jest.mock('@/features/search/search-provider', () => ({
     results: mockResults,
     status: mockStatus,
     search: mockSearch,
+    searchCurrentLocation: mockSearchCurrentLocation,
     surpriseMe: mockSurpriseMe,
   }),
 }));
@@ -62,22 +64,39 @@ describe('HomeScreen', () => {
     mockSearch.mockResolvedValue({
       places: [{ id: 'mock-seri-klang-kitchen' }],
     });
+    mockSearchCurrentLocation.mockResolvedValue({
+      places: [{ id: 'mock-seri-klang-kitchen' }],
+    });
     mockSurpriseMe.mockReturnValue({
       id: 'mock-seri-klang-kitchen',
     });
   });
 
-  it('runs the shared nearby search instead of injecting fixture results', async () => {
+  it('uses GPS for the nearby search and opens the shared map results', async () => {
     const screen = renderScreen();
 
     fireEvent.press(screen.getByTestId('nearby-now-button'));
 
-    expect(mockSearch).toHaveBeenCalledWith(
-      expect.objectContaining({ openNow: true }),
+    await waitFor(() => expect(mockSearchCurrentLocation).toHaveBeenCalled());
+    expect(mockPush).toHaveBeenCalledWith('/map');
+  });
+
+  it('prevents duplicate GPS searches from rapid presses', async () => {
+    let resolveLocation: (() => void) | undefined;
+    mockSearchCurrentLocation.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveLocation = resolve;
+      }),
     );
-    await waitFor(() =>
-      expect(screen.getByText('1 nearby place ready')).toBeTruthy(),
-    );
+    const screen = renderScreen();
+    const button = screen.getByTestId('nearby-now-button');
+
+    fireEvent.press(button);
+    fireEvent.press(button);
+
+    expect(mockSearchCurrentLocation).toHaveBeenCalledTimes(1);
+    resolveLocation?.();
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
   });
 
   it('opens only a place selected from current shared results', () => {
@@ -145,5 +164,40 @@ describe('HomeScreen', () => {
     fireEvent.press(screen.getByLabelText('Location: Klang Valley'));
 
     expect(mockPush).toHaveBeenCalledWith('/map');
+  });
+
+  it('opens the canonical map search from the search control', () => {
+    const screen = renderScreen();
+    const searchControl = screen.getByLabelText('Search restaurants on map');
+
+    expect(searchControl.props.accessibilityHint).toBe(
+      'Opens the map to search restaurants, cuisines, or dishes',
+    );
+
+    fireEvent.press(searchControl);
+
+    expect(mockPush).toHaveBeenCalledWith('/map');
+    expect(mockSearch).not.toHaveBeenCalled();
+  });
+
+  it('uses MakanMana’s playful food-discovery voice for primary choices', () => {
+    const screen = renderScreen();
+
+    expect(screen.getByText('What are we makan today?')).toBeTruthy();
+    expect(screen.getByText('Good food, close enough')).toBeTruthy();
+    expect(screen.getByText('Find makan near me')).toBeTruthy();
+    expect(screen.getByText('Let MakanMana pick')).toBeTruthy();
+  });
+
+  it('keeps the unavailable surprise message clear and actionable', () => {
+    mockSurpriseMe.mockReturnValue(undefined);
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByTestId('surprise-me-button'));
+
+    expect(
+      screen.getByText('Find nearby food first, then let MakanMana pick.'),
+    ).toBeTruthy();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

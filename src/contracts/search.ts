@@ -1,6 +1,7 @@
 import type { Coordinates, PlaceSummary, PriceLevel } from '@/contracts/place';
 
 export type SearchCriteria = {
+  query?: string;
   center: Coordinates;
   areaLabel: string;
   radiusMeters: number;

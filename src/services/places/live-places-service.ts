@@ -78,6 +78,9 @@ type PlacesAction =
       longitude: number;
       radiusMeters: number;
       includedTypes: string[];
+      query?: string;
+      openNow?: boolean;
+      priceLevels?: PriceLevel[];
     }
   | { action: 'autocomplete'; input: string; sessionToken: string }
   | { action: 'details'; placeId: string };
@@ -89,6 +92,24 @@ const PRICE_LEVELS: Record<string, PriceLevel | undefined> = {
   PRICE_LEVEL_EXPENSIVE: 3,
   PRICE_LEVEL_VERY_EXPENSIVE: 4,
 };
+
+const CATEGORY_PLACE_TYPES: Record<string, string> = {
+  malaysian: 'malaysian_restaurant',
+  cafe: 'cafe',
+  chinese: 'chinese_restaurant',
+  indian: 'indian_restaurant',
+};
+
+function includedTypesFor(criteria: SearchCriteria) {
+  const selectedType = criteria.categories
+    .map((category) => CATEGORY_PLACE_TYPES[category.toLocaleLowerCase()])
+    .find(Boolean);
+  if (selectedType) return [selectedType];
+  if (/\b(cafe|coffee|kopi|kopitiam)\b/i.test(criteria.query ?? '')) {
+    return ['cafe'];
+  }
+  return criteria.query ? ['restaurant'] : ['restaurant', 'cafe'];
+}
 
 function errorForStatus(status: number) {
   if (status === 401 || status === 403) {
@@ -252,7 +273,10 @@ export class LivePlacesService implements PlacesService {
         latitude: criteria.center.latitude,
         longitude: criteria.center.longitude,
         radiusMeters: criteria.radiusMeters,
-        includedTypes: ['restaurant', 'cafe'],
+        includedTypes: includedTypesFor(criteria),
+        query: criteria.query,
+        openNow: criteria.openNow,
+        priceLevels: criteria.priceLevels,
       }),
     );
     const places = payload.places

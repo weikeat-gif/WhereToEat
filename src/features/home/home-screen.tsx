@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -24,14 +24,6 @@ import { DISCOVERY_PLACES, heroImage } from './discovery-data';
 
 const brandMark = require('../../../assets/images/icon.png');
 
-const COPY = {
-  area: 'Klang Valley',
-  eyebrow: 'Tonight in your city',
-  headline: 'Jom cari makan.',
-  searchPlaceholder: 'Search places, cuisines, dishes',
-  trending: 'Trending near you',
-};
-
 export function HomeScreen() {
   const { colors } = useAppTheme();
   const {
@@ -39,6 +31,7 @@ export function HomeScreen() {
     error: searchError,
     results,
     search,
+    searchCurrentLocation,
     status: searchStatus,
     surpriseMe,
   } = useSearch();
@@ -46,6 +39,7 @@ export function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [openNowActive, setOpenNowActive] = useState(criteria.openNow);
   const [notice, setNotice] = useState<string | null>(null);
+  const nearbyRequestInFlight = useRef(false);
   const visiblePlaces = searchStatus === 'idle' ? DISCOVERY_PLACES : results;
 
   const compact = width < 360 || fontScale > 1.3;
@@ -128,10 +122,21 @@ export function HomeScreen() {
   function handleSurprise() {
     const picked = surpriseMe();
     if (!picked) {
-      setNotice('Search nearby first, then try Surprise me.');
+      setNotice(i18n.t('homeSurpriseUnavailable'));
       return;
     }
     router.push({ pathname: '/place/[id]', params: { id: picked.id } });
+  }
+
+  async function handleNearbyNow() {
+    if (nearbyRequestInFlight.current) return;
+    nearbyRequestInFlight.current = true;
+    try {
+      await searchCurrentLocation();
+      router.push('/map');
+    } finally {
+      nearbyRequestInFlight.current = false;
+    }
   }
 
   function openPlace(id: string) {
@@ -148,7 +153,7 @@ export function HomeScreen() {
         <View style={styles.topBar}>
           <View
             accessible
-            accessibilityLabel={`${i18n.t('appName')}, Food worth leaving home for`}
+            accessibilityLabel={`${i18n.t('appName')}, ${i18n.t('homeBrandNote')}`}
             accessibilityRole="header"
             style={styles.brandLockup}>
             <Image
@@ -170,13 +175,13 @@ export function HomeScreen() {
                   maxFontSizeMultiplier={1.3}
                   numberOfLines={1}
                   style={[styles.brandNote, { color: colors.textMuted }]}>
-                  Food worth leaving home for
+                  {i18n.t('homeBrandNote')}
                 </Text>
               )}
             </View>
           </View>
           <Pressable
-            accessibilityLabel={`Location: ${COPY.area}`}
+            accessibilityLabel={`Location: ${i18n.t('homeArea')}`}
             accessibilityRole="button"
             onPress={() => router.push('/map')}
             style={[styles.location, { borderColor: colors.border }]}>
@@ -187,14 +192,14 @@ export function HomeScreen() {
             />
             {!compact && (
               <Text style={[styles.locationText, { color: colors.text }]}>
-                {COPY.area}
+                {i18n.t('homeArea')}
               </Text>
             )}
             <Ionicons color={colors.textMuted} name="chevron-down" size={15} />
           </Pressable>
         </View>
 
-        <View style={styles.hero}>
+        <View style={[styles.hero, compact && styles.heroCompact]}>
           <Image
             accessibilityLabel="Kuala Lumpur night market"
             contentFit="cover"
@@ -204,8 +209,14 @@ export function HomeScreen() {
           />
           <View style={[StyleSheet.absoluteFill, styles.heroShade]} />
           <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>{COPY.eyebrow}</Text>
-            <Text style={styles.headline}>{COPY.headline}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.eyebrow}>
+              {i18n.t('homeEyebrow')}
+            </Text>
+            <Text
+              maxFontSizeMultiplier={compact ? 1.2 : 1.35}
+              style={[styles.headline, compact && styles.headlineCompact]}>
+              {i18n.t('homeHeadline')}
+            </Text>
           </View>
           <View style={styles.heroActions}>
             <ActionButton
@@ -213,7 +224,7 @@ export function HomeScreen() {
               color={colors.accentText}
               icon="navigate"
               label={i18n.t('nearbyNow')}
-              onPress={() => void applyDiscovery()}
+              onPress={() => void handleNearbyNow()}
               testID="nearby-now-button"
             />
             <ActionButton
@@ -229,16 +240,19 @@ export function HomeScreen() {
         </View>
 
         <Pressable
-          accessibilityHint="Finds open food near your current area"
-          accessibilityRole="search"
-          onPress={() => void applyDiscovery()}
+          accessibilityHint={i18n.t('homeSearchHint')}
+          accessibilityLabel={i18n.t('homeSearchLabel')}
+          accessibilityRole="button"
+          onPress={() => router.push('/map')}
           style={[
             styles.search,
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}>
           <Ionicons color={colors.textMuted} name="search" size={21} />
-          <Text style={[styles.searchText, { color: colors.textMuted }]}>
-            {COPY.searchPlaceholder}
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={[styles.searchText, { color: colors.textMuted }]}>
+            {i18n.t('homeSearchPlaceholder')}
           </Text>
           <View style={[styles.tune, { backgroundColor: colors.surfaceElevated }]}>
             <Ionicons
@@ -285,10 +299,10 @@ export function HomeScreen() {
         <View style={styles.sectionHeading}>
           <View>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {COPY.trending}
+              {i18n.t('homeTrending')}
             </Text>
             <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-              Open late, loved locally
+              {i18n.t('homeTrendingSubtitle')}
             </Text>
           </View>
           <Ionicons
@@ -359,15 +373,16 @@ const styles = StyleSheet.create({
   },
   locationText: { fontSize: 13, fontWeight: '700' },
   hero: {
-    height: 398,
+    minHeight: 410,
     justifyContent: 'space-between',
     marginHorizontal: 14,
     overflow: 'hidden',
     padding: 18,
     borderRadius: 28,
   },
+  heroCompact: { minHeight: 430, padding: 16 },
   heroShade: { backgroundColor: 'rgba(0,0,0,0.36)' },
-  heroCopy: { marginTop: 34 },
+  heroCopy: { marginTop: 28 },
   eyebrow: {
     color: '#C6FF00',
     fontSize: 13,
@@ -377,12 +392,18 @@ const styles = StyleSheet.create({
   },
   headline: {
     color: '#FFFFFF',
-    fontSize: 52,
+    fontSize: 46,
     fontWeight: '900',
-    letterSpacing: -2.4,
-    lineHeight: 54,
+    letterSpacing: -1.8,
+    lineHeight: 48,
     marginTop: 8,
-    maxWidth: 280,
+    maxWidth: 330,
+  },
+  headlineCompact: {
+    fontSize: 40,
+    letterSpacing: -1.4,
+    lineHeight: 43,
+    maxWidth: 270,
   },
   heroActions: { gap: 9 },
   search: {
@@ -395,8 +416,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     paddingLeft: 16,
     paddingRight: 6,
+    paddingVertical: 6,
   },
-  searchText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  searchText: { flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 20 },
   tune: {
     width: 44,
     height: 44,
@@ -421,8 +443,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 4,
   },
-  sectionTitle: { fontSize: 23, fontWeight: '900', letterSpacing: -0.6 },
-  sectionSubtitle: { fontSize: 13, marginTop: 3 },
+  sectionTitle: { fontSize: 25, fontWeight: '900', letterSpacing: -0.8 },
+  sectionSubtitle: { fontSize: 13, fontWeight: '500', marginTop: 3 },
   cards: { gap: 10, paddingHorizontal: 14 },
   empty: { fontSize: 15, lineHeight: 22, paddingHorizontal: 4, paddingVertical: 18 },
 });

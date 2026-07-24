@@ -5,6 +5,9 @@ export type PlacesAction =
       longitude: number;
       radiusMeters: number;
       includedTypes?: string[];
+      query?: string;
+      openNow?: boolean;
+      priceLevels?: number[];
     }
   | { action: 'autocomplete'; input: string; sessionToken: string }
   | { action: 'details'; placeId: string }
@@ -37,6 +40,166 @@ export class UpstreamError extends Error {
     super(message);
     this.name = 'UpstreamError';
   }
+}
+
+const FIELD_MASKS = {
+  nearby:
+    'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.types',
+  autocomplete:
+    'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
+  details:
+    'id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
+  route:
+    'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+} as const;
+
+const GOOGLE_PRICE_LEVELS: Record<number, string> = {
+  1: 'PRICE_LEVEL_INEXPENSIVE',
+  2: 'PRICE_LEVEL_MODERATE',
+  3: 'PRICE_LEVEL_EXPENSIVE',
+  4: 'PRICE_LEVEL_VERY_EXPENSIVE',
+};
+const ALLOWED_SEARCH_TYPES = new Set([
+  'restaurant',
+  'cafe',
+  'malaysian_restaurant',
+  'chinese_restaurant',
+  'indian_restaurant',
+]);
+
+function textSearchRectangle(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+) {
+  const latitudeDelta = radiusMeters / 111_320;
+  const longitudeDelta =
+    radiusMeters /
+    (111_320 * Math.max(Math.cos((latitude * Math.PI) / 180), 0.01));
+  return {
+    low: {
+      latitude: Math.max(-90, latitude - latitudeDelta),
+      longitude: Math.max(-180, longitude - longitudeDelta),
+    },
+    high: {
+      latitude: Math.min(90, latitude + latitudeDelta),
+      longitude: Math.min(180, longitude + longitudeDelta),
+    },
+  };
+}
+
+export function buildGoogleRequest(
+  apiKey: string,
+  input: PlacesAction,
+): { url: string; init: RequestInit } {
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Goog-Api-Key': apiKey,
+    'X-Goog-FieldMask': FIELD_MASKS[input.action],
+  };
+
+  if (input.action === 'nearby') {
+    if (input.query) {
+      return {
+        url: 'https://places.googleapis.com/v1/places:searchText',
+        init: {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            textQuery: input.query,
+            includedType: input.includedTypes?.[0] ?? 'restaurant',
+            strictTypeFiltering: true,
+            pageSize: 20,
+            locationRestriction: {
+              rectangle: textSearchRectangle(
+                input.latitude,
+                input.longitude,
+                input.radiusMeters,
+              ),
+            },
+            ...(input.openNow ? { openNow: true } : {}),
+            ...(input.priceLevels?.length
+              ? {
+                  priceLevels: input.priceLevels.map(
+                    (level) => GOOGLE_PRICE_LEVELS[level],
+                  ),
+                }
+              : {}),
+          }),
+        },
+      };
+    }
+
+    return {
+      url: 'https://places.googleapis.com/v1/places:searchNearby',
+      init: {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          includedTypes: input.includedTypes,
+          maxResultCount: 20,
+          locationRestriction: {
+            circle: {
+              center: {
+                latitude: input.latitude,
+                longitude: input.longitude,
+              },
+              radius: input.radiusMeters,
+            },
+          },
+        }),
+      },
+    };
+  }
+
+  if (input.action === 'autocomplete') {
+    return {
+      url: 'https://places.googleapis.com/v1/places:autocomplete',
+      init: {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          input: input.input,
+          sessionToken: input.sessionToken,
+          includedPrimaryTypes: ['(regions)'],
+          regionCode: 'MY',
+        }),
+      },
+    };
+  }
+
+  if (input.action === 'details') {
+    return {
+      url: `https://places.googleapis.com/v1/places/${encodeURIComponent(input.placeId)}`,
+      init: { method: 'GET', headers },
+    };
+  }
+
+  return {
+    url: 'https://routes.googleapis.com/directions/v2:computeRoutes',
+    init: {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        origin: {
+          location: {
+            latLng: input.origin,
+          },
+        },
+        destination: {
+          location: {
+            latLng: input.destination,
+          },
+        },
+        travelMode: input.travelMode,
+        routingPreference: 'TRAFFIC_AWARE',
+        computeAlternativeRoutes: false,
+        polylineQuality: 'OVERVIEW',
+        languageCode: 'en-US',
+        units: 'METRIC',
+      }),
+    },
+  };
 }
 
 export function setBoundedMapValue<Key, Value>(
@@ -170,17 +333,50 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
         : Array.isArray(value.includedTypes) &&
             value.includedTypes.length <= 10 &&
             value.includedTypes.every(
-              (item) => typeof item === 'string' && item.length <= 80,
+              (item) =>
+                typeof item === 'string' && ALLOWED_SEARCH_TYPES.has(item),
             )
           ? value.includedTypes
           : null;
     if (includedTypes === null) throw new Error('includedTypes is invalid.');
+    const query =
+      value.query === undefined
+        ? undefined
+        : typeof value.query === 'string' && value.query.length <= 120
+          ? value.query.trim() || undefined
+          : null;
+    if (query === null) throw new Error('Nearby search query is invalid.');
+    const openNow =
+      value.openNow === undefined
+        ? undefined
+        : typeof value.openNow === 'boolean'
+          ? value.openNow
+          : null;
+    if (openNow === null) throw new Error('openNow is invalid.');
+    const priceLevels =
+      value.priceLevels === undefined
+        ? undefined
+        : Array.isArray(value.priceLevels) &&
+            value.priceLevels.length <= 4 &&
+            value.priceLevels.every(
+              (level) =>
+                typeof level === 'number' &&
+                Number.isInteger(level) &&
+                level >= 1 &&
+                level <= 4,
+            )
+          ? [...new Set(value.priceLevels)]
+          : null;
+    if (priceLevels === null) throw new Error('priceLevels is invalid.');
     return {
       action: 'nearby',
       latitude: value.latitude,
       longitude: value.longitude,
       radiusMeters: value.radiusMeters,
       includedTypes,
+      query,
+      openNow,
+      priceLevels,
     };
   }
 
@@ -369,6 +565,15 @@ function jwtIdentity(
   }
 }
 
+function requestNetworkIdentity(request: Request) {
+  const forwarded =
+    request.headers.get('cf-connecting-ip') ??
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return forwarded && /^[0-9a-f:.]{3,64}$/i.test(forwarded)
+    ? forwarded
+    : 'unknown';
+}
+
 export function createPlacesHandler(dependencies: PlacesDependencies) {
   return async (request: Request): Promise<Response> => {
     if (request.method === 'OPTIONS') return json(200, { ok: true });
@@ -395,7 +600,7 @@ export function createPlacesHandler(dependencies: PlacesDependencies) {
 
     if (
       !(await dependencies.allowRequest(
-        `user:${identity.subject}`,
+        `user:${identity.subject}|network:${requestNetworkIdentity(request)}`,
         input,
       ))
     ) {

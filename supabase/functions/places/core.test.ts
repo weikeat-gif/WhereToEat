@@ -1,4 +1,5 @@
 import {
+  buildGoogleRequest,
   createPlacesHandler,
   fetchWithTimeout,
   filterCurrentHalalRecords,
@@ -48,6 +49,155 @@ describe('places Edge Function core', () => {
         radiusMeters: 500,
       }),
     ).toThrow('invalid');
+  });
+
+  it('normalizes a bounded nearby text query and rejects oversized input', () => {
+    expect(
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 3.139,
+        longitude: 101.6869,
+        radiusMeters: 3000,
+        query: '  nasi kandar  ',
+      }),
+    ).toMatchObject({ action: 'nearby', query: 'nasi kandar' });
+
+    expect(() =>
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 3.139,
+        longitude: 101.6869,
+        radiusMeters: 3000,
+        query: 'x'.repeat(121),
+      }),
+    ).toThrow('query');
+  });
+
+  it('builds Text Search New for a non-empty restaurant query', () => {
+    const request = buildGoogleRequest('server-key', {
+      action: 'nearby',
+      latitude: 3.139,
+      longitude: 101.6869,
+      radiusMeters: 3000,
+      includedTypes: ['restaurant', 'cafe'],
+      query: 'nasi kandar',
+    });
+
+    expect(request.url).toBe(
+      'https://places.googleapis.com/v1/places:searchText',
+    );
+    expect(request.init).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'X-Goog-Api-Key': 'server-key',
+        'X-Goog-FieldMask': expect.stringContaining('places.displayName'),
+      }),
+    });
+    const body = JSON.parse(request.init.body as string);
+    expect(body).toMatchObject({
+      textQuery: 'nasi kandar',
+      includedType: 'restaurant',
+      strictTypeFiltering: true,
+      pageSize: 20,
+      locationRestriction: {
+        rectangle: {
+          low: {
+            latitude: expect.any(Number),
+            longitude: expect.any(Number),
+          },
+          high: {
+            latitude: expect.any(Number),
+            longitude: expect.any(Number),
+          },
+        },
+      },
+    });
+    expect(body).not.toHaveProperty('locationBias');
+    expect(body.locationRestriction.rectangle.low.latitude).toBeLessThan(3.139);
+    expect(body.locationRestriction.rectangle.high.latitude).toBeGreaterThan(
+      3.139,
+    );
+  });
+
+  it('validates and forwards supported text-search filters', () => {
+    const input = validatePlacesRequest({
+      action: 'nearby',
+      latitude: 3.139,
+      longitude: 101.6869,
+      radiusMeters: 3000,
+      query: 'coffee',
+      openNow: true,
+      priceLevels: [1, 2, 2],
+    });
+    const request = buildGoogleRequest('server-key', input);
+
+    expect(JSON.parse(request.init.body as string)).toMatchObject({
+      openNow: true,
+      priceLevels: ['PRICE_LEVEL_INEXPENSIVE', 'PRICE_LEVEL_MODERATE'],
+    });
+    expect(() =>
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 3.139,
+        longitude: 101.6869,
+        radiusMeters: 3000,
+        query: 'coffee',
+        priceLevels: [5],
+      }),
+    ).toThrow('priceLevels');
+  });
+
+  it('uses the validated category type for strict text search', () => {
+    const input = validatePlacesRequest({
+      action: 'nearby',
+      latitude: 3.139,
+      longitude: 101.6869,
+      radiusMeters: 3000,
+      query: 'brunch',
+      includedTypes: ['cafe'],
+    });
+    const request = buildGoogleRequest('server-key', input);
+
+    expect(JSON.parse(request.init.body as string)).toMatchObject({
+      includedType: 'cafe',
+      strictTypeFiltering: true,
+    });
+    expect(() =>
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 3.139,
+        longitude: 101.6869,
+        radiusMeters: 3000,
+        query: 'anything',
+        includedTypes: ['night_club'],
+      }),
+    ).toThrow('includedTypes');
+  });
+
+  it('retains Nearby Search New when the normalized query is empty', () => {
+    const input = validatePlacesRequest({
+      action: 'nearby',
+      latitude: 3.139,
+      longitude: 101.6869,
+      radiusMeters: 3000,
+      includedTypes: ['restaurant', 'cafe'],
+      query: '   ',
+    });
+    const request = buildGoogleRequest('server-key', input);
+
+    expect(request.url).toBe(
+      'https://places.googleapis.com/v1/places:searchNearby',
+    );
+    expect(JSON.parse(request.init.body as string)).toEqual({
+      includedTypes: ['restaurant', 'cafe'],
+      maxResultCount: 20,
+      locationRestriction: {
+        circle: {
+          center: { latitude: 3.139, longitude: 101.6869 },
+          radius: 3000,
+        },
+      },
+    });
   });
 
   it('accepts a bounded driving route and rejects invalid coordinates', () => {
@@ -232,7 +382,24 @@ describe('places Edge Function core', () => {
 
     expect(response.status).toBe(200);
     expect(allowRequest).toHaveBeenCalledWith(
-      'user:anonymous-user-123',
+      'user:anonymous-user-123|network:unknown',
+      expect.objectContaining({ action: 'details' }),
+    );
+  });
+
+  it('combines the user subject with the trusted forwarding network bucket', async () => {
+    const allowRequest = jest.fn().mockResolvedValue(true);
+    const handler = createPlacesHandler(dependencies({ allowRequest }));
+    const request = authorizedRequest(
+      { action: 'details', placeId: 'ChIJ12345' },
+      'anonymous-user-123',
+    );
+    request.headers.set('x-forwarded-for', '203.0.113.42, 10.0.0.1');
+
+    await handler(request);
+
+    expect(allowRequest).toHaveBeenCalledWith(
+      'user:anonymous-user-123|network:203.0.113.42',
       expect.objectContaining({ action: 'details' }),
     );
   });

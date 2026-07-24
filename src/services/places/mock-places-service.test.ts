@@ -15,6 +15,26 @@ const criteria: SearchCriteria = {
 };
 
 describe('MockPlacesService discovery', () => {
+  it('matches a text query against restaurant names, subtitles, and cuisines', async () => {
+    const service = new MockPlacesService();
+
+    await expect(
+      service.searchNearby({ ...criteria, query: 'kopi' }),
+    ).resolves.toMatchObject({
+      places: [expect.objectContaining({ name: 'Kopi Bukit Bintang' })],
+    });
+    await expect(
+      service.searchNearby({ ...criteria, query: 'hand-pulled' }),
+    ).resolves.toMatchObject({
+      places: [expect.objectContaining({ name: 'PJ Noodle Lab' })],
+    });
+    await expect(
+      service.searchNearby({ ...criteria, query: 'japanese' }),
+    ).resolves.toMatchObject({
+      places: [expect.objectContaining({ name: 'Damansara Bowl Club' })],
+    });
+  });
+
   it('applies radius, open, price, category, and verified Halal filters together', async () => {
     const service = new MockPlacesService();
 

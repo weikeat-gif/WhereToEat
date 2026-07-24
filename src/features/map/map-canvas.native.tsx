@@ -8,6 +8,7 @@ import MapView, {
 
 import type { PlaceSummary } from '@/contracts/place';
 import type { MapCanvasProps } from '@/features/map/map-canvas';
+import { i18n } from '@/i18n';
 import { hasTrustedHalalVerification } from '@/services/places/mock-places-service';
 import { useAppTheme } from '@/theme/theme-provider';
 import { radius, spacing } from '@/theme/tokens';
@@ -28,7 +29,6 @@ export function MapCanvas({
   loading,
   onCenterChange,
   onSearchArea,
-  onCurrentLocation,
   onPlacePress,
   showsUserLocation,
 }: MapCanvasProps) {
@@ -75,7 +75,7 @@ export function MapCanvas({
     <View style={[styles.container, { borderColor: colors.border }]}>
       <MapView
         ref={mapRef}
-        accessibilityLabel="Restaurant results map"
+        accessibilityLabel={i18n.t('mapAccessibility')}
         initialRegion={{
           ...center,
           latitudeDelta: LATITUDE_DELTA,
@@ -90,7 +90,10 @@ export function MapCanvas({
         {places.map((place) => (
           <Marker
             key={place.id}
-            accessibilityLabel={`${place.name}, ${Math.round(place.distanceMeters)} metres away`}
+            accessibilityLabel={i18n.t('mapPinAccessibility', {
+              name: place.name,
+              distance: Math.round(place.distanceMeters),
+            })}
             coordinate={place.coordinates}
             description={place.subtitle}
             onPress={() => onPlacePress(place.id)}
@@ -100,23 +103,13 @@ export function MapCanvas({
         ))}
       </MapView>
       <TouchableOpacity
-        accessibilityLabel="Use my current location"
-        accessibilityRole="button"
-        disabled={loading}
-        onPress={onCurrentLocation}
-        style={[
-          styles.locationButton,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}>
-        <Text style={{ color: colors.text, fontSize: 18 }}>◎</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
+        accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
         accessibilityRole="button"
         disabled={loading}
         onPress={onSearchArea}
         style={[styles.searchButton, { backgroundColor: colors.accent }]}>
         <Text style={{ color: colors.accentText, fontWeight: '800' }}>
-          {loading ? 'Searching…' : 'Search this area'}
+          {loading ? i18n.t('mapSearching') : i18n.t('mapSearchArea')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -125,26 +118,16 @@ export function MapCanvas({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    height: 330,
+    flex: 1,
     overflow: 'hidden',
   },
-  locationButton: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: spacing.md,
-    top: spacing.md,
-    width: 44,
-  },
   searchButton: {
+    alignItems: 'center',
     alignSelf: 'center',
     borderRadius: radius.pill,
     bottom: spacing.md,
+    justifyContent: 'center',
+    minHeight: 44,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     position: 'absolute',

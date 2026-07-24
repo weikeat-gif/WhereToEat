@@ -27,7 +27,9 @@ resolution does not stretch the mobile UI.
 
 - `GOOGLE_MAPS_IOS_API_KEY`: restricted native iOS key used only while building.
 - `GOOGLE_MAPS_ANDROID_API_KEY`: restricted native Android key used only while building.
-- `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY`: browser-restricted Maps Embed API key.
+- `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY`: browser-restricted key with Maps
+  JavaScript API and Maps Embed API enabled. It powers the interactive discovery
+  map and the in-app route preview on web.
 - `GOOGLE_MAPS_SERVER_API_KEY`: server-only Places/Routes key set as a Supabase secret.
 
 EAS builds fail early if their target native Maps key is missing. Never prefix

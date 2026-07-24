@@ -240,6 +240,12 @@ export function distanceInMeters(
 }
 
 function matchesCriteria(place: PlaceSummary, criteria: SearchCriteria) {
+  const normalizedQuery = criteria.query?.trim().toLocaleLowerCase() ?? '';
+  const queryMatches =
+    normalizedQuery.length === 0 ||
+    [place.name, place.subtitle, ...place.categories].some((value) =>
+      value.toLocaleLowerCase().includes(normalizedQuery),
+    );
   const normalizedCategories = criteria.categories.map((category) =>
     category.toLocaleLowerCase(),
   );
@@ -250,6 +256,7 @@ function matchesCriteria(place: PlaceSummary, criteria: SearchCriteria) {
     );
 
   return (
+    queryMatches &&
     place.distanceMeters <= criteria.radiusMeters &&
     (!criteria.openNow || place.isOpen === true) &&
     (criteria.priceLevels.length === 0 ||

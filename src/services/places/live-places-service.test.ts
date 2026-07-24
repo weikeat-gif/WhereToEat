@@ -158,6 +158,8 @@ describe('LivePlacesService', () => {
           longitude: criteria.center.longitude,
           radiusMeters: criteria.radiusMeters,
           includedTypes: ['restaurant', 'cafe'],
+          openNow: criteria.openNow,
+          priceLevels: criteria.priceLevels,
         }),
       }),
     );
@@ -175,6 +177,67 @@ describe('LivePlacesService', () => {
     });
     expect(result.places[0].distanceMeters).toBeGreaterThan(0);
   });
+
+  it('sends a restaurant text query through the single nearby action envelope', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ places: [] }));
+    const service = new LivePlacesService(
+      'https://project.supabase.co/functions/v1/places',
+    );
+
+    await service.searchNearby({ ...criteria, query: 'nasi kandar' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://project.supabase.co/functions/v1/places',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'nearby',
+          latitude: criteria.center.latitude,
+          longitude: criteria.center.longitude,
+          radiusMeters: criteria.radiusMeters,
+          includedTypes: ['restaurant'],
+          query: 'nasi kandar',
+          openNow: criteria.openNow,
+          priceLevels: criteria.priceLevels,
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    {
+      label: 'Cafe filter',
+      changes: { categories: ['Cafe'], query: 'brunch' },
+      includedTypes: ['cafe'],
+    },
+    {
+      label: 'coffee query',
+      changes: { categories: [], query: 'coffee' },
+      includedTypes: ['cafe'],
+    },
+    {
+      label: 'Chinese filter',
+      changes: { categories: ['Chinese'], query: 'dumplings' },
+      includedTypes: ['chinese_restaurant'],
+    },
+  ])(
+    'maps $label to a strict Google place type',
+    async ({ changes, includedTypes }) => {
+      const fetchMock = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(Response.json({ places: [] }));
+      const service = new LivePlacesService(
+        'https://project.supabase.co/functions/v1/places',
+      );
+
+      await service.searchNearby({ ...criteria, ...changes });
+
+      const init = fetchMock.mock.calls[0][1] as RequestInit;
+      expect(JSON.parse(init.body as string)).toMatchObject({ includedTypes });
+    },
+  );
 
   it('returns autocomplete predictions without issuing details requests per keystroke', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -205,20 +268,21 @@ describe('LivePlacesService', () => {
   });
 
   it('matches the deployed Edge handler contract end to end', async () => {
+    const callGoogle = jest.fn().mockResolvedValue({
+      places: [
+        {
+          id: 'contract-place-1',
+          displayName: { text: 'Contract Kitchen' },
+          formattedAddress: 'Klang, Selangor',
+          location: { latitude: 3.14, longitude: 101.69 },
+          priceLevel: 'PRICE_LEVEL_MODERATE',
+          currentOpeningHours: { openNow: true },
+          types: ['restaurant'],
+        },
+      ],
+    });
     const handler = createPlacesHandler({
-      callGoogle: jest.fn().mockResolvedValue({
-        places: [
-          {
-            id: 'contract-place-1',
-            displayName: { text: 'Contract Kitchen' },
-            formattedAddress: 'Klang, Selangor',
-            location: { latitude: 3.14, longitude: 101.69 },
-            priceLevel: 'PRICE_LEVEL_MODERATE',
-            currentOpeningHours: { openNow: true },
-            types: ['restaurant'],
-          },
-        ],
-      }),
+      callGoogle,
       loadHalal: jest.fn().mockResolvedValue([]),
       allowRequest: () => true,
     });
@@ -230,11 +294,20 @@ describe('LivePlacesService', () => {
       async () => userJwt,
     );
 
-    const result = await service.searchNearby(criteria);
+    const result = await service.searchNearby({
+      ...criteria,
+      query: 'contract kitchen',
+    });
 
     expect(result.places[0]).toMatchObject({
       id: 'contract-place-1',
       name: 'Contract Kitchen',
     });
+    expect(callGoogle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'nearby',
+        query: 'contract kitchen',
+      }),
+    );
   });
 });

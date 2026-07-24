@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { FlatList, Linking, ScrollView } from 'react-native';
 
 import type { PlaceSummary } from '@/contracts/place';
 
@@ -17,9 +17,28 @@ jest.mock('@/features/search/search-provider', () => ({
 }));
 
 jest.mock('@/features/map/map-canvas', () => {
-  const { View } = jest.requireActual('react-native');
+  const { TouchableOpacity, View } = jest.requireActual('react-native');
   return {
-    MapCanvas: () => <View accessibilityLabel="Map test canvas" />,
+    MapCanvas: ({
+      onCenterChange,
+      onSearchArea,
+    }: {
+      onCenterChange: (center: { latitude: number; longitude: number }) => void;
+      onSearchArea: () => void;
+    }) => (
+      <View accessibilityLabel="Map test canvas">
+        <TouchableOpacity
+          accessibilityLabel="Pan map test control"
+          onPress={() =>
+            onCenterChange({ latitude: 3.05, longitude: 101.45 })
+          }
+        />
+        <TouchableOpacity
+          accessibilityLabel="Search this map area test control"
+          onPress={onSearchArea}
+        />
+      </View>
+    ),
   };
 });
 
@@ -82,10 +101,23 @@ describe('MapScreen states', () => {
     mockUseSearch.mockReturnValue(searchState());
   });
 
+  it('keeps the map and vertical nearby results in a fixed split', () => {
+    const { UNSAFE_getAllByType, UNSAFE_getByType } = render(<MapScreen />);
+
+    expect(screen.getByTestId('map-pane')).toHaveStyle({ flex: 47 });
+    expect(screen.getByTestId('results-pane')).toHaveStyle({ flex: 53 });
+    expect(UNSAFE_getByType(FlatList).props.horizontal).toBeFalsy();
+    expect(
+      UNSAFE_getAllByType(ScrollView).filter(
+        (scrollView) => scrollView.props.horizontal !== true,
+      ),
+    ).toHaveLength(1);
+  });
+
   it('opens a shared result in place details', () => {
     render(<MapScreen />);
 
-    fireEvent.press(screen.getByRole('button', { name: '1. Trusted Place' }));
+    fireEvent.press(screen.getByText('Trusted Place'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/place/[id]',
@@ -94,13 +126,87 @@ describe('MapScreen states', () => {
     expect(screen.getByLabelText('Use my current location')).toBeTruthy();
   });
 
+  it('searches the restaurant or cuisine query shown in criteria', () => {
+    const updateCriteriaAndSearch = jest.fn();
+    const state = searchState({ updateCriteriaAndSearch });
+    mockUseSearch.mockReturnValue({
+      ...state,
+      criteria: { ...state.criteria, query: 'nasi lemak' },
+    });
+
+    render(<MapScreen />);
+
+    const query = screen.getByLabelText('Search restaurants or cuisines');
+    expect(query).toHaveProp('value', 'nasi lemak');
+    fireEvent.changeText(query, '  roti canai  ');
+    fireEvent(query, 'submitEditing');
+
+    expect(updateCriteriaAndSearch).toHaveBeenCalledWith({
+      query: 'roti canai',
+    });
+  });
+
+  it('applies RM price filters through the shared search criteria', () => {
+    const updateCriteriaAndSearch = jest.fn();
+    mockUseSearch.mockReturnValue(searchState({ updateCriteriaAndSearch }));
+
+    render(<MapScreen />);
+    fireEvent.press(screen.getByRole('button', { name: 'Filter RM RM' }));
+
+    expect(updateCriteriaAndSearch).toHaveBeenCalledWith({ priceLevels: [1] });
+    expect(screen.queryByText(/\$/)).toBeNull();
+  });
+
+  it('keeps a draft query while another filter refreshes criteria', () => {
+    const firstState = searchState();
+    let currentState = firstState;
+    mockUseSearch.mockImplementation(() => currentState);
+    const view = render(<MapScreen />);
+    const query = screen.getByLabelText('Search restaurants or cuisines');
+
+    fireEvent.changeText(query, 'coffee');
+    currentState = {
+      ...firstState,
+      criteria: {
+        ...firstState.criteria,
+        center: { ...firstState.criteria.center },
+        openNow: false,
+      },
+    };
+    view.rerender(<MapScreen />);
+
+    expect(screen.getByLabelText('Search restaurants or cuisines')).toHaveProp(
+      'value',
+      'coffee',
+    );
+  });
+
+  it('searches the explicitly panned map area only after confirmation', () => {
+    const search = jest.fn();
+    mockUseSearch.mockReturnValue(searchState({ search }));
+
+    render(<MapScreen />);
+    fireEvent.press(screen.getByLabelText('Pan map test control'));
+
+    expect(search).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Search this map area test control'));
+    expect(search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        areaLabel: 'Map area',
+        center: { latitude: 3.05, longitude: 101.45 },
+      }),
+    );
+  });
+
   it('requests GPS and nearby food from the in-app map', () => {
     const searchCurrentLocation = jest.fn();
     mockUseSearch.mockReturnValue(searchState({ searchCurrentLocation }));
 
     render(<MapScreen />);
 
-    fireEvent.press(screen.getByRole('button', { name: 'Find food near me' }));
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Use my current location' }),
+    );
 
     expect(searchCurrentLocation).toHaveBeenCalledTimes(1);
   });
@@ -176,11 +282,13 @@ describe('MapScreen states', () => {
 
     expect(
       screen.getByText(
-        'No places match these filters. Expand the radius or clear a filter.',
+        'No makan spots match yet. Try a wider radius or fewer filters.',
       ),
     ).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Surprise me' }),
+      screen.getByRole('button', {
+        name: 'Surprise me with a nearby restaurant',
+      }),
     ).toBeDisabled();
   });
 
@@ -191,6 +299,6 @@ describe('MapScreen states', () => {
 
     render(<MapScreen />);
 
-    expect(screen.getByLabelText('Loading places')).toBeTruthy();
+    expect(screen.getByLabelText('Loading nearby restaurants')).toBeTruthy();
   });
 });
