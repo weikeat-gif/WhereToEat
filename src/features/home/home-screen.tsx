@@ -22,6 +22,8 @@ import { useAppTheme } from '@/theme/theme-provider';
 
 import { DISCOVERY_PLACES, heroImage } from './discovery-data';
 
+const brandMark = require('../../../assets/images/icon.png');
+
 const COPY = {
   area: 'Klang Valley',
   eyebrow: 'Tonight in your city',
@@ -40,13 +42,13 @@ export function HomeScreen() {
     status: searchStatus,
     surpriseMe,
   } = useSearch();
-  const { width } = useWindowDimensions();
+  const { fontScale, width } = useWindowDimensions();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [openNowActive, setOpenNowActive] = useState(criteria.openNow);
   const [notice, setNotice] = useState<string | null>(null);
   const visiblePlaces = searchStatus === 'idle' ? DISCOVERY_PLACES : results;
 
-  const compact = width < 360;
+  const compact = width < 360 || fontScale > 1.3;
   const filters = useMemo(
     () => [
       {
@@ -144,13 +146,34 @@ export function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <View>
-            <Text style={[styles.brand, { color: colors.accentForeground }]}>
-              {i18n.t('appName')}?
-            </Text>
-            <Text style={[styles.brandNote, { color: colors.textMuted }]}>
-              Food worth leaving home for
-            </Text>
+          <View
+            accessible
+            accessibilityLabel={`${i18n.t('appName')}, Food worth leaving home for`}
+            accessibilityRole="header"
+            style={styles.brandLockup}>
+            <Image
+              accessible={false}
+              accessibilityIgnoresInvertColors
+              contentFit="contain"
+              source={brandMark}
+              style={styles.brandMark}
+            />
+            <View style={styles.brandCopy}>
+              <Text
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={[styles.brand, { color: colors.accentForeground }]}>
+                {i18n.t('appName')}
+              </Text>
+              {!compact && (
+                <Text
+                  maxFontSizeMultiplier={1.3}
+                  numberOfLines={1}
+                  style={[styles.brandNote, { color: colors.textMuted }]}>
+                  Food worth leaving home for
+                </Text>
+              )}
+            </View>
           </View>
           <Pressable
             accessibilityLabel={`Location: ${COPY.area}`}
@@ -314,6 +337,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 4,
   },
+  brandLockup: {
+    alignItems: 'center',
+    flexShrink: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minWidth: 0,
+  },
+  brandCopy: { flexShrink: 1, minWidth: 0 },
+  brandMark: { borderRadius: 10, height: 38, width: 38 },
   brand: { fontSize: 25, fontWeight: '900', letterSpacing: -1 },
   brandNote: { fontSize: 11, fontWeight: '600', marginTop: 1 },
   location: {

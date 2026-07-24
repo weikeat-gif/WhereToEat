@@ -64,15 +64,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'com.makanmana.app',
-    icon: './assets/expo.icon',
+    icon: './assets/images/icon.png',
   },
   android: {
     package: 'com.makanmana.app',
     predictiveBackGestureEnabled: false,
     adaptiveIcon: {
-      backgroundColor: '#0B0D0C',
+      backgroundColor: '#FFF8E8',
       foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
   },
@@ -96,9 +95,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#0B0D0C',
+        backgroundColor: '#FFF8E8',
+        dark: {
+          backgroundColor: '#0B0D0C',
+          image: './assets/images/splash-icon-dark.png',
+        },
         image: './assets/images/splash-icon.png',
-        imageWidth: 96,
+        imageWidth: 180,
       },
     ],
   ],
