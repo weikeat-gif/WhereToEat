@@ -6,7 +6,7 @@ Function. That function calls Google Places (New) with the server-only key and
 returns the real nearby businesses.
 
 Google does not expose every business on Earth in one response. MakanMana asks
-for up to 100 nearby food businesses inside the selected radius, ranked by
+for up to 20 nearby food businesses inside the selected radius, ranked by
 distance. Text searches use Google's paginated Text Search and currently return
 the first 20 strongest matches. Moving the map and pressing **Search this area**
 retrieves businesses around the new map centre.
@@ -89,6 +89,15 @@ EAS; it belongs only in Supabase.
 Preview and production builds intentionally fail when live mode or its backend
 variables are missing. This prevents a TestFlight or Play build from showing
 the local demo restaurants.
+
+SDK 55 EAS Updates must also select their environment. The same configuration
+guard runs before the update bundle is published:
+
+```powershell
+pnpm dlx eas-cli update --environment production
+```
+
+Do not publish a release update without the `--environment production` flag.
 
 ## 5. Verify
 

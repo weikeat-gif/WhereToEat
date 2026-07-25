@@ -143,7 +143,7 @@ export function buildGoogleRequest(
         headers,
         body: JSON.stringify({
           includedTypes: input.includedTypes,
-          maxResultCount: 100,
+          maxResultCount: 20,
           locationRestriction: {
             circle: {
               center: {

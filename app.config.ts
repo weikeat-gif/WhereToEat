@@ -29,15 +29,18 @@ export function assertMapsBuildConfiguration(
 export function assertLiveDataBuildConfiguration(
   environment: BuildEnvironment,
 ): void {
+  const isEasBuild = environment.EAS_BUILD === 'true';
+  const isEasUpdateWithEnvironment =
+    environment.EXPO_NO_DOTENV === '1' && !isEasBuild;
   if (
-    environment.EAS_BUILD !== 'true' ||
-    environment.EAS_BUILD_PROFILE === 'development'
+    (!isEasBuild && !isEasUpdateWithEnvironment) ||
+    (isEasBuild && environment.EAS_BUILD_PROFILE === 'development')
   ) {
     return;
   }
   if (environment.EXPO_PUBLIC_DATA_MODE !== 'live') {
     throw new Error(
-      'EXPO_PUBLIC_DATA_MODE=live is required for preview and production EAS builds so demo restaurants cannot ship.',
+      'EXPO_PUBLIC_DATA_MODE=live is required for release EAS builds and updates so demo restaurants cannot ship.',
     );
   }
 

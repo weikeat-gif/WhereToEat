@@ -46,6 +46,15 @@ describe('Google Maps Expo configuration', () => {
     ).not.toThrow();
   });
 
+  it('blocks EAS Updates that could publish demo restaurants', () => {
+    expect(() =>
+      assertLiveDataBuildConfiguration({
+        EXPO_NO_DOTENV: '1',
+        EXPO_PUBLIC_DATA_MODE: 'mock',
+      }),
+    ).toThrow('EXPO_PUBLIC_DATA_MODE=live');
+  });
+
   it('configures the native plugin for the target keys', () => {
     expect(
       createMapsPlugin({

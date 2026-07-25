@@ -190,7 +190,7 @@ describe('places Edge Function core', () => {
     );
     expect(JSON.parse(request.init.body as string)).toEqual({
       includedTypes: ['restaurant', 'cafe'],
-      maxResultCount: 100,
+      maxResultCount: 20,
       locationRestriction: {
         circle: {
           center: { latitude: 3.139, longitude: 101.6869 },
