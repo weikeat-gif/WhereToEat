@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { env } from '@/config/env';
@@ -22,6 +23,7 @@ type WebMap = {
   addListener(event: string, listener: () => void): MapsListener;
   getCenter(): MapsLatLng | undefined;
   setCenter(center: { lat: number; lng: number }): void;
+  setOptions?(options: Record<string, unknown>): void;
 };
 type WebMarker = {
   addListener(event: string, listener: () => void): MapsListener;
@@ -43,6 +45,43 @@ declare global {
 }
 
 let mapsLoader: Promise<GoogleMapsApi> | undefined;
+const mapPreview = require('../../../assets/images/makanmana/kl-map-preview.png');
+const brandMark = require('../../../assets/images/brand/makanmana-mark.png');
+const PREVIEW_MARKER_POSITIONS = [
+  { left: '20%', top: '24%' },
+  { left: '65%', top: '31%' },
+  { left: '42%', top: '46%' },
+  { left: '74%', top: '56%' },
+  { left: '28%', top: '66%' },
+  { left: '54%', top: '75%' },
+  { left: '82%', top: '42%' },
+  { left: '13%', top: '50%' },
+] as const;
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#171C1B' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#A9B0AC' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#171C1B' }] },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#2A302F' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#353C39' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'geometry',
+    stylers: [{ color: '#202624' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#101817' }],
+  },
+];
 
 function loadGoogleMaps(apiKey: string) {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -94,7 +133,7 @@ export function MapCanvas({
   onPlacePress,
   showsUserLocation: _showsUserLocation,
 }: MapCanvasProps) {
-  const { colors } = useAppTheme();
+  const { colors, resolvedMode } = useAppTheme();
   const hostRef = useRef<View>(null);
   const mapRef = useRef<WebMap | null>(null);
   const mapListenerRef = useRef<MapsListener | null>(null);
@@ -102,6 +141,7 @@ export function MapCanvas({
   const markerRefs = useRef<WebMarker[]>([]);
   const lastCenterRef = useRef(center);
   const latestCenterRef = useRef(center);
+  const latestResolvedModeRef = useRef(resolvedMode);
   const onCenterChangeRef = useRef(onCenterChange);
   const onMapPressRef = useRef(onMapPress);
   const [mapReady, setMapReady] = useState(false);
@@ -109,6 +149,7 @@ export function MapCanvas({
   const [retryNonce, setRetryNonce] = useState(0);
   const webKey = env.EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY;
   latestCenterRef.current = center;
+  latestResolvedModeRef.current = resolvedMode;
 
   useEffect(() => {
     onCenterChangeRef.current = onCenterChange;
@@ -138,6 +179,8 @@ export function MapCanvas({
           fullscreenControl: false,
           mapTypeControl: false,
           streetViewControl: false,
+          styles:
+            latestResolvedModeRef.current === 'dark' ? DARK_MAP_STYLE : [],
           zoom: 14,
         });
         mapRef.current = map;
@@ -170,6 +213,20 @@ export function MapCanvas({
       mapRef.current = null;
     };
   }, [retryNonce, webKey]);
+
+  useEffect(() => {
+    if (!webKey || mapReady || mapError) return;
+    const timeout = setTimeout(() => {
+      setMapError(i18n.t('mapWebLoadError'));
+    }, 4000);
+    return () => clearTimeout(timeout);
+  }, [mapError, mapReady, retryNonce, webKey]);
+
+  useEffect(() => {
+    mapRef.current?.setOptions?.({
+      styles: resolvedMode === 'dark' ? DARK_MAP_STYLE : [],
+    });
+  }, [resolvedMode]);
 
   useEffect(() => {
     if (!mapRef.current || !coordinatesChanged(lastCenterRef.current, center)) {
@@ -217,6 +274,12 @@ export function MapCanvas({
     <View
       accessibilityLabel={i18n.t('mapAccessibility')}
       style={[styles.container, { backgroundColor: colors.surfaceElevated }]}>
+      <Image
+        accessibilityIgnoresInvertColors
+        contentFit="cover"
+        source={mapPreview}
+        style={StyleSheet.absoluteFill}
+      />
       <View ref={hostRef} style={StyleSheet.absoluteFill} />
 
       {!webKey || mapError ? (
@@ -227,15 +290,40 @@ export function MapCanvas({
             onPress={onMapPress}
             style={StyleSheet.absoluteFill}
           />
+          {places.slice(0, PREVIEW_MARKER_POSITIONS.length).map((place, index) => (
+            <Pressable
+              accessibilityLabel={i18n.t('mapPinAccessibility', {
+                name: place.name,
+                distance: Math.round(place.distanceMeters),
+              })}
+              accessibilityRole="button"
+              key={place.id}
+              onPress={() => onPlacePress(place.id)}
+              style={[
+                styles.previewMarker,
+                PREVIEW_MARKER_POSITIONS[index],
+              ]}>
+              <Image
+                accessibilityIgnoresInvertColors
+                contentFit="contain"
+                source={brandMark}
+                style={styles.previewMarkerImage}
+              />
+            </Pressable>
+          ))}
           <View
             style={[
               styles.webNotice,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}>
-            <Text style={[styles.webNoticeTitle, { color: colors.text }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.webNoticeTitle, { color: colors.text }]}>
               {i18n.t('mapWebUnavailableTitle')}
             </Text>
-            <Text style={[styles.webNoticeBody, { color: colors.textMuted }]}>
+            <Text
+              numberOfLines={2}
+              style={[styles.webNoticeBody, { color: colors.textMuted }]}>
               {mapError ?? i18n.t('mapWebUnavailableBody')}
             </Text>
             {mapError ? (
@@ -269,13 +357,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   webNotice: {
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: 1,
-    bottom: spacing.xl + 44,
     left: spacing.lg,
-    padding: spacing.md,
+    padding: spacing.sm,
     position: 'absolute',
     right: spacing.lg,
+    top: 82,
   },
   webNoticeTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
   webNoticeBody: {
@@ -292,4 +380,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: spacing.lg,
   },
+  previewMarker: {
+    width: 34,
+    height: 44,
+    marginLeft: -17,
+    marginTop: -22,
+    position: 'absolute',
+  },
+  previewMarkerImage: { height: 44, width: 34 },
 });

@@ -252,7 +252,7 @@ export function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { gap: 24, padding: 20, paddingBottom: 36 },
+  content: { gap: 18, padding: 18, paddingBottom: 32 },
   header: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -264,9 +264,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   title: {
-    fontFamily: fontFamily.display,
-    fontSize: 40,
-    letterSpacing: -0.5,
+    fontFamily: fontFamily.bold,
+    fontSize: 32,
+    letterSpacing: -0.8,
     marginTop: 2,
   },
   avatar: {
@@ -277,9 +277,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   account: {
-    minHeight: 78,
+    minHeight: 74,
     alignItems: 'center',
-    borderRadius: 19,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   accountButtonText: { fontFamily: fontFamily.semibold, fontSize: 13 },
-  preview: { borderRadius: 24, borderWidth: 1, gap: 22, padding: 20 },
+  preview: { borderRadius: 18, borderWidth: 1, gap: 18, padding: 16 },
   previewTop: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -323,8 +323,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   previewTitle: {
-    fontFamily: fontFamily.display,
-    fontSize: 26,
+    fontFamily: fontFamily.bold,
+    fontSize: 22,
     marginTop: 4,
   },
   previewChips: { flexDirection: 'row', gap: 8 },
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   previewChipText: { fontFamily: fontFamily.semibold, fontSize: 12 },
-  sectionTitle: { fontFamily: fontFamily.display, fontSize: 25 },
+  sectionTitle: { fontFamily: fontFamily.semibold, fontSize: 18 },
   sectionDescription: {
     fontFamily: fontFamily.regular,
     fontSize: 14,
@@ -346,9 +346,9 @@ const styles = StyleSheet.create({
   },
   options: { gap: 10 },
   option: {
-    minHeight: 78,
+    minHeight: 72,
     alignItems: 'center',
-    borderRadius: 19,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     padding: 13,

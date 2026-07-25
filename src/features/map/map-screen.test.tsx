@@ -107,7 +107,7 @@ describe('MapScreen states', () => {
     expect(screen.getByTestId('map-pane')).toHaveStyle({ flex: 1 });
     expect(screen.getByTestId('results-pane')).toBeTruthy();
     expect(screen.getByTestId('search-area-button')).toHaveStyle({
-      bottom: '52%',
+      bottom: '48%',
     });
     expect(
       screen.getByRole('button', { name: 'Focus map view' }),
@@ -123,7 +123,7 @@ describe('MapScreen states', () => {
 
     expect(screen.queryByTestId('results-pane')).toBeNull();
     expect(screen.getByTestId('search-area-button')).toHaveStyle({
-      bottom: 96,
+      bottom: 128,
     });
     const nearbyDock = screen.getByRole('button', {
       name: 'Show 1 place nearby',

@@ -9,8 +9,9 @@ import { fontFamily } from '@/theme/tokens';
 
 const ICONS = {
   index: ['home-outline', 'home'],
-  map: ['map-outline', 'map'],
+  map: ['search-outline', 'search'],
   saved: ['bookmark-outline', 'bookmark'],
+  lists: ['list-outline', 'list'],
   profile: ['person-outline', 'person'],
 } as const;
 
@@ -44,11 +45,11 @@ export default function TabsLayout() {
           tabBarStyle: {
             backgroundColor: colors.navBackground,
             borderTopColor: colors.border,
-            height: 74,
-            paddingTop: 8,
-            paddingBottom: 10,
+            height: 70,
+            paddingTop: 7,
+            paddingBottom: 9,
           },
-          tabBarLabelStyle: { fontFamily: fontFamily.semibold, fontSize: 12 },
+          tabBarLabelStyle: { fontFamily: fontFamily.medium, fontSize: 10 },
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               color={color}
@@ -59,8 +60,9 @@ export default function TabsLayout() {
         };
       }}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="map" options={{ title: 'Map' }} />
+      <Tabs.Screen name="map" options={{ title: 'Search' }} />
       <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
+      <Tabs.Screen name="lists" options={{ title: 'Lists' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );

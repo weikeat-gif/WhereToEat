@@ -6,6 +6,7 @@ node_modules/
 # Expo
 .expo/
 .expo-final-*.log
+.expo-web*.log
 dist/
 dist-qa/
 web-build/

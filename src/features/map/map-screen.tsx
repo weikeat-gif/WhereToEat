@@ -17,10 +17,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
-import { PlaceCard } from '@/components/ui/place-card';
+import { CompactPlaceRow } from '@/components/ui/compact-place-row';
 import type { Coordinates, PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
 import { MapCanvas } from '@/features/map/map-canvas';
+import { DISCOVERY_PLACES } from '@/features/home/discovery-data';
 import { useSearch } from '@/features/search/search-provider';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -157,6 +158,79 @@ export function MapScreen() {
 
   const listHeader = (
     <View style={styles.listHeader}>
+      <View
+        style={[
+          styles.areaControl,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}>
+        <View style={styles.areaRow}>
+          <Ionicons
+            color={colors.accentForeground}
+            name="location-outline"
+            size={19}
+          />
+          <TextInput
+            accessibilityLabel={i18n.t('mapAreaAccessibility')}
+            onChangeText={setAreaInput}
+            placeholder={i18n.t('mapAreaPlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            style={[styles.areaInput, { color: colors.text }]}
+            value={areaInput}
+          />
+          <TouchableOpacity
+            accessibilityLabel={
+              locationCanAskAgain === false
+                ? i18n.t('mapOpenLocationSettings')
+                : i18n.t('mapUseCurrentLocation')
+            }
+            accessibilityRole="button"
+            disabled={locationStatus === 'requesting'}
+            onPress={() => void handleCurrentLocation()}
+            style={[
+              styles.locationButton,
+              { backgroundColor: colors.surfaceElevated },
+            ]}>
+            <Ionicons
+              color={colors.text}
+              name={
+                locationStatus === 'requesting'
+                  ? 'hourglass-outline'
+                  : 'locate-outline'
+              }
+              size={20}
+            />
+          </TouchableOpacity>
+        </View>
+        {suggestions.length > 0 ? (
+          <View style={styles.suggestions}>
+            {suggestions.slice(0, 4).map((area) => (
+              <TouchableOpacity
+                key={area.id}
+                accessibilityLabel={i18n.t('mapChooseArea', {
+                  area: area.label,
+                })}
+                accessibilityRole="button"
+                onPress={() => chooseArea(area)}
+                style={[styles.suggestion, { borderColor: colors.border }]}>
+                <Text numberOfLines={1} style={{ color: colors.text }}>
+                  {area.label}
+                </Text>
+                {area.secondaryLabel ? (
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.suggestionSecondary,
+                      { color: colors.textMuted },
+                    ]}>
+                    {area.secondaryLabel}
+                  </Text>
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
       <View style={styles.resultHeader}>
         <View style={styles.resultCopy}>
           <Text style={[styles.resultTitle, { color: colors.text }]}>
@@ -341,6 +415,7 @@ export function MapScreen() {
             },
           ]}>
           <View style={styles.queryRow}>
+            <Ionicons color={colors.textMuted} name="search" size={22} />
             <TextInput
               accessibilityLabel={i18n.t('mapQueryAccessibility')}
               maxLength={120}
@@ -353,87 +428,16 @@ export function MapScreen() {
               value={queryInput}
             />
             <TouchableOpacity
-              accessibilityLabel={i18n.t('mapQuerySubmitAccessibility')}
+              accessibilityLabel="Show search filters and nearby results"
               accessibilityRole="button"
-              disabled={status === 'loading'}
-              onPress={submitQuery}
-              style={[styles.submitButton, { backgroundColor: colors.accent }]}>
-              <Text style={{ color: colors.accentText, fontFamily: fontFamily.semibold }}>
-                {i18n.t('mapQuerySubmit')}
-              </Text>
+              onPress={() => setMapFocused(false)}
+              style={[
+                styles.submitButton,
+                { backgroundColor: colors.surfaceElevated },
+              ]}>
+              <Ionicons color={colors.text} name="options-outline" size={20} />
             </TouchableOpacity>
           </View>
-
-          <View style={styles.areaRow}>
-            <TextInput
-              accessibilityLabel={i18n.t('mapAreaAccessibility')}
-              onChangeText={setAreaInput}
-              placeholder={i18n.t('mapAreaPlaceholder')}
-              placeholderTextColor={colors.textMuted}
-              style={[
-                styles.areaInput,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={areaInput}
-            />
-            <TouchableOpacity
-              accessibilityLabel={
-                locationCanAskAgain === false
-                  ? i18n.t('mapOpenLocationSettings')
-                  : i18n.t('mapUseCurrentLocation')
-              }
-              accessibilityRole="button"
-              disabled={locationStatus === 'requesting'}
-              onPress={() => void handleCurrentLocation()}
-              style={[
-                styles.locationButton,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                },
-              ]}>
-              <Text style={{ color: colors.text, fontSize: 18 }}>
-                {locationStatus === 'requesting' ? '…' : '◎'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {suggestions.length > 0 ? (
-            <View
-              style={[
-                styles.suggestions,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}>
-              {suggestions.slice(0, 4).map((area) => (
-                <TouchableOpacity
-                  key={area.id}
-                  accessibilityLabel={i18n.t('mapChooseArea', {
-                    area: area.label,
-                  })}
-                  accessibilityRole="button"
-                  onPress={() => chooseArea(area)}
-                  style={[styles.suggestion, { borderColor: colors.border }]}>
-                  <Text numberOfLines={1} style={{ color: colors.text }}>
-                    {area.label}
-                  </Text>
-                  {area.secondaryLabel ? (
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.suggestionSecondary, { color: colors.textMuted }]}>
-                      {area.secondaryLabel}
-                    </Text>
-                  ) : null}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
         </View>
       </View>
 
@@ -475,7 +479,15 @@ export function MapScreen() {
             }
             ListHeaderComponent={listHeader}
             renderItem={({ item }) => (
-              <PlaceCard place={item} onPress={() => openPlace(item.id)} />
+              <CompactPlaceRow
+                image={
+                  DISCOVERY_PLACES.find(
+                    (candidate) => candidate.id === item.id,
+                  )?.image
+                }
+                place={item}
+                onPress={() => openPlace(item.id)}
+              />
             )}
             showsVerticalScrollIndicator={false}
           />
@@ -567,11 +579,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   resultsPane: {
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderTopWidth: 1,
     bottom: 0,
-    height: '50%',
+    height: '46%',
     left: 0,
     overflow: 'hidden',
     position: 'absolute',
@@ -579,14 +591,13 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   searchOverlay: {
-    borderRadius: radius.lg,
+    borderRadius: 22,
     borderWidth: 1,
-    gap: spacing.xs,
-    left: spacing.md,
-    padding: spacing.sm,
+    left: spacing.lg,
+    padding: 7,
     position: 'absolute',
-    right: spacing.md,
-    top: spacing.sm,
+    right: spacing.lg,
+    top: spacing.md,
     zIndex: 2,
   },
   searchAreaButton: {
@@ -599,49 +610,50 @@ const styles = StyleSheet.create({
     position: 'absolute',
     zIndex: 2,
   },
-  searchAreaButtonExpanded: { bottom: '52%' },
-  searchAreaButtonFocused: { bottom: 96 },
-  queryRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs },
+  searchAreaButtonExpanded: { bottom: '48%' },
+  searchAreaButtonFocused: { bottom: 128 },
+  queryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingLeft: 8,
+  },
   queryInput: {
     flex: 1,
-    fontFamily: fontFamily.semibold,
-    fontSize: 16,
+    fontFamily: fontFamily.regular,
+    fontSize: 15,
     minHeight: 44,
     paddingHorizontal: spacing.sm,
   },
   submitButton: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: 15,
     height: 44,
     justifyContent: 'center',
-    width: 48,
+    width: 44,
   },
-  areaRow: { flexDirection: 'row', gap: spacing.xs },
-  areaInput: {
-    borderRadius: radius.pill,
+  areaControl: {
+    borderRadius: 15,
     borderWidth: 1,
+    padding: 8,
+  },
+  areaRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  areaInput: {
     flex: 1,
     fontFamily: fontFamily.regular,
     minHeight: 44,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 2,
     paddingVertical: spacing.xs,
   },
   locationButton: {
     alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    borderRadius: 14,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
   suggestions: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    left: spacing.sm,
     overflow: 'hidden',
-    position: 'absolute',
-    right: spacing.sm,
-    top: 98,
   },
   suggestion: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -685,7 +697,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   resultCopy: { flex: 1 },
-  resultTitle: { fontFamily: fontFamily.display, fontSize: 24 },
+  resultTitle: { fontFamily: fontFamily.semibold, fontSize: 20 },
   surpriseButton: {
     borderRadius: radius.pill,
     justifyContent: 'center',
@@ -712,15 +724,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     borderWidth: 1,
-    bottom: spacing.md,
+    bottom: 0,
     flexDirection: 'row',
     gap: spacing.md,
-    left: spacing.md,
-    minHeight: 72,
+    left: 0,
+    minHeight: 112,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     position: 'absolute',
-    right: spacing.md,
+    right: 0,
     zIndex: 4,
   },
   dockHandle: {

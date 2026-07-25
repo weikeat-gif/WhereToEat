@@ -1,6 +1,7 @@
 import type { ImageSource } from 'expo-image';
 
 import {
+  demoImageForPlace,
   DISCOVERY_PLACES,
   type DiscoveryPlace,
 } from '@/features/home/discovery-data';
@@ -28,7 +29,9 @@ export async function loadDisplayPlace(
 
   const details = await service.getPlaceDetails(id);
   const photoUrl = details.photoUrl ?? details.photoUrls[0];
-  const image: ImageSource | undefined = photoUrl ? { uri: photoUrl } : undefined;
+  const image: ImageSource | undefined = photoUrl
+    ? { uri: photoUrl }
+    : demoImageForPlace(details.id, details.categories);
 
   return {
     ...details,

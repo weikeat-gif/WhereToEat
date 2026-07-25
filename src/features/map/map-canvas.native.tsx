@@ -1,26 +1,65 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import MapView, {
   Marker,
   PROVIDER_GOOGLE,
+  type MapStyleElement,
   type Region,
 } from 'react-native-maps';
 
-import type { PlaceSummary } from '@/contracts/place';
 import type { MapCanvasProps } from '@/features/map/map-canvas';
 import { i18n } from '@/i18n';
-import { hasTrustedHalalVerification } from '@/services/places/mock-places-service';
 import { useAppTheme } from '@/theme/theme-provider';
 
 const LATITUDE_DELTA = 0.075;
+const brandMark = require('../../../assets/images/brand/makanmana-mark.png');
 
-function pinColor(place: PlaceSummary, colors: ReturnType<typeof useAppTheme>['colors']) {
-  if (hasTrustedHalalVerification(place.halalVerification)) return colors.halal;
-  if (place.categories.some((category) => category.toLowerCase() === 'cafe')) {
-    return colors.cafe;
-  }
-  return colors.supper;
-}
+const DARK_MAP_STYLE: MapStyleElement[] = [
+  { elementType: 'geometry', stylers: [{ color: '#171C1B' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#A9B0AC' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#171C1B' }] },
+  {
+    featureType: 'administrative',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#3A4140' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'geometry',
+    stylers: [{ color: '#202624' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#87908B' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#2A302F' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#151A19' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#353C39' }],
+  },
+  {
+    featureType: 'transit',
+    elementType: 'geometry',
+    stylers: [{ color: '#252B2A' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#101817' }],
+  },
+];
 
 export function MapCanvas({
   center,
@@ -30,7 +69,7 @@ export function MapCanvas({
   onPlacePress,
   showsUserLocation,
 }: MapCanvasProps) {
-  const { colors } = useAppTheme();
+  const { colors, resolvedMode } = useAppTheme();
   const mapRef = useRef<MapView>(null);
   const lastRegionCenterRef = useRef(center);
 
@@ -79,6 +118,7 @@ export function MapCanvas({
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LATITUDE_DELTA,
         }}
+        customMapStyle={resolvedMode === 'dark' ? DARK_MAP_STYLE : []}
         onPress={onMapPress}
         onRegionChangeComplete={handleRegionChange}
         provider={PROVIDER_GOOGLE}
@@ -96,9 +136,15 @@ export function MapCanvas({
             coordinate={place.coordinates}
             description={place.subtitle}
             onPress={() => onPlacePress(place.id)}
-            pinColor={pinColor(place, colors)}
             title={place.name}
-          />
+            tracksViewChanges={false}>
+            <Image
+              accessibilityIgnoresInvertColors
+              contentFit="contain"
+              source={brandMark}
+              style={styles.marker}
+            />
+          </Marker>
         ))}
       </MapView>
     </View>
@@ -110,4 +156,5 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
+  marker: { height: 42, width: 34 },
 });

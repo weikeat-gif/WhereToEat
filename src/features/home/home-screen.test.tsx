@@ -158,10 +158,10 @@ describe('HomeScreen', () => {
     expect(screen.getByText('No places match these filters yet.')).toBeTruthy();
   });
 
-  it('opens the map from the current area control', () => {
+  it('opens the map from the nearby results control', () => {
     const screen = renderScreen();
 
-    fireEvent.press(screen.getByLabelText('Location: Klang Valley'));
+    fireEvent.press(screen.getByLabelText('See all nearby restaurants'));
 
     expect(mockPush).toHaveBeenCalledWith('/map');
   });
@@ -180,13 +180,13 @@ describe('HomeScreen', () => {
     expect(mockSearch).not.toHaveBeenCalled();
   });
 
-  it('uses MakanMana’s playful food-discovery voice for primary choices', () => {
+  it('uses concise food-discovery wording for primary choices', () => {
     const screen = renderScreen();
 
-    expect(screen.getByText('Tonight, eat well.')).toBeTruthy();
-    expect(screen.getByText('Klang Valley, handpicked')).toBeTruthy();
-    expect(screen.getByText('Find food near me')).toBeTruthy();
-    expect(screen.getByText('Let MakanMana pick')).toBeTruthy();
+    expect(screen.getByText('MakanMana')).toBeTruthy();
+    expect(screen.getByText('Find nearby')).toBeTruthy();
+    expect(screen.getByText('Surprise me')).toBeTruthy();
+    expect(screen.getByText('Nearby for you')).toBeTruthy();
   });
 
   it('uses the transparent icon-only brand mark', () => {

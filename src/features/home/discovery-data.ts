@@ -13,7 +13,30 @@ export type DiscoveryPlace = PlaceSummary & {
 const burgerImage = require('../../../assets/images/makanmana/ramly-burger.png');
 const nasiLemakImage = require('../../../assets/images/makanmana/nasi-lemak.png');
 
-export const heroImage = require('../../../assets/images/makanmana/kl-night-market-hero.png');
+export const heroImage = require('../../../assets/images/makanmana/char-kway-teow-hero.png');
+
+export function demoImageForPlace(
+  placeId: string,
+  categories: string[] = [],
+): ImageSource | undefined {
+  if (!placeId.startsWith('mock-')) return undefined;
+  const normalized = categories.map((category) => category.toLowerCase());
+  if (
+    normalized.some(
+      (category) => category.includes('noodle') || category.includes('cafe'),
+    )
+  ) {
+    return heroImage;
+  }
+  if (
+    normalized.some(
+      (category) => category.includes('grill') || category.includes('burger'),
+    )
+  ) {
+    return burgerImage;
+  }
+  return nasiLemakImage;
+}
 
 export const DISCOVERY_PLACES: DiscoveryPlace[] = [
   {

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -8,8 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ScreenPlaceholder } from '@/components/screen-placeholder';
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { useAuth } from '@/features/auth/auth-provider';
 import { placesService } from '@/services/places';
@@ -84,51 +85,108 @@ export function SavedScreen() {
 
   if (!user) {
     return (
-      <ScreenPlaceholder
-        title="Saved"
-        description="Sign in to save restaurants and sync them across devices.">
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/auth')}
-          style={[styles.button, { backgroundColor: colors.accent }]}>
-          <Text style={{ color: colors.accentText, fontFamily: fontFamily.semibold }}>
-            Sign in
+      <SafeAreaView
+        style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={styles.guest}>
+          <View
+            style={[
+              styles.guestIcon,
+              { backgroundColor: `${colors.accent}18` },
+            ]}>
+            <Ionicons
+              color={colors.accentForeground}
+              name="bookmark-outline"
+              size={34}
+            />
+          </View>
+          <Text style={[styles.guestTitle, { color: colors.text }]}>
+            Keep the good ones
           </Text>
-        </Pressable>
-      </ScreenPlaceholder>
+          <Text style={[styles.guestBody, { color: colors.textMuted }]}>
+            Sign in to save restaurants and sync them across devices.
+          </Text>
+          <Pressable
+            accessibilityLabel="Sign in"
+            accessibilityRole="button"
+            onPress={() => router.push('/auth')}
+            style={[styles.signIn, { backgroundColor: colors.accent }]}>
+            <Text
+              style={[styles.signInText, { color: colors.accentText }]}>
+              Sign in
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScreenPlaceholder
-      title="Saved"
-      description="Restaurants saved to your MakanMana account.">
+    <SafeAreaView
+      edges={['top']}
+      style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <View style={styles.header}>
+        <View>
+          <Text style={[styles.eyebrow, { color: colors.accentForeground }]}>
+            YOUR SHORTLIST
+          </Text>
+          <Text style={[styles.title, { color: colors.text }]}>Saved</Text>
+        </View>
+        <View
+          style={[
+            styles.count,
+            { backgroundColor: colors.surfaceElevated },
+          ]}>
+          <Text style={[styles.countText, { color: colors.text }]}>
+            {savedIdList.length}
+          </Text>
+        </View>
+      </View>
+
       {isLoading ? (
         <ActivityIndicator
           accessibilityLabel="Loading saved restaurants"
           color={colors.accentForeground}
+          style={styles.loading}
         />
       ) : null}
       {error ? (
-        <Text accessibilityRole="alert" style={{ color: colors.warning }}>
+        <Text
+          accessibilityRole="alert"
+          style={[styles.alert, { color: colors.warning }]}>
           {error}
         </Text>
       ) : null}
+
       {!isLoading && savedIds.size === 0 ? (
-        <Text style={{ color: colors.textMuted }}>
-          No saved restaurants yet.
-        </Text>
+        <View
+          style={[
+            styles.empty,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}>
+          <Ionicons
+            color={colors.textMuted}
+            name="restaurant-outline"
+            size={28}
+          />
+          <Text style={[styles.emptyText, { color: colors.text }]}>
+            No saved restaurants yet.
+          </Text>
+          <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
+            Save a place from its restaurant page and it will appear here.
+          </Text>
+        </View>
       ) : (
         <FlatList
           contentContainerStyle={styles.listContent}
           data={savedIdList}
           keyExtractor={(item) => item}
+          ListFooterComponent={<GoogleMapsAttribution />}
           renderItem={({ item }) => (
             <View
               style={[
                 styles.row,
                 {
-                  backgroundColor: colors.surfaceElevated,
+                  backgroundColor: colors.surface,
                   borderColor: colors.border,
                 },
               ]}>
@@ -142,11 +200,27 @@ export function SavedScreen() {
                   })
                 }
                 style={styles.openPlace}>
-                <Text
-                  numberOfLines={1}
-                  style={[styles.id, { color: colors.text }]}>
-                  {placeNames[item] ?? 'Loading restaurant…'}
-                </Text>
+                <View
+                  style={[
+                    styles.rowIcon,
+                    { backgroundColor: colors.surfaceElevated },
+                  ]}>
+                  <Ionicons
+                    color={colors.accentForeground}
+                    name="restaurant-outline"
+                    size={22}
+                  />
+                </View>
+                <View style={styles.rowCopy}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.name, { color: colors.text }]}>
+                    {placeNames[item] ?? 'Loading restaurant…'}
+                  </Text>
+                  <Text style={[styles.savedLabel, { color: colors.textMuted }]}>
+                    Saved to your MakanMana
+                  </Text>
+                </View>
               </Pressable>
               <Pressable
                 accessibilityLabel={`Remove saved place ${item}`}
@@ -158,9 +232,11 @@ export function SavedScreen() {
                   styles.remove,
                   { opacity: pendingIds.has(item) ? 0.5 : 1 },
                 ]}>
-                <Text style={{ color: colors.warning, fontWeight: '700' }}>
-                  Remove
-                </Text>
+                <Ionicons
+                  color={colors.accentForeground}
+                  name="bookmark"
+                  size={22}
+                />
               </Pressable>
             </View>
           )}
@@ -168,38 +244,122 @@ export function SavedScreen() {
           testID="saved-places-list"
         />
       )}
-      <GoogleMapsAttribution />
-    </ScreenPlaceholder>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    alignItems: 'center',
-    borderRadius: 15,
-    minHeight: 54,
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  list: { marginTop: 16, maxHeight: '70%', width: '100%' },
-  listContent: { paddingBottom: 12 },
-  row: {
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    padding: 14,
-  },
-  id: { flex: 1, fontFamily: fontFamily.semibold },
-  openPlace: { flex: 1, minHeight: 44, justifyContent: 'center' },
-  remove: {
+  safeArea: { flex: 1 },
+  guest: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
-    minWidth: 64,
+    paddingHorizontal: 34,
+  },
+  guestIcon: {
+    width: 72,
+    height: 72,
+    alignItems: 'center',
+    borderRadius: 24,
+    justifyContent: 'center',
+  },
+  guestTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: 27,
+    letterSpacing: -0.6,
+    marginTop: 20,
+  },
+  guestBody: {
+    fontFamily: fontFamily.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 7,
+    textAlign: 'center',
+  },
+  signIn: {
+    minHeight: 52,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    borderRadius: 15,
+    justifyContent: 'center',
+    marginTop: 22,
+  },
+  signInText: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  eyebrow: {
+    fontFamily: fontFamily.bold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+  },
+  title: {
+    fontFamily: fontFamily.bold,
+    fontSize: 32,
+    letterSpacing: -0.8,
+    marginTop: 3,
+  },
+  count: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    borderRadius: 13,
+    justifyContent: 'center',
+  },
+  countText: { fontFamily: fontFamily.bold, fontSize: 16 },
+  loading: { marginTop: 28 },
+  alert: { fontFamily: fontFamily.medium, marginHorizontal: 18, marginTop: 8 },
+  empty: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    margin: 18,
+    padding: 24,
+  },
+  emptyText: { fontFamily: fontFamily.semibold, fontSize: 16, marginTop: 11 },
+  emptyHint: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  list: { flex: 1 },
+  listContent: { gap: 9, padding: 14, paddingBottom: 28 },
+  row: {
+    minHeight: 78,
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    padding: 10,
+  },
+  openPlace: {
+    minHeight: 54,
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 11,
+  },
+  rowIcon: {
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    borderRadius: 14,
+    justifyContent: 'center',
+  },
+  rowCopy: { flex: 1, minWidth: 0 },
+  name: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  savedLabel: { fontFamily: fontFamily.regular, fontSize: 12, marginTop: 4 },
+  remove: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

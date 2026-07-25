@@ -1,4 +1,3 @@
-import { DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
 import {
   Manrope_400Regular,
   Manrope_500Medium,
@@ -65,7 +64,6 @@ function AppFrame() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    DMSerifDisplay_400Regular,
     Manrope_400Regular,
     Manrope_500Medium,
     Manrope_600SemiBold,

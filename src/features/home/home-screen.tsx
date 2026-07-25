@@ -12,9 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ActionButton } from '@/components/ui/action-button';
+import { CompactPlaceRow } from '@/components/ui/compact-place-row';
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
-import { PlaceCard } from '@/components/ui/place-card';
 import { SemanticChip } from '@/components/ui/semantic-chip';
 import { useSearch } from '@/features/search/search-provider';
 import { i18n } from '@/i18n';
@@ -42,33 +41,29 @@ export function HomeScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const nearbyRequestInFlight = useRef(false);
   const visiblePlaces = searchStatus === 'idle' ? DISCOVERY_PLACES : results;
+  const compact = width < 360 || fontScale > 1.25;
 
-  const compact = width < 360 || fontScale > 1.3;
   const filters = useMemo(
     () => [
       {
         label: 'Halal',
-        icon: 'restaurant-outline' as const,
+        icon: 'shield-checkmark-outline' as const,
         color: colors.halal,
-        category: 'Halal',
       },
       {
         label: 'Open now',
         icon: 'time-outline' as const,
         color: colors.success,
-        category: 'Open now',
       },
       {
         label: 'Under RM20',
         icon: 'wallet-outline' as const,
         color: colors.price,
-        category: 'Under RM20',
       },
       {
         label: 'Supper',
         icon: 'moon-outline' as const,
         color: colors.supper,
-        category: 'Supper',
       },
     ],
     [colors],
@@ -140,10 +135,6 @@ export function HomeScreen() {
     }
   }
 
-  function openPlace(id: string) {
-    router.push({ pathname: '/place/[id]', params: { id } });
-  }
-
   return (
     <SafeAreaView
       edges={['top']}
@@ -151,103 +142,93 @@ export function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.topBar}>
+        <View style={[styles.hero, compact && styles.heroCompact]}>
+          <Image
+            accessibilityLabel="Steaming char kway teow with teh tarik"
+            contentFit="cover"
+            contentPosition="center"
+            source={heroImage}
+            style={StyleSheet.absoluteFill}
+            transition={180}
+          />
+          <View style={[StyleSheet.absoluteFill, styles.heroShade]} />
+
           <View
             accessible
-            accessibilityLabel={`${i18n.t('appName')}, ${i18n.t('homeBrandNote')}`}
+            accessibilityLabel="MakanMana"
             accessibilityRole="header"
-            style={styles.brandLockup}>
+            style={styles.brand}>
             <Image
               accessible={false}
-              accessibilityIgnoresInvertColors
               contentFit="contain"
               source={brandMark}
-              testID="brand-mark"
               style={styles.brandMark}
+              testID="brand-mark"
             />
+            <Text style={styles.brandName}>MakanMana</Text>
           </View>
+
           <Pressable
-            accessibilityLabel={`Location: ${i18n.t('homeArea')}`}
+            accessibilityHint={i18n.t('homeSearchHint')}
+            accessibilityLabel={i18n.t('homeSearchLabel')}
             accessibilityRole="button"
             onPress={() => router.push('/map')}
-            style={[styles.location, { borderColor: colors.border }]}>
-            <Ionicons
-              color={colors.accentForeground}
-              name="location-outline"
-              size={20}
-            />
-            {!compact && (
-              <Text style={[styles.locationText, { color: colors.text }]}>
-                {i18n.t('homeArea')}
-              </Text>
-            )}
-            <Ionicons color={colors.textMuted} name="chevron-down" size={15} />
+            style={styles.search}>
+            <Ionicons color="#F7F7F3" name="search" size={21} />
+            <Text style={styles.searchText}>
+              {i18n.t('homeSearchPlaceholder')}
+            </Text>
+            <View style={styles.tune}>
+              <Ionicons color="#F7F7F3" name="options-outline" size={19} />
+            </View>
           </Pressable>
         </View>
 
-        <View style={[styles.hero, compact && styles.heroCompact]}>
-          <Image
-            accessibilityLabel="Kuala Lumpur night market"
-            contentFit="cover"
-            source={heroImage}
-            style={StyleSheet.absoluteFill}
-            transition={220}
-          />
-          <View style={[StyleSheet.absoluteFill, styles.heroShade]} />
-          <View style={styles.heroCopy}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.eyebrow}>
-              {i18n.t('homeEyebrow')}
+        <View style={styles.primaryActions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void handleNearbyNow()}
+            testID="nearby-now-button"
+            style={({ pressed }) => [
+              styles.primaryAction,
+              {
+                backgroundColor: colors.accent,
+                opacity: pressed ? 0.78 : 1,
+              },
+            ]}>
+            <View style={styles.actionIconDark}>
+              <Ionicons color="#FFFFFF" name="navigate" size={21} />
+            </View>
+            <Text style={[styles.primaryActionText, { color: colors.accentText }]}>
+              Find nearby
             </Text>
-            <Text
-              maxFontSizeMultiplier={compact ? 1.2 : 1.35}
-              style={[styles.headline, compact && styles.headlineCompact]}>
-              {i18n.t('homeHeadline')}
-            </Text>
-          </View>
-          <View style={styles.heroActions}>
-            <ActionButton
-              backgroundColor={colors.accent}
-              color={colors.accentText}
-              icon="navigate"
-              label={i18n.t('nearbyNow')}
-              onPress={() => void handleNearbyNow()}
-              testID="nearby-now-button"
-            />
-            <ActionButton
-              backgroundColor="rgba(8,10,9,0.82)"
-              borderColor="rgba(255,255,255,0.42)"
-              color="#FFFFFF"
-              icon="sparkles"
-              label={i18n.t('surpriseMe')}
-              onPress={handleSurprise}
-              testID="surprise-me-button"
-            />
-          </View>
-        </View>
+          </Pressable>
 
-        <Pressable
-          accessibilityHint={i18n.t('homeSearchHint')}
-          accessibilityLabel={i18n.t('homeSearchLabel')}
-          accessibilityRole="button"
-          onPress={() => router.push('/map')}
-          style={[
-            styles.search,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}>
-          <Ionicons color={colors.textMuted} name="search" size={21} />
-          <Text
-            maxFontSizeMultiplier={1.35}
-            style={[styles.searchText, { color: colors.textMuted }]}>
-            {i18n.t('homeSearchPlaceholder')}
-          </Text>
-          <View style={[styles.tune, { backgroundColor: colors.surfaceElevated }]}>
-            <Ionicons
-              color={colors.accentForeground}
-              name="options-outline"
-              size={19}
-            />
-          </View>
-        </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleSurprise}
+            testID="surprise-me-button"
+            style={({ pressed }) => [
+              styles.primaryAction,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderWidth: 1,
+                opacity: pressed ? 0.72 : 1,
+              },
+            ]}>
+            <View
+              style={[
+                styles.actionIconLight,
+                { backgroundColor: colors.surfaceElevated },
+              ]}>
+              <Ionicons color={colors.text} name="dice-outline" size={20} />
+            </View>
+            <Text style={[styles.primaryActionText, { color: colors.text }]}>
+              Surprise me
+            </Text>
+          </Pressable>
+        </View>
 
         <ScrollView
           contentContainerStyle={styles.filterRow}
@@ -259,64 +240,84 @@ export function HomeScreen() {
               icon={filter.icon}
               key={filter.label}
               label={filter.label}
-              onPress={() => handleFilter(filter.category)}
+              onPress={() => handleFilter(filter.label)}
               selected={
-                filter.category === 'Open now'
+                filter.label === 'Open now'
                   ? openNowActive
-                  : selectedCategory === filter.category
+                  : selectedCategory === filter.label
               }
             />
           ))}
         </ScrollView>
 
-        {notice && (
-          <View style={[styles.status, { backgroundColor: `${colors.accent}1A` }]}>
+        {notice ? (
+          <View
+            style={[
+              styles.notice,
+              { backgroundColor: `${colors.accent}18` },
+            ]}>
             <Ionicons
               color={colors.accentForeground}
-              name="checkmark-circle"
-              size={18}
+              name="sparkles"
+              size={17}
             />
-            <Text style={[styles.statusText, { color: colors.text }]}>
+            <Text style={[styles.noticeText, { color: colors.text }]}>
               {notice}
             </Text>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.sectionHeading}>
           <View>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {i18n.t('homeTrending')}
+              Nearby for you
             </Text>
             <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-              {i18n.t('homeTrendingSubtitle')}
+              Good food, sorted by distance
             </Text>
           </View>
-          <Ionicons
-            color={colors.accentForeground}
-            name="trending-up"
-            size={24}
-          />
+          <Pressable
+            accessibilityLabel="See all nearby restaurants"
+            accessibilityRole="button"
+            onPress={() => router.push('/map')}
+            style={styles.seeAll}>
+            <Text style={[styles.seeAllText, { color: colors.accentForeground }]}>
+              See all
+            </Text>
+            <Ionicons
+              color={colors.accentForeground}
+              name="chevron-forward"
+              size={16}
+            />
+          </Pressable>
         </View>
 
-        <View style={styles.cards}>
+        <View style={styles.rows}>
           {searchStatus === 'empty' ? (
             <Text style={[styles.empty, { color: colors.textMuted }]}>
               No places match these filters yet.
             </Text>
           ) : null}
           {searchStatus === 'error' ? (
-            <Text accessibilityRole="alert" style={[styles.empty, { color: colors.warning }]}>
+            <Text
+              accessibilityRole="alert"
+              style={[styles.empty, { color: colors.warning }]}>
               {searchError ?? 'Unable to load nearby restaurants.'}
             </Text>
           ) : null}
-          {visiblePlaces.map((place) => (
-            <PlaceCard
+          {visiblePlaces.slice(0, 5).map((place) => (
+            <CompactPlaceRow
               image={
                 DISCOVERY_PLACES.find((candidate) => candidate.id === place.id)
                   ?.image
               }
               key={place.id}
-              onPress={() => openPlace(place.id)}
+              onPress={() =>
+                router.push({
+                  pathname: '/place/[id]',
+                  params: { id: place.id },
+                })
+              }
               place={place}
             />
           ))}
@@ -329,124 +330,127 @@ export function HomeScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { gap: 16, paddingBottom: 30 },
-  topBar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 4,
-  },
-  brandLockup: {
-    alignItems: 'center',
-    flexShrink: 1,
-    flexDirection: 'row',
-    gap: 8,
-    minWidth: 0,
-  },
-  brandMark: { height: 42, width: 38 },
-  location: {
-    minHeight: 44,
-    alignItems: 'center',
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 12,
-  },
-  locationText: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  content: { gap: 14, paddingBottom: 28 },
   hero: {
-    minHeight: 410,
+    height: 335,
     justifyContent: 'space-between',
-    marginHorizontal: 14,
     overflow: 'hidden',
     padding: 18,
-    borderRadius: 28,
   },
-  heroCompact: { minHeight: 430, padding: 16 },
-  heroShade: { backgroundColor: 'rgba(0,0,0,0.36)' },
-  heroCopy: { marginTop: 28 },
-  eyebrow: {
-    color: '#D7F36A',
-    fontFamily: fontFamily.semibold,
-    fontSize: 11,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
+  heroCompact: { height: 350, paddingHorizontal: 14 },
+  heroShade: { backgroundColor: 'rgba(0,0,0,0.16)' },
+  brand: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 9,
+    marginTop: 2,
   },
-  headline: {
+  brandMark: { height: 42, width: 34 },
+  brandName: {
     color: '#FFFFFF',
-    fontFamily: fontFamily.display,
-    fontSize: 48,
-    letterSpacing: -0.8,
-    lineHeight: 50,
-    marginTop: 10,
-    maxWidth: 330,
+    fontFamily: fontFamily.bold,
+    fontSize: 24,
+    letterSpacing: -0.55,
   },
-  headlineCompact: {
-    fontSize: 42,
-    letterSpacing: -0.5,
-    lineHeight: 44,
-    maxWidth: 270,
-  },
-  heroActions: { gap: 9 },
   search: {
     minHeight: 56,
     alignItems: 'center',
-    borderRadius: 18,
+    backgroundColor: 'rgba(15,17,16,0.93)',
+    borderColor: 'rgba(255,255,255,0.24)',
+    borderRadius: 17,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 10,
-    marginHorizontal: 16,
+    gap: 11,
     paddingLeft: 16,
     paddingRight: 6,
     paddingVertical: 6,
   },
   searchText: {
+    color: '#D4D5D1',
     flex: 1,
-    fontFamily: fontFamily.medium,
-    fontSize: 15,
-    lineHeight: 20,
+    fontFamily: fontFamily.regular,
+    fontSize: 14,
   },
   tune: {
     width: 44,
     height: 44,
     alignItems: 'center',
-    borderRadius: 14,
+    borderLeftColor: 'rgba(255,255,255,0.18)',
+    borderLeftWidth: 1,
     justifyContent: 'center',
   },
-  filterRow: { gap: 8, paddingHorizontal: 16 },
-  status: {
+  primaryActions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+  },
+  primaryAction: {
+    minHeight: 70,
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 16,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 9,
+    paddingRight: 13,
+  },
+  actionIconDark: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    backgroundColor: '#20231F',
+    borderRadius: 12,
+    justifyContent: 'center',
+  },
+  actionIconLight: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    borderRadius: 12,
+    justifyContent: 'center',
+  },
+  primaryActionText: {
+    flex: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: 14,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  filterRow: { gap: 8, paddingHorizontal: 16 },
+  notice: {
+    alignItems: 'center',
+    borderRadius: 12,
     flexDirection: 'row',
     gap: 8,
     marginHorizontal: 16,
-    padding: 12,
+    padding: 10,
   },
-  statusText: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  noticeText: { fontFamily: fontFamily.semibold, fontSize: 12 },
   sectionHeading: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 4,
+    paddingHorizontal: 17,
+    paddingTop: 3,
   },
   sectionTitle: {
-    fontFamily: fontFamily.display,
-    fontSize: 28,
-    letterSpacing: -0.3,
+    fontFamily: fontFamily.semibold,
+    fontSize: 18,
+    letterSpacing: -0.25,
   },
   sectionSubtitle: {
     fontFamily: fontFamily.regular,
-    fontSize: 13,
-    marginTop: 3,
+    fontSize: 12,
+    marginTop: 2,
   },
-  cards: { gap: 10, paddingHorizontal: 14 },
+  seeAll: { alignItems: 'center', flexDirection: 'row', gap: 2, minHeight: 44 },
+  seeAllText: { fontFamily: fontFamily.semibold, fontSize: 12 },
+  rows: { gap: 8, paddingHorizontal: 14 },
   empty: {
     fontFamily: fontFamily.regular,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 21,
     paddingHorizontal: 4,
-    paddingVertical: 18,
+    paddingVertical: 16,
   },
 });
