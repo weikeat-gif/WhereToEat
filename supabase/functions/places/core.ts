@@ -62,6 +62,12 @@ const GOOGLE_PRICE_LEVELS: Record<number, string> = {
 const ALLOWED_SEARCH_TYPES = new Set([
   'restaurant',
   'cafe',
+  'bakery',
+  'coffee_shop',
+  'food_court',
+  'meal_takeaway',
+  'dessert_shop',
+  'ice_cream_shop',
   'malaysian_restaurant',
   'chinese_restaurant',
   'indian_restaurant',
@@ -137,7 +143,7 @@ export function buildGoogleRequest(
         headers,
         body: JSON.stringify({
           includedTypes: input.includedTypes,
-          maxResultCount: 20,
+          maxResultCount: 100,
           locationRestriction: {
             circle: {
               center: {
@@ -147,6 +153,7 @@ export function buildGoogleRequest(
               radius: input.radiusMeters,
             },
           },
+          rankPreference: 'DISTANCE',
         }),
       },
     };

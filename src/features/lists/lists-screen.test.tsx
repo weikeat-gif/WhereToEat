@@ -5,6 +5,7 @@ import { ListsScreen } from './lists-screen';
 
 const mockPush = jest.fn();
 const mockUpdateCriteriaAndSearch = jest.fn();
+let mockDataMode: 'mock' | 'live' = 'mock';
 const mockSearchState = {
   error: null as string | null,
   status: 'success' as 'idle' | 'loading' | 'success' | 'empty' | 'error',
@@ -49,6 +50,14 @@ jest.mock('@/features/search/search-provider', () => ({
   }),
 }));
 
+jest.mock('@/config/env', () => ({
+  env: {
+    get EXPO_PUBLIC_DATA_MODE() {
+      return mockDataMode;
+    },
+  },
+}));
+
 jest.mock('@/theme/theme-provider', () => ({
   useAppTheme: () => ({
     colors: jest.requireActual('@/theme/tokens').themeColors.dark,
@@ -70,6 +79,7 @@ function renderScreen() {
 describe('ListsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockDataMode = 'mock';
     mockSearchState.error = null;
     mockSearchState.status = 'success';
     mockSearchState.results = [
@@ -97,7 +107,7 @@ describe('ListsScreen', () => {
     expect(mockUpdateCriteriaAndSearch).toHaveBeenCalledWith({
       categories: ['Supper'],
       openNow: true,
-      priceLevels: [1, 2, 3, 4],
+      priceLevels: [],
       query: undefined,
       verifiedHalalOnly: false,
     });
@@ -138,5 +148,15 @@ describe('ListsScreen', () => {
     expect(screen.getByText('Couldn’t load this list')).toBeTruthy();
     expect(screen.getByText('Search is temporarily unavailable.')).toBeTruthy();
     expect(screen.queryByText('Late Night Noodles')).toBeNull();
+  });
+
+  it('does not show curated demo shops while live discovery is idle', () => {
+    mockDataMode = 'live';
+    mockSearchState.status = 'idle';
+    mockSearchState.results = [];
+    const screen = renderScreen();
+
+    expect(screen.queryByText('Jalan 21 Burger')).toBeNull();
+    expect(screen.queryByText('Nasi Lemak Antarabangsa')).toBeNull();
   });
 });

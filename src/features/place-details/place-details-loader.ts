@@ -1,5 +1,6 @@
 import type { ImageSource } from 'expo-image';
 
+import { env } from '@/config/env';
 import {
   demoImageForPlace,
   DISCOVERY_PLACES,
@@ -24,7 +25,10 @@ export async function loadDisplayPlace(
 ): Promise<DiscoveryPlace> {
   if (!id) throw new Error('Place ID is missing.');
 
-  const fixture = DISCOVERY_PLACES.find((candidate) => candidate.id === id);
+  const fixture =
+    env.EXPO_PUBLIC_DATA_MODE === 'mock'
+      ? DISCOVERY_PLACES.find((candidate) => candidate.id === id)
+      : undefined;
   if (fixture) return fixture;
 
   const details = await service.getPlaceDetails(id);

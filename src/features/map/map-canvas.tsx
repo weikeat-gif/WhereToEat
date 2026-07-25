@@ -46,7 +46,7 @@ declare global {
 
 let mapsLoader: Promise<GoogleMapsApi> | undefined;
 const mapPreview = require('../../../assets/images/makanmana/kl-map-preview.png');
-const brandMark = require('../../../assets/images/brand/makanmana-mark.png');
+const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
 const PREVIEW_MARKER_POSITIONS = [
   { left: '20%', top: '24%' },
   { left: '65%', top: '31%' },
@@ -381,11 +381,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   previewMarker: {
-    width: 34,
-    height: 44,
-    marginLeft: -17,
-    marginTop: -22,
+    width: 40,
+    height: 54,
+    marginLeft: -20,
+    marginTop: -27,
     position: 'absolute',
   },
-  previewMarkerImage: { height: 44, width: 34 },
+  previewMarkerImage: { height: 54, width: 40 },
 });

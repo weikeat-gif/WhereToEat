@@ -99,6 +99,16 @@ const CATEGORY_PLACE_TYPES: Record<string, string> = {
   chinese: 'chinese_restaurant',
   indian: 'indian_restaurant',
 };
+const NEARBY_FOOD_TYPES = [
+  'restaurant',
+  'cafe',
+  'bakery',
+  'coffee_shop',
+  'food_court',
+  'meal_takeaway',
+  'dessert_shop',
+  'ice_cream_shop',
+] as const;
 
 function includedTypesFor(criteria: SearchCriteria) {
   const selectedType = criteria.categories
@@ -108,7 +118,7 @@ function includedTypesFor(criteria: SearchCriteria) {
   if (/\b(cafe|coffee|kopi|kopitiam)\b/i.test(criteria.query ?? '')) {
     return ['cafe'];
   }
-  return criteria.query ? ['restaurant'] : ['restaurant', 'cafe'];
+  return criteria.query ? ['restaurant'] : [...NEARBY_FOOD_TYPES];
 }
 
 function errorForStatus(status: number) {

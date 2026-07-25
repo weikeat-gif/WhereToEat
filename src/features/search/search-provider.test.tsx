@@ -43,7 +43,7 @@ class FakePlacesService implements PlacesService {
   async searchNearby(criteria: SearchCriteria): Promise<SearchResults> {
     return {
       criteria,
-      places: criteria.openNow ? [result] : [],
+      places: criteria.openNow ? [] : [result],
       fetchedAt: '2026-07-23T00:00:00.000Z',
     };
   }
@@ -62,8 +62,8 @@ function Harness() {
       </Text>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel="Show closed too"
-        onPress={() => void updateCriteriaAndSearch({ openNow: false })}>
+        accessibilityLabel="Open restaurants only"
+        onPress={() => void updateCriteriaAndSearch({ openNow: true })}>
         <Text>Change filter</Text>
       </TouchableOpacity>
     </View>
@@ -134,9 +134,15 @@ describe('SearchProvider synchronization', () => {
       </SearchProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('open:success:1'));
-    fireEvent.press(screen.getByRole('button', { name: 'Show closed too' }));
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('any:empty:0'));
+    await waitFor(() =>
+      expect(screen.getByTestId('state')).toHaveTextContent('any:success:1'),
+    );
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Open restaurants only' }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('state')).toHaveTextContent('open:empty:0'),
+    );
   });
 
   it('resolves coordinates only after an autocomplete prediction is selected', async () => {

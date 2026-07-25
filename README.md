@@ -12,7 +12,10 @@ pnpm start
 ```
 
 The default `EXPO_PUBLIC_DATA_MODE=mock` keeps local development independent of
-production credentials.
+production credentials and is visibly labelled as preview data. Preview and
+production EAS builds are blocked unless `EXPO_PUBLIC_DATA_MODE=live` and the
+Supabase Places backend variables are configured, so demo restaurants cannot
+accidentally ship.
 
 For a laptop browser preview with a fresh Metro cache:
 
@@ -39,6 +42,9 @@ database-rate-limit migration, and Edge Function setup.
 Before live testing, enable Supabase anonymous sign-ins. Guest discovery uses
 that anonymous-user session JWT for the protected Edge Function while the UI
 continues to treat the person as a guest until Google, Apple, or email sign-in.
+
+For the complete Google Cloud, Supabase, local environment, and EAS setup, see
+[`docs/setup/live-places.md`](docs/setup/live-places.md).
 
 ## Verification
 

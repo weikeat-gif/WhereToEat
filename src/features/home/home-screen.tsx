@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CompactPlaceRow } from '@/components/ui/compact-place-row';
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { SemanticChip } from '@/components/ui/semantic-chip';
+import { env } from '@/config/env';
 import { useSearch } from '@/features/search/search-provider';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -22,7 +23,7 @@ import { fontFamily } from '@/theme/tokens';
 
 import { DISCOVERY_PLACES, heroImage } from './discovery-data';
 
-const brandMark = require('../../../assets/images/brand/makanmana-mark.png');
+const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
 
 export function HomeScreen() {
   const { colors } = useAppTheme();
@@ -40,7 +41,9 @@ export function HomeScreen() {
   const [openNowActive, setOpenNowActive] = useState(criteria.openNow);
   const [notice, setNotice] = useState<string | null>(null);
   const nearbyRequestInFlight = useRef(false);
-  const visiblePlaces = searchStatus === 'idle' ? DISCOVERY_PLACES : results;
+  const isLiveDiscovery = env.EXPO_PUBLIC_DATA_MODE === 'live';
+  const visiblePlaces =
+    searchStatus === 'idle' && !isLiveDiscovery ? DISCOVERY_PLACES : results;
   const compact = width < 360 || fontScale > 1.25;
 
   const filters = useMemo(
@@ -90,12 +93,7 @@ export function HomeScreen() {
           ? [nextCategory]
           : [],
       verifiedHalalOnly: nextCategory === 'Halal',
-      priceLevels:
-        nextCategory === 'Under RM20'
-          ? [1]
-          : selectedCategory === 'Under RM20'
-            ? [1, 2]
-            : criteria.priceLevels,
+      priceLevels: nextCategory === 'Under RM20' ? [1] : [],
     });
     if (searchResults) {
       const count = searchResults.places.length;
@@ -273,7 +271,9 @@ export function HomeScreen() {
               Nearby for you
             </Text>
             <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-              Good food, sorted by distance
+              {isLiveDiscovery
+                ? 'Real places from Google, sorted by distance'
+                : 'Preview mode · demo restaurants'}
             </Text>
           </View>
           <Pressable
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     gap: 9,
     marginTop: 2,
   },
-  brandMark: { height: 42, width: 34 },
+  brandMark: { height: 52, width: 40 },
   brandName: {
     color: '#FFFFFF',
     fontFamily: fontFamily.bold,

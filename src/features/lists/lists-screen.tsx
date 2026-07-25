@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { CompactPlaceRow } from '@/components/ui/compact-place-row';
+import { env } from '@/config/env';
 import type { SearchCriteria } from '@/contracts/search';
 import { useSearch } from '@/features/search/search-provider';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -31,7 +32,7 @@ const COLLECTIONS: Collection[] = [
     criteria: {
       categories: ['Supper'],
       openNow: true,
-      priceLevels: [1, 2, 3, 4],
+      priceLevels: [],
       query: undefined,
       verifiedHalalOnly: false,
     },
@@ -57,7 +58,7 @@ const COLLECTIONS: Collection[] = [
     criteria: {
       categories: ['Cafe'],
       openNow: false,
-      priceLevels: [1, 2, 3, 4],
+      priceLevels: [],
       query: undefined,
       verifiedHalalOnly: false,
     },
@@ -70,7 +71,7 @@ const COLLECTIONS: Collection[] = [
     criteria: {
       categories: [],
       openNow: false,
-      priceLevels: [1, 2, 3, 4],
+      priceLevels: [],
       query: undefined,
       verifiedHalalOnly: true,
     },
@@ -81,11 +82,14 @@ export function ListsScreen() {
   const { colors } = useAppTheme();
   const { error, results, status, updateCriteriaAndSearch } = useSearch();
   const [activeCollection, setActiveCollection] = useState<string | null>(null);
+  const isLiveDiscovery = env.EXPO_PUBLIC_DATA_MODE === 'live';
   const places = activeCollection
     ? results
     : results.length > 0
       ? results
-      : DISCOVERY_PLACES;
+      : isLiveDiscovery
+        ? []
+        : DISCOVERY_PLACES;
   const isCollectionLoading =
     activeCollection !== null && status === 'loading';
   const collectionIsEmpty = activeCollection !== null && status === 'empty';

@@ -26,6 +26,12 @@ Google and Apple provider-console client IDs/secrets remain dashboard/server
 configuration. Apple OAuth client secrets require rotation if a web OAuth flow
 is later added.
 
+Nearby discovery requests up to 100 real food businesses ranked by distance.
+The supported discovery set includes restaurants, cafés, bakeries, coffee
+shops, food courts, takeaway shops, dessert shops, and ice-cream shops. Google
+may return fewer results depending on density, radius, ranking, availability,
+quota, and its own data coverage.
+
 The deployed function receives the Supabase publishable key only in the
 `apikey` header. `Authorization` must contain a real signed-in or anonymous-user
 session JWT with an authenticated role and non-empty user subject; a reusable

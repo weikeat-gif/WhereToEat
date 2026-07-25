@@ -17,6 +17,7 @@ import { ActionButton } from '@/components/ui/action-button';
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { IconButton } from '@/components/ui/icon-button';
 import { SemanticChip } from '@/components/ui/semantic-chip';
+import { env } from '@/config/env';
 import { useAuth } from '@/features/auth/auth-provider';
 import {
   DISCOVERY_PLACES,
@@ -50,7 +51,10 @@ export function PlaceDetailsScreen() {
     toggle,
   } = useSavedPlaces();
   const { results } = useSearch();
-  const initialPlace = DISCOVERY_PLACES.find((candidate) => candidate.id === id);
+  const initialPlace =
+    env.EXPO_PUBLIC_DATA_MODE === 'mock'
+      ? DISCOVERY_PLACES.find((candidate) => candidate.id === id)
+      : undefined;
   const [loadedPlace, setLoadedPlace] = useState(initialPlace);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -63,7 +67,10 @@ export function PlaceDetailsScreen() {
 
   useEffect(() => {
     let active = true;
-    const fixture = DISCOVERY_PLACES.find((candidate) => candidate.id === id);
+    const fixture =
+      env.EXPO_PUBLIC_DATA_MODE === 'mock'
+        ? DISCOVERY_PLACES.find((candidate) => candidate.id === id)
+        : undefined;
     if (fixture) {
       setLoadedPlace(fixture);
       setLoadError(null);

@@ -27,8 +27,8 @@ export const DEFAULT_SEARCH_CRITERIA: SearchCriteria = {
   center: { latitude: 3.139, longitude: 101.6869 },
   areaLabel: 'Klang Valley',
   radiusMeters: 3000,
-  openNow: true,
-  priceLevels: [1, 2],
+  openNow: false,
+  priceLevels: [],
   categories: [],
   verifiedHalalOnly: false,
 };

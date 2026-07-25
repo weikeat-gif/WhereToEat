@@ -26,6 +26,34 @@ export function assertMapsBuildConfiguration(
   }
 }
 
+export function assertLiveDataBuildConfiguration(
+  environment: BuildEnvironment,
+): void {
+  if (
+    environment.EAS_BUILD !== 'true' ||
+    environment.EAS_BUILD_PROFILE === 'development'
+  ) {
+    return;
+  }
+  if (environment.EXPO_PUBLIC_DATA_MODE !== 'live') {
+    throw new Error(
+      'EXPO_PUBLIC_DATA_MODE=live is required for preview and production EAS builds so demo restaurants cannot ship.',
+    );
+  }
+
+  const required = [
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+    'EXPO_PUBLIC_PLACES_PROXY_URL',
+  ] as const;
+  const missing = required.filter((name) => !environment[name]);
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.join(', ')} required for live Google Places discovery.`,
+    );
+  }
+}
+
 export function createMapsPlugin(
   environment: BuildEnvironment,
 ): NonNullable<ExpoConfig['plugins']>[number] | undefined {
@@ -49,6 +77,7 @@ export function createMapsPlugin(
 }
 
 assertMapsBuildConfiguration(process.env);
+assertLiveDataBuildConfiguration(process.env);
 const mapsPlugin = createMapsPlugin(process.env);
 
 export default ({ config }: ConfigContext): ExpoConfig => ({

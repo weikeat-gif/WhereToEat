@@ -13,7 +13,7 @@ import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
 
 const LATITUDE_DELTA = 0.075;
-const brandMark = require('../../../assets/images/brand/makanmana-mark.png');
+const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#171C1B' }] },
@@ -156,5 +156,5 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
-  marker: { height: 42, width: 34 },
+  marker: { height: 52, width: 40 },
 });

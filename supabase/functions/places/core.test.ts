@@ -190,13 +190,44 @@ describe('places Edge Function core', () => {
     );
     expect(JSON.parse(request.init.body as string)).toEqual({
       includedTypes: ['restaurant', 'cafe'],
-      maxResultCount: 20,
+      maxResultCount: 100,
       locationRestriction: {
         circle: {
           center: { latitude: 3.139, longitude: 101.6869 },
           radius: 3000,
         },
       },
+      rankPreference: 'DISTANCE',
+    });
+  });
+
+  it('accepts the complete nearby food discovery type set', () => {
+    expect(
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 3.139,
+        longitude: 101.6869,
+        radiusMeters: 3000,
+        includedTypes: [
+          'restaurant',
+          'cafe',
+          'bakery',
+          'coffee_shop',
+          'food_court',
+          'meal_takeaway',
+          'dessert_shop',
+          'ice_cream_shop',
+        ],
+      }),
+    ).toMatchObject({
+      includedTypes: expect.arrayContaining([
+        'bakery',
+        'coffee_shop',
+        'food_court',
+        'meal_takeaway',
+        'dessert_shop',
+        'ice_cream_shop',
+      ]),
     });
   });
 

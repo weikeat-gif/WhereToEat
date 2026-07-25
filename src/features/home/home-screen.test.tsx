@@ -9,6 +9,7 @@ const mockSearchCurrentLocation = jest.fn();
 const mockSurpriseMe = jest.fn();
 let mockResults: { id: string; name?: string }[] = [];
 let mockStatus = 'idle';
+let mockDataMode: 'mock' | 'live' = 'mock';
 
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockPush(...args) },
@@ -25,8 +26,8 @@ jest.mock('@/features/search/search-provider', () => ({
       center: { latitude: 3.139, longitude: 101.6869 },
       areaLabel: 'Klang Valley',
       radiusMeters: 3000,
-      openNow: true,
-      priceLevels: [1, 2],
+      openNow: false,
+      priceLevels: [],
       categories: [],
       verifiedHalalOnly: false,
     },
@@ -36,6 +37,14 @@ jest.mock('@/features/search/search-provider', () => ({
     searchCurrentLocation: mockSearchCurrentLocation,
     surpriseMe: mockSurpriseMe,
   }),
+}));
+
+jest.mock('@/config/env', () => ({
+  env: {
+    get EXPO_PUBLIC_DATA_MODE() {
+      return mockDataMode;
+    },
+  },
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
@@ -61,6 +70,7 @@ describe('HomeScreen', () => {
     jest.clearAllMocks();
     mockResults = [];
     mockStatus = 'idle';
+    mockDataMode = 'mock';
     mockSearch.mockResolvedValue({
       places: [{ id: 'mock-seri-klang-kitchen' }],
     });
@@ -141,12 +151,12 @@ describe('HomeScreen', () => {
 
     fireEvent.press(screen.getByText('Open now'));
     expect(mockSearch).toHaveBeenLastCalledWith(
-      expect.objectContaining({ openNow: false }),
+      expect.objectContaining({ openNow: true }),
     );
 
     fireEvent.press(screen.getByText('Open now'));
     expect(mockSearch).toHaveBeenLastCalledWith(
-      expect.objectContaining({ openNow: true }),
+      expect.objectContaining({ openNow: false }),
     );
   });
 
@@ -191,11 +201,21 @@ describe('HomeScreen', () => {
 
   it('uses the transparent icon-only brand mark', () => {
     const screen = renderScreen();
+    const mark = screen.getByTestId('brand-mark');
 
-    expect(screen.getByTestId('brand-mark')).toHaveProp(
+    expect(mark).toHaveProp(
       'source',
-      require('../../../assets/images/brand/makanmana-mark.png'),
+      require('../../../assets/images/brand/makanmana-mark-tight.png'),
     );
+    expect(mark).toHaveStyle({ height: 52, width: 40 });
+  });
+
+  it('never flashes demo restaurants while live discovery starts', () => {
+    mockDataMode = 'live';
+    const screen = renderScreen();
+
+    expect(screen.queryByText('Jalan 21 Burger')).toBeNull();
+    expect(screen.queryByText('Nasi Lemak Antarabangsa')).toBeNull();
   });
 
   it('keeps the unavailable surprise message clear and actionable', () => {
