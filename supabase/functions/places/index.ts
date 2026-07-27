@@ -4,6 +4,7 @@ import {
   fetchWithTimeout,
   type HalalRecord,
   type PlacesAction,
+  type PromotionRecord,
   setBoundedMapValue,
   UpstreamError,
 } from './core.ts';
@@ -123,9 +124,41 @@ async function loadHalal(placeIds: string[]): Promise<HalalRecord[]> {
   );
 }
 
+async function loadPromotions(placeIds: string[]): Promise<PromotionRecord[]> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || placeIds.length === 0) {
+    return [];
+  }
+  const values = placeIds.map((id) => `"${id.replaceAll('"', '')}"`).join(',');
+  const query = new URL('/rest/v1/restaurant_promotions', SUPABASE_URL);
+  query.searchParams.set(
+    'select',
+    'id,google_place_id,starts_at,ends_at',
+  );
+  const now = new Date().toISOString();
+  query.searchParams.set('google_place_id', `in.(${values})`);
+  query.searchParams.set('starts_at', `lte.${now}`);
+  query.searchParams.set('ends_at', `gt.${now}`);
+  query.searchParams.set('order', 'starts_at.asc');
+  return fetchWithTimeout(
+    fetch,
+    query,
+    {
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    },
+    async (response) => {
+      if (!response.ok) return [];
+      return response.json() as Promise<PromotionRecord[]>;
+    },
+  );
+}
+
 const handler = createPlacesHandler({
   callGoogle: googleRequest,
   loadHalal,
+  loadPromotions,
   async allowRequest(key, input) {
     const now = Date.now();
     if (!RATE_LIMIT_HMAC_SECRET) return false;

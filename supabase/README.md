@@ -1,6 +1,6 @@
 # MakanMana Supabase setup
 
-Apply both migrations before deploying `functions/places`, then set the
+Apply all migrations before deploying `functions/places`, then set the
 function secret `GOOGLE_MAPS_SERVER_API_KEY`. Enable both Places API (New) and
 Routes API for that server key. `GOOGLE_PLACES_API_KEY` remains a
 backwards-compatible fallback while existing environments are migrated. The
@@ -43,3 +43,46 @@ consume a durable Postgres rate bucket through the service role. Deploy
 `202607240001_places_rate_limits.sql` before enabling live routes. Google route
 and Places responses are not cached. Rate-limit bucket identifiers use a
 server-keyed HMAC and rows older than 24 hours are deleted.
+
+## Manual restaurant promotion pilot
+
+Promotions are operator-managed in Supabase. Restaurants cannot write promotion
+rows, alter their measurement events, or buy a verification label. Add a
+time-limited campaign using the restaurant's real Google Place ID:
+
+```sql
+insert into public.restaurant_promotions
+  (google_place_id, starts_at, ends_at)
+values
+  ('GOOGLE_PLACE_ID', now(), now() + interval '14 days')
+returning id;
+```
+
+Redeploy `functions/places` after applying
+`202607270001_restaurant_promotions.sql`. Active campaigns are enriched into
+Google Places results by the protected function and the app shows the fixed
+label **Sponsored**. Signed-in and anonymous Supabase sessions can record one
+profile view per campaign through `record_promotion_view`; the underlying tables
+remain private.
+
+Measure the pilot from the Supabase SQL editor:
+
+```sql
+select promotion_id, count(*) as unique_profile_viewers
+from public.promotion_events
+group by promotion_id;
+```
+
+This is an interest metric, not proof of a restaurant visit or purchase. Keep
+payments and campaign administration manual until repeat demand is validated.
+Anonymous accounts can be recreated, so do not bill a restaurant from this
+count.
+
+Promotion events contain an account identifier and must be deleted after 90
+days. Until an automated retention job is introduced, the operator must run this
+cleanup at least monthly:
+
+```sql
+delete from public.promotion_events
+where created_at < now() - interval '90 days';
+```

@@ -25,6 +25,7 @@ import {
   formatPrice,
   formatReviews,
 } from '@/features/home/discovery-data';
+import { recordPromotionView } from '@/features/promotions/promotion-service';
 import { useSavedPlaces } from '@/features/saved/use-saved-places';
 import { useSearch } from '@/features/search/search-provider';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -64,6 +65,7 @@ export function PlaceDetailsScreen() {
     : loadedPlace;
   const saved = place ? savedIds.has(place.id) : false;
   const openingStatus = placeOpeningStatus(place?.isOpen);
+  const promotionId = place?.promotion?.id;
 
   useEffect(() => {
     let active = true;
@@ -93,6 +95,11 @@ export function PlaceDetailsScreen() {
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!promotionId) return;
+    void recordPromotionView(promotionId).catch(() => undefined);
+  }, [promotionId]);
 
   function toggleSave() {
     if (!place) return;
@@ -257,6 +264,13 @@ export function PlaceDetailsScreen() {
           </View>
 
           <View style={styles.chips}>
+            {place.promotion ? (
+              <SemanticChip
+                color={colors.supper}
+                icon="megaphone"
+                label="Sponsored"
+              />
+            ) : null}
             {place.categories.map((category, index) => (
               <SemanticChip
                 color={

@@ -48,6 +48,7 @@ const rawPlaceSchema = z.object({
     .optional(),
   types: z.array(z.string()).optional(),
   halalVerification: halalVerificationSchema.optional(),
+  promotion: z.object({ id: z.string().uuid() }).optional(),
 });
 
 const rawNearbySchema = z.object({
@@ -192,6 +193,7 @@ function toSummary(place: RawPlace, criteria: SearchCriteria): PlaceSummary {
     isOpen: place.currentOpeningHours?.openNow,
     categories,
     halalVerification: trustedHalal(place.halalVerification),
+    promotion: place.promotion,
   };
 }
 
@@ -292,7 +294,12 @@ export class LivePlacesService implements PlacesService {
     const places = payload.places
       .map((place) => toSummary(place, criteria))
       .filter((place) => matchesCriteria(place, criteria))
-      .sort((left, right) => left.distanceMeters - right.distanceMeters);
+      .sort(
+        (left, right) =>
+          Number(Boolean(right.promotion)) -
+            Number(Boolean(left.promotion)) ||
+          left.distanceMeters - right.distanceMeters,
+      );
 
     return {
       criteria: {

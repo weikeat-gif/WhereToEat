@@ -1,13 +1,16 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import type { PlaceSummary } from '@/contracts/place';
+import { DISCOVERY_PLACES } from '@/features/home/discovery-data';
+
 import { HomeScreen } from './home-screen';
 
 const mockPush = jest.fn();
 const mockSearch = jest.fn();
 const mockSearchCurrentLocation = jest.fn();
 const mockSurpriseMe = jest.fn();
-let mockResults: { id: string; name?: string }[] = [];
+let mockResults: PlaceSummary[] = [];
 let mockStatus = 'idle';
 let mockDataMode: 'mock' | 'live' = 'mock';
 
@@ -216,6 +219,19 @@ describe('HomeScreen', () => {
 
     expect(screen.queryByText('Jalan 21 Burger')).toBeNull();
     expect(screen.queryByText('Nasi Lemak Antarabangsa')).toBeNull();
+  });
+
+  it('clearly discloses a paid restaurant placement', () => {
+    mockDataMode = 'live';
+    mockResults = [
+      {
+        ...DISCOVERY_PLACES[0],
+        promotion: { id: '3be82851-f46d-43af-9a87-466ef33685d7' },
+      },
+    ];
+    const screen = renderScreen();
+
+    expect(screen.getByText('Sponsored')).toBeTruthy();
   });
 
   it('keeps the unavailable surprise message clear and actionable', () => {

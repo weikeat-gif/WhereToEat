@@ -12,6 +12,10 @@ export type HalalVerification = {
   expiresAt: string;
 };
 
+export type Promotion = {
+  id: string;
+};
+
 export type PlaceSummary = {
   id: string;
   name: string;
@@ -25,6 +29,7 @@ export type PlaceSummary = {
   photoUrl?: string;
   categories: string[];
   halalVerification?: HalalVerification;
+  promotion?: Promotion;
 };
 
 export type PlaceDetails = PlaceSummary & {

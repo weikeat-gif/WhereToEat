@@ -40,6 +40,28 @@ map, and either choose directly or let Surprise me make the final call.
   CAPTCHA for email OTP, and verified universal/app links.
 - Native iOS and Android device testing before TestFlight or Play release.
 
+## Business model and first promotion pilot
+
+MakanMana stays free for diners and uses Google Places for dependable restaurant
+discovery. MakanMana adds trusted local information, such as independently
+verified Halal records, then gives restaurants an optional paid way to reach
+nearby diners.
+
+The first pilot is deliberately small:
+
+- An operator schedules a promotion for a real Google Place ID in Supabase.
+- The restaurant moves above organic results only while that promotion is
+  active and always carries a visible **Sponsored** label.
+- Opening a sponsored restaurant records one unique profile viewer per
+  promotion and account. It does not store the diner's GPS coordinates.
+- Paying for promotion never creates or changes a Halal verification.
+
+Campaigns are managed manually for the pilot. A merchant portal, payments,
+campaign dashboard, and broader analytics should be built only after restaurants
+have paid for and renewed this simpler service. Unique viewers are a directional
+interest signal and must not be used as a billing basis because anonymous
+accounts can be recreated.
+
 ## Useful post-MVP additions
 
 - Malay, Simplified Chinese, and Tamil.

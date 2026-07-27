@@ -82,6 +82,14 @@ export function CompactPlaceRow({
           {place.subtitle} · {formatDistance(place.distanceMeters)}
         </Text>
         <View style={styles.labelRow}>
+          {place.promotion ? (
+            <View style={styles.label}>
+              <Ionicons color={colors.supper} name="megaphone" size={12} />
+              <Text style={[styles.labelText, { color: colors.supper }]}>
+                Sponsored
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.label}>
             <View
               style={[
@@ -142,7 +150,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 3,
   },
-  labelRow: { flexDirection: 'row', marginTop: 8 },
+  labelRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   label: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   labelDot: { borderRadius: 3, height: 6, width: 6 },
   labelText: {

@@ -187,6 +187,47 @@ describe('LivePlacesService', () => {
     expect(result.places[0].distanceMeters).toBeGreaterThan(0);
   });
 
+  it('keeps paid placement explicit while placing it before organic results', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        places: [
+          {
+            id: 'organic-place',
+            displayName: { text: 'Closer Organic Restaurant' },
+            location: { latitude: 3.1391, longitude: 101.687 },
+            priceLevel: 'PRICE_LEVEL_MODERATE',
+            currentOpeningHours: { openNow: true },
+            types: ['restaurant'],
+          },
+          {
+            id: 'promoted-place',
+            displayName: { text: 'Clearly Sponsored Restaurant' },
+            location: { latitude: 3.14, longitude: 101.69 },
+            priceLevel: 'PRICE_LEVEL_MODERATE',
+            currentOpeningHours: { openNow: true },
+            types: ['restaurant'],
+            promotion: {
+              id: '3be82851-f46d-43af-9a87-466ef33685d7',
+            },
+          },
+        ],
+      }),
+    );
+    const service = new LivePlacesService(
+      'https://project.supabase.co/functions/v1/places',
+    );
+
+    const result = await service.searchNearby(criteria);
+
+    expect(result.places.map((place) => place.id)).toEqual([
+      'promoted-place',
+      'organic-place',
+    ]);
+    expect(result.places[0].promotion).toEqual({
+      id: '3be82851-f46d-43af-9a87-466ef33685d7',
+    });
+  });
+
   it('sends a restaurant text query through the single nearby action envelope', async () => {
     const fetchMock = jest
       .spyOn(globalThis, 'fetch')

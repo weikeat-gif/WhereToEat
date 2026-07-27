@@ -339,6 +339,48 @@ describe('places Edge Function core', () => {
     expect(rows.map((row) => row.google_place_id)).toEqual(['current']);
   });
 
+  it('labels only active admin-managed restaurant promotions', async () => {
+    const handler = createPlacesHandler(
+      dependencies({
+        callGoogle: jest.fn().mockResolvedValue({
+          places: [
+            {
+              id: 'ChIJPromoted',
+              displayName: { text: 'Promoted Restaurant' },
+            },
+          ],
+        }),
+        loadPromotions: jest.fn().mockResolvedValue([
+          {
+            id: '3be82851-f46d-43af-9a87-466ef33685d7',
+            google_place_id: 'ChIJPromoted',
+            starts_at: '2026-07-01T00:00:00Z',
+            ends_at: '2099-08-01T00:00:00Z',
+          },
+        ]),
+      }),
+    );
+
+    const response = await handler(
+      authorizedRequest({
+        action: 'nearby',
+        latitude: 3.139,
+        longitude: 101.6869,
+        radiusMeters: 3000,
+        includedTypes: ['restaurant'],
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      places: [
+        {
+          id: 'ChIJPromoted',
+          promotion: { id: '3be82851-f46d-43af-9a87-466ef33685d7' },
+        },
+      ],
+    });
+  });
+
   it('maps Google rate limits without exposing upstream payloads', async () => {
     const handler = createPlacesHandler(
       dependencies({

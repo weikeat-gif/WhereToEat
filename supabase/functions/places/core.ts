@@ -26,9 +26,17 @@ export type HalalRecord = {
   expires_at: string;
 };
 
+export type PromotionRecord = {
+  id: string;
+  google_place_id: string;
+  starts_at: string;
+  ends_at: string;
+};
+
 export interface PlacesDependencies {
   callGoogle(input: PlacesAction): Promise<unknown>;
   loadHalal(placeIds: string[]): Promise<HalalRecord[]>;
+  loadPromotions?(placeIds: string[]): Promise<PromotionRecord[]>;
   allowRequest(key: string, input: PlacesAction): Promise<boolean> | boolean;
 }
 
@@ -481,6 +489,25 @@ export function filterCurrentHalalRecords(
   });
 }
 
+export function filterActivePromotionRecords(
+  rows: PromotionRecord[],
+  now = new Date(),
+): PromotionRecord[] {
+  const timestamp = now.getTime();
+  return rows.filter((row) => {
+    const startsAt = Date.parse(row.starts_at);
+    const endsAt = Date.parse(row.ends_at);
+    return (
+      /^[0-9a-f-]{36}$/i.test(row.id) &&
+      row.google_place_id.length >= 5 &&
+      Number.isFinite(startsAt) &&
+      Number.isFinite(endsAt) &&
+      startsAt <= timestamp &&
+      endsAt > timestamp
+    );
+  });
+}
+
 function placeId(value: unknown): string | null {
   if (!isRecord(value)) return null;
   if (typeof value.id === 'string') return value.id;
@@ -490,10 +517,10 @@ function placeId(value: unknown): string | null {
   return null;
 }
 
-async function enrichHalal(
+async function enrichLocalData(
   value: unknown,
   action: PlacesAction,
-  loadHalal: PlacesDependencies['loadHalal'],
+  dependencies: PlacesDependencies,
 ): Promise<unknown> {
   if (action.action === 'autocomplete' || action.action === 'route') {
     return value;
@@ -505,7 +532,12 @@ async function enrichHalal(
   const ids = places.map(placeId).filter((id): id is string => Boolean(id));
   if (ids.length === 0) return value;
 
-  const current = filterCurrentHalalRecords(await loadHalal(ids));
+  const [current, activePromotions] = await Promise.all([
+    dependencies.loadHalal(ids).then(filterCurrentHalalRecords),
+    dependencies.loadPromotions
+      ? dependencies.loadPromotions(ids).then(filterActivePromotionRecords)
+      : [],
+  ]);
   const byPlace = new Map(
     current.map((row) => [
       row.google_place_id,
@@ -517,10 +549,24 @@ async function enrichHalal(
       },
     ]),
   );
+  const promotionsByPlace = new Map(
+    activePromotions.map((row) => [
+      row.google_place_id,
+      { id: row.id },
+    ]),
+  );
   const enriched = places.map((place) => {
     const id = placeId(place);
-    if (!id || !isRecord(place) || !byPlace.has(id)) return place;
-    return { ...place, halalVerification: byPlace.get(id) };
+    if (!id || !isRecord(place)) return place;
+    return {
+      ...place,
+      ...(byPlace.has(id)
+        ? { halalVerification: byPlace.get(id) }
+        : {}),
+      ...(promotionsByPlace.has(id)
+        ? { promotion: promotionsByPlace.get(id) }
+        : {}),
+    };
   });
 
   return action.action === 'nearby' && isRecord(value)
@@ -616,11 +662,7 @@ export function createPlacesHandler(dependencies: PlacesDependencies) {
 
     try {
       const googleResult = await dependencies.callGoogle(input);
-      const result = await enrichHalal(
-        googleResult,
-        input,
-        dependencies.loadHalal,
-      );
+      const result = await enrichLocalData(googleResult, input, dependencies);
       return json(200, result);
     } catch (error) {
       if (error instanceof UpstreamError) {

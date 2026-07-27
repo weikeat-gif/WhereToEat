@@ -52,6 +52,10 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
               title="Guest session"
             />
             <Section
+              body="When you open a sponsored restaurant, MakanMana records the promotion and your signed-in or anonymous account identifier once for that campaign. This measures unique profile viewers. Your precise GPS coordinates are not stored with the promotion event, and promotion events are deleted after 90 days."
+              title="Sponsored restaurant measurement"
+            />
+            <Section
               body="You can deny location and search by area. You can revoke permission at any time in iPhone or Android Settings. Saved places are stored only after sign-in and can be removed from the app."
               title="Your choices"
             />
@@ -70,6 +74,10 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
               body="Verified Halal labels appear only when a current trusted verification record is available. Missing verification is never a Halal claim."
               title="Halal information"
             />
+            <Section
+              body="Paid restaurant placements are always marked Sponsored. Payment can affect result placement during an active campaign, but it never creates or changes a Halal verification."
+              title="Sponsored placements"
+            />
           </>
         )}
 
@@ -85,7 +93,7 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
         </View>
 
         <Text style={[styles.updated, { color: colors.textMuted }]}>
-          English MVP notice · Updated 24 July 2026
+          English MVP notice · Updated 27 July 2026
         </Text>
       </ScrollView>
     </SafeAreaView>
