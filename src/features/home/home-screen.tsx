@@ -45,7 +45,6 @@ export function HomeScreen() {
   const [openNowActive, setOpenNowActive] = useState(criteria.openNow);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeHeroSlide, setActiveHeroSlide] = useState(0);
-  const heroScrollRef = useRef<ScrollView>(null);
   const nearbyRequestInFlight = useRef(false);
   const isLiveDiscovery = env.EXPO_PUBLIC_DATA_MODE === 'live';
   const visiblePlaces =
@@ -84,18 +83,10 @@ export function HomeScreen() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveHeroSlide((current) => {
-        const next = (current + 1) % HERO_SLIDES.length;
-        heroScrollRef.current?.scrollTo({
-          animated: true,
-          x: next * width,
-          y: 0,
-        });
-        return next;
-      });
+      setActiveHeroSlide((current) => (current + 1) % HERO_SLIDES.length);
     }, HERO_SLIDE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [width]);
+  }, []);
 
   async function applyDiscovery(
     category?: string | null,
@@ -162,30 +153,17 @@ export function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, compact && styles.heroCompact]}>
-          <ScrollView
-            ref={heroScrollRef}
-            accessibilityElementsHidden
-            contentContainerStyle={styles.heroSlides}
-            horizontal
-            importantForAccessibility="no-hide-descendants"
-            pagingEnabled
-            scrollEnabled={false}
-            showsHorizontalScrollIndicator={false}
-            style={StyleSheet.absoluteFill}>
-            {HERO_SLIDES.map((slide, index) => (
-              <View key={slide.label} style={[styles.heroSlide, { width }]}>
-                <Image
-                  accessibilityIgnoresInvertColors
-                  contentFit="contain"
-                  contentPosition="center"
-                  source={slide.source}
-                  style={StyleSheet.absoluteFill}
-                  testID={`hero-slide-${index}`}
-                  transition={180}
-                />
-              </View>
-            ))}
-          </ScrollView>
+          <Image
+            accessibilityIgnoresInvertColors
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            contentPosition="center"
+            recyclingKey={HERO_SLIDES[activeHeroSlide].label}
+            source={HERO_SLIDES[activeHeroSlide].source}
+            style={StyleSheet.absoluteFill}
+            testID={`hero-slide-${activeHeroSlide}`}
+            transition={350}
+          />
           <View style={[StyleSheet.absoluteFill, styles.heroShade]} />
           <View
             accessible
@@ -395,8 +373,6 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   heroCompact: { height: 350, paddingHorizontal: 14 },
-  heroSlides: { height: '100%' },
-  heroSlide: { height: '100%' },
   heroShade: { backgroundColor: 'rgba(0,0,0,0.16)' },
   heroDots: {
     alignSelf: 'center',

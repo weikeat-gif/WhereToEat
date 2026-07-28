@@ -213,14 +213,13 @@ export function PlaceDetailsScreen() {
               style={[
                 StyleSheet.absoluteFill,
                 styles.heroNoPhoto,
-                { backgroundColor: colors.surfaceElevated },
               ]}>
               <Ionicons
-                color={colors.textMuted}
+                color="#D7DAD5"
                 name="restaurant-outline"
                 size={54}
               />
-              <Text style={{ color: colors.textMuted, fontFamily: fontFamily.semibold }}>
+              <Text style={styles.heroNoPhotoText}>
                 Photo unavailable
               </Text>
             </View>
@@ -559,9 +558,14 @@ const styles = StyleSheet.create({
   hero: { height: 350, justifyContent: 'flex-end' },
   heroNoPhoto: {
     alignItems: 'center',
+    backgroundColor: '#20231F',
     gap: 8,
     justifyContent: 'center',
     paddingBottom: 82,
+  },
+  heroNoPhotoText: {
+    color: '#D7DAD5',
+    fontFamily: fontFamily.semibold,
   },
   heroShade: { backgroundColor: 'rgba(0,0,0,0.28)' },
   heroCopy: { padding: 20, paddingBottom: 24 },

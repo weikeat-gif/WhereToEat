@@ -220,6 +220,10 @@ describe('HomeScreen', () => {
     jest.useFakeTimers();
     const screen = renderScreen();
 
+    expect(screen.UNSAFE_getByProps({ testID: 'hero-slide-0' })).toBeTruthy();
+    expect(
+      screen.UNSAFE_queryAllByProps({ testID: 'hero-slide-1' }),
+    ).toHaveLength(0);
     expect(
       screen.getByLabelText(
         'Featured Malaysian food: Char kway teow with teh tarik',
@@ -235,10 +239,14 @@ describe('HomeScreen', () => {
         'Featured Malaysian food: Nasi lemak ayam berempah',
       ),
     ).toBeTruthy();
+    expect(
+      screen.UNSAFE_queryAllByProps({ testID: 'hero-slide-0' }),
+    ).toHaveLength(0);
+    expect(screen.UNSAFE_getByProps({ testID: 'hero-slide-1' })).toBeTruthy();
     jest.useRealTimers();
   });
 
-  it('uses five sharp, uncropped Malaysian food carousel images', () => {
+  it('keeps one sharp, uncropped Malaysian food image mounted at a time', () => {
     const screen = renderScreen();
 
     expect(HERO_SLIDES).toHaveLength(5);
@@ -248,6 +256,9 @@ describe('HomeScreen', () => {
     expect(
       screen.UNSAFE_getByProps({ testID: 'hero-slide-0' }).props.contentFit,
     ).toBe('contain');
+    expect(
+      screen.UNSAFE_queryAllByProps({ testID: 'hero-slide-1' }),
+    ).toHaveLength(0);
   });
 
   it('never flashes demo restaurants while live discovery starts', () => {

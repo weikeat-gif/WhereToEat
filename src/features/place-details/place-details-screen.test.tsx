@@ -10,9 +10,12 @@ import { PlaceDetailsScreen } from './place-details-screen';
 const mockPush = jest.fn();
 const mockToggle = jest.fn();
 const mockRecordPromotionView = jest.fn();
+const mockLoadDisplayPlace = jest.fn();
 let mockUser: { id: string } | null = null;
 let mockSavedIds = new Set<string>();
 let mockResults: PlaceSummary[] = [];
+let mockThemeMode: 'light' | 'dark' = 'dark';
+let mockDataMode: 'mock' | 'live' = 'mock';
 
 jest.mock('expo-image', () => {
   const { Image } = jest.requireActual('react-native');
@@ -46,10 +49,26 @@ jest.mock('@/features/promotions/promotion-service', () => ({
     mockRecordPromotionView(...args),
 }));
 
+jest.mock('@/config/env', () => ({
+  env: {
+    get EXPO_PUBLIC_DATA_MODE() {
+      return mockDataMode;
+    },
+  },
+}));
+
+jest.mock('./place-details-loader', () => ({
+  loadDisplayPlace: (...args: unknown[]) => mockLoadDisplayPlace(...args),
+}));
+
 jest.mock('@/theme/theme-provider', () => ({
-  useAppTheme: () => ({
-    colors: jest.requireActual('@/theme/tokens').themeColors.dark,
-  }),
+  useAppTheme: () => {
+    const { themeColors } = jest.requireActual('@/theme/tokens');
+    return {
+      colors: themeColors[mockThemeMode],
+      resolvedMode: mockThemeMode,
+    };
+  },
 }));
 
 describe('PlaceDetailsScreen', () => {
@@ -60,6 +79,12 @@ describe('PlaceDetailsScreen', () => {
     mockUser = null;
     mockSavedIds = new Set();
     mockResults = [];
+    mockThemeMode = 'dark';
+    mockDataMode = 'mock';
+    mockLoadDisplayPlace.mockResolvedValue({
+      ...DISCOVERY_PLACES[0],
+      image: undefined,
+    });
   });
 
   afterEach(() => {
@@ -149,6 +174,29 @@ describe('PlaceDetailsScreen', () => {
     expect(screen.getByTestId('directions-button')).toBeTruthy();
     expect(screen.getByText('Directions · 600 m')).toBeTruthy();
     expect(screen.getByText('Jalan 21 Burger')).toHaveProp('numberOfLines', 2);
+  });
+
+  it('keeps no-photo restaurant headers readable in light mode', async () => {
+    mockThemeMode = 'light';
+    mockDataMode = 'live';
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText('Jalan 21 Burger has no photo'),
+      ).toHaveStyle({ backgroundColor: '#20231F' }),
+    );
+    expect(screen.getByText('Photo unavailable')).toHaveStyle({
+      color: '#D7DAD5',
+    });
   });
 
   it('removes generic Google types from the visible cuisine chips', () => {
