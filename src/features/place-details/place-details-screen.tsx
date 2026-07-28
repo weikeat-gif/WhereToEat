@@ -45,6 +45,12 @@ const CATEGORY_ICONS = [
   'restaurant-outline',
   'people-outline',
 ] as const;
+const HIDDEN_GENERIC_CATEGORIES = new Set([
+  'Food',
+  'Store',
+  'Point Of Interest',
+  'Establishment',
+]);
 
 export function PlaceDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,6 +79,9 @@ export function PlaceDetailsScreen() {
   const saved = place ? savedIds.has(place.id) : false;
   const openingStatus = placeOpeningStatus(place?.isOpen);
   const promotionId = place?.promotion?.id;
+  const visibleCategories = (place?.categories ?? [])
+    .filter((category) => !HIDDEN_GENERIC_CATEGORIES.has(category))
+    .slice(0, 4);
 
   useEffect(() => {
     let active = true;
@@ -212,13 +221,18 @@ export function PlaceDetailsScreen() {
                 size={54}
               />
               <Text style={{ color: colors.textMuted, fontFamily: fontFamily.semibold }}>
-                No restaurant photo available
+                Photo unavailable
               </Text>
             </View>
           )}
           <View style={[StyleSheet.absoluteFill, styles.heroShade]} />
           <View style={styles.heroCopy}>
-            <Text style={styles.name}>{place.name}</Text>
+            <Text
+              maxFontSizeMultiplier={1.15}
+              numberOfLines={2}
+              style={styles.name}>
+              {place.name}
+            </Text>
             <Text style={styles.subtitle}>{place.subtitle}</Text>
             <View style={styles.heroMeta}>
               <View style={styles.heroMetaItem}>
@@ -273,13 +287,12 @@ export function PlaceDetailsScreen() {
                 ]}>
                 {openingStatus.label}
               </Text>
-              <Text style={[styles.openingNote, { color: colors.textMuted }]}>
-                • {place.openingNote}
-              </Text>
+              {place.openingNote !== openingStatus.label ? (
+                <Text style={[styles.openingNote, { color: colors.textMuted }]}>
+                  • {place.openingNote}
+                </Text>
+              ) : null}
             </View>
-            <Text style={[styles.hoursLink, { color: colors.accentForeground }]}>
-              See all hours
-            </Text>
           </View>
 
           <View style={styles.chips}>
@@ -290,7 +303,7 @@ export function PlaceDetailsScreen() {
                 label="Sponsored"
               />
             ) : null}
-            {place.categories.map((category, index) => (
+            {visibleCategories.map((category, index) => (
               <SemanticChip
                 color={
                   index === 0
@@ -427,25 +440,12 @@ export function PlaceDetailsScreen() {
             paddingBottom: Math.max(insets.bottom, 12),
           },
         ]}>
-        <Pressable
-          accessibilityLabel={`Distance ${formatDistance(place.distanceMeters)}`}
-          accessibilityRole="button"
-          onPress={openDirections}
-          style={[
-            styles.distanceButton,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}>
-          <Ionicons color={colors.text} name="navigate-outline" size={20} />
-          <Text style={[styles.distanceText, { color: colors.text }]}>
-            {formatDistance(place.distanceMeters)}
-          </Text>
-        </Pressable>
         <View style={styles.directionAction}>
           <ActionButton
             backgroundColor={colors.accent}
             color={colors.accentText}
             icon="arrow-forward"
-            label="Directions"
+            label={`Directions · ${formatDistance(place.distanceMeters)}`}
             onPress={openDirections}
             testID="directions-button"
           />
@@ -557,15 +557,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   hero: { height: 350, justifyContent: 'flex-end' },
-  heroNoPhoto: { alignItems: 'center', gap: 10, justifyContent: 'center' },
+  heroNoPhoto: {
+    alignItems: 'center',
+    gap: 8,
+    justifyContent: 'center',
+    paddingBottom: 82,
+  },
   heroShade: { backgroundColor: 'rgba(0,0,0,0.28)' },
   heroCopy: { padding: 20, paddingBottom: 24 },
   name: {
     color: '#FFFFFF',
     fontFamily: fontFamily.bold,
-    fontSize: 30,
-    letterSpacing: -0.7,
-    lineHeight: 34,
+    fontSize: 26,
+    letterSpacing: -0.5,
+    lineHeight: 31,
   },
   subtitle: {
     color: '#D7DAD5',
@@ -573,7 +578,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 4,
   },
-  heroMeta: { alignItems: 'center', flexDirection: 'row', gap: 9, marginTop: 14 },
+  heroMeta: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
   heroMetaItem: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   heroRating: { color: '#D7F36A', fontFamily: fontFamily.semibold, fontSize: 16 },
   heroMuted: { color: '#E0E2DE', fontFamily: fontFamily.medium, fontSize: 14 },
@@ -588,10 +599,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
   },
-  openLabel: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  openLabel: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   open: { fontFamily: fontFamily.semibold, fontSize: 14 },
   openingNote: { fontFamily: fontFamily.regular, fontSize: 13 },
-  hoursLink: { fontFamily: fontFamily.semibold, fontSize: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   description: { fontFamily: fontFamily.regular, fontSize: 14, lineHeight: 22 },
   sectionTitleRow: {
@@ -661,17 +676,6 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 10,
   },
-  distanceButton: {
-    minHeight: 52,
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 7,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  distanceText: { fontFamily: fontFamily.semibold, fontSize: 15 },
   directionAction: { flex: 1 },
   navigationModal: {
     backgroundColor: 'rgba(0,0,0,0.56)',

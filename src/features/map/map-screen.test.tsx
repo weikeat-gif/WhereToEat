@@ -161,6 +161,24 @@ describe('MapScreen states', () => {
     ).toBeTruthy();
   });
 
+  it('expands the restaurant list and hides the map when results are scrolled', () => {
+    const { UNSAFE_getByType } = render(<MapScreen />);
+
+    fireEvent.scroll(UNSAFE_getByType(FlatList), {
+      nativeEvent: { contentOffset: { x: 0, y: 32 } },
+    });
+
+    expect(screen.queryByTestId('map-pane')).toBeNull();
+    expect(screen.getByTestId('results-pane')).toHaveStyle({ height: '100%' });
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Focus map view' }),
+    );
+
+    expect(screen.getByTestId('map-pane')).toBeTruthy();
+    expect(screen.queryByTestId('results-pane')).toBeNull();
+  });
+
   it('opens a shared result in place details', () => {
     render(<MapScreen />);
 

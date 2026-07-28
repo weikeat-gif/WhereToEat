@@ -36,6 +36,7 @@ const CATEGORIES = [
 ] as const;
 const PRICES: PriceLevel[] = [1, 2, 3, 4];
 const RADII = [1000, 3000, 5000, 10_000];
+type MapViewMode = 'split' | 'map' | 'list';
 
 export function MapScreen() {
   const { colors } = useAppTheme();
@@ -63,14 +64,16 @@ export function MapScreen() {
   const [areaInput, setAreaInput] = useState(criteria.areaLabel);
   const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [mapFocused, setMapFocused] = useState(false);
+  const [viewMode, setViewMode] = useState<MapViewMode>('split');
+  const mapFocused = viewMode === 'map';
+  const listFocused = viewMode === 'list';
   const nearbyDockPanResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_event, gesture) =>
           Math.abs(gesture.dy) > 8,
         onPanResponderRelease: (_event, gesture) => {
-          if (gesture.dy < -18) setMapFocused(false);
+          if (gesture.dy < -18) setViewMode('split');
         },
       }),
     [],
@@ -378,15 +381,16 @@ export function MapScreen() {
     <SafeAreaView
       edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <View testID="map-pane" style={styles.mapPane}>
-        <MapCanvas
-          center={mapViewport.center}
-          onViewportChange={setMapViewport}
-          onMapPress={() => setMapFocused(true)}
-          onPlacePress={openPlace}
-          places={results}
-          showsUserLocation={locationStatus === 'granted'}
-        />
+      {!listFocused ? (
+        <View testID="map-pane" style={styles.mapPane}>
+          <MapCanvas
+            center={mapViewport.center}
+            onViewportChange={setMapViewport}
+            onMapPress={() => setViewMode('map')}
+            onPlacePress={openPlace}
+            places={results}
+            showsUserLocation={locationStatus === 'granted'}
+          />
 
         <TouchableOpacity
           accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
@@ -439,7 +443,7 @@ export function MapScreen() {
             <TouchableOpacity
               accessibilityLabel="Show search filters and nearby results"
               accessibilityRole="button"
-              onPress={() => setMapFocused(false)}
+              onPress={() => setViewMode('split')}
               style={[
                 styles.submitButton,
                 { backgroundColor: colors.surfaceElevated },
@@ -448,13 +452,14 @@ export function MapScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+        </View>
+      ) : null}
 
       {!mapFocused ? (
         <View
           testID="results-pane"
           style={[
-            styles.resultsPane,
+            listFocused ? styles.resultsPaneFocused : styles.resultsPane,
             {
               backgroundColor: colors.background,
               borderColor: colors.border,
@@ -464,7 +469,7 @@ export function MapScreen() {
             accessibilityLabel={i18n.t('mapFocusViewAccessibility')}
             accessibilityRole="button"
             accessibilityState={{ expanded: true }}
-            onPress={() => setMapFocused(true)}
+            onPress={() => setViewMode('map')}
             style={({ pressed }) => [
               styles.sheetCollapseControl,
               { opacity: pressed ? 0.72 : 1 },
@@ -481,12 +486,21 @@ export function MapScreen() {
             ItemSeparatorComponent={() => <View style={styles.resultGap} />}
             keyboardShouldPersistTaps="handled"
             keyExtractor={(place) => place.id}
+            onScrollBeginDrag={() => setViewMode('list')}
             ListFooterComponent={
               <View style={styles.attribution}>
                 <GoogleMapsAttribution />
               </View>
             }
             ListHeaderComponent={listHeader}
+            onScroll={(event) => {
+              if (
+                viewMode === 'split' &&
+                event.nativeEvent.contentOffset.y > 12
+              ) {
+                setViewMode('list');
+              }
+            }}
             renderItem={({ item }) => (
               <CompactPlaceRow
                 image={
@@ -498,6 +512,7 @@ export function MapScreen() {
                 onPress={() => openPlace(item.id)}
               />
             )}
+            scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
           />
         </View>
@@ -514,7 +529,7 @@ export function MapScreen() {
           })}
           accessibilityRole="button"
           accessibilityState={{ expanded: false }}
-          onPress={() => setMapFocused(false)}
+          onPress={() => setViewMode('split')}
           style={({ pressed }) => [
             styles.nearbyDock,
             {
@@ -593,6 +608,15 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     bottom: 0,
     height: '46%',
+    left: 0,
+    overflow: 'hidden',
+    position: 'absolute',
+    right: 0,
+    zIndex: 3,
+  },
+  resultsPaneFocused: {
+    bottom: 0,
+    height: '100%',
     left: 0,
     overflow: 'hidden',
     position: 'absolute',

@@ -2,7 +2,10 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { PlaceSummary } from '@/contracts/place';
-import { DISCOVERY_PLACES } from '@/features/home/discovery-data';
+import {
+  DISCOVERY_PLACES,
+  HERO_SLIDES,
+} from '@/features/home/discovery-data';
 
 import { HomeScreen } from './home-screen';
 
@@ -233,6 +236,18 @@ describe('HomeScreen', () => {
       ),
     ).toBeTruthy();
     jest.useRealTimers();
+  });
+
+  it('uses five sharp, uncropped Malaysian food carousel images', () => {
+    const screen = renderScreen();
+
+    expect(HERO_SLIDES).toHaveLength(5);
+    expect(HERO_SLIDES.map((slide) => slide.label)).toEqual(
+      expect.arrayContaining(['Malaysian satay platter', 'Prawn curry laksa']),
+    );
+    expect(
+      screen.UNSAFE_getByProps({ testID: 'hero-slide-0' }).props.contentFit,
+    ).toBe('contain');
   });
 
   it('never flashes demo restaurants while live discovery starts', () => {

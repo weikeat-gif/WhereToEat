@@ -172,14 +172,15 @@ export function HomeScreen() {
             scrollEnabled={false}
             showsHorizontalScrollIndicator={false}
             style={StyleSheet.absoluteFill}>
-            {HERO_SLIDES.map((slide) => (
+            {HERO_SLIDES.map((slide, index) => (
               <View key={slide.label} style={[styles.heroSlide, { width }]}>
                 <Image
                   accessibilityIgnoresInvertColors
-                  contentFit="cover"
+                  contentFit="contain"
                   contentPosition="center"
                   source={slide.source}
                   style={StyleSheet.absoluteFill}
+                  testID={`hero-slide-${index}`}
                   transition={180}
                 />
               </View>
@@ -387,6 +388,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   content: { gap: 14, paddingBottom: 28 },
   hero: {
+    backgroundColor: '#080B09',
     height: 335,
     justifyContent: 'space-between',
     overflow: 'hidden',

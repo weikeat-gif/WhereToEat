@@ -12,6 +12,8 @@ export type DiscoveryPlace = PlaceSummary & {
 
 const burgerImage = require('../../../assets/images/makanmana/ramly-burger.png');
 const nasiLemakImage = require('../../../assets/images/makanmana/nasi-lemak.png');
+const satayHeroImage = require('../../../assets/images/makanmana/satay-hero-v2.png');
+const curryLaksaHeroImage = require('../../../assets/images/makanmana/curry-laksa-hero-v2.png');
 
 export const heroImage = require('../../../assets/images/makanmana/char-kway-teow-hero.png');
 export const HERO_SLIDE_INTERVAL_MS = 4500;
@@ -27,6 +29,14 @@ export const HERO_SLIDES = [
   {
     source: burgerImage,
     label: 'Ramly burger special',
+  },
+  {
+    source: satayHeroImage,
+    label: 'Malaysian satay platter',
+  },
+  {
+    source: curryLaksaHeroImage,
+    label: 'Prawn curry laksa',
   },
 ] as const;
 

@@ -134,6 +134,75 @@ describe('PlaceDetailsScreen', () => {
     );
   });
 
+  it('uses one clear directions action and restrained place typography', () => {
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Distance 600 m' })).toBeNull();
+    expect(screen.getByTestId('directions-button')).toBeTruthy();
+    expect(screen.getByText('Directions · 600 m')).toBeTruthy();
+    expect(screen.getByText('Jalan 21 Burger')).toHaveProp('numberOfLines', 2);
+  });
+
+  it('removes generic Google types from the visible cuisine chips', () => {
+    mockResults = [
+      {
+        ...DISCOVERY_PLACES[0],
+        categories: [
+          'Fast Food Restaurant',
+          'Meal Takeaway',
+          'Restaurant',
+          'Food',
+          'Point Of Interest',
+          'Establishment',
+        ],
+      },
+    ];
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByText('Fast Food Restaurant')).toBeTruthy();
+    expect(screen.getByText('Meal Takeaway')).toBeTruthy();
+    expect(screen.queryByText('Point Of Interest')).toBeNull();
+    expect(screen.queryByText('Establishment')).toBeNull();
+  });
+
+  it('shows unavailable opening hours once without a dead hours control', () => {
+    mockResults = [
+      {
+        ...DISCOVERY_PLACES[0],
+        isOpen: undefined,
+        openingNote: 'Hours unavailable',
+      } as PlaceSummary,
+    ];
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getAllByText('Hours unavailable')).toHaveLength(1);
+    expect(screen.queryByText('See all hours')).toBeNull();
+  });
+
   it('discloses a sponsored restaurant and records its unique profile view', async () => {
     mockResults = [
       {
