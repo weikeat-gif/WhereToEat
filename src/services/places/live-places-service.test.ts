@@ -48,6 +48,31 @@ describe('LivePlacesService', () => {
     );
   });
 
+  it('calls the browser fetch function with its global receiver', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(function (this: typeof globalThis) {
+        if (this !== globalThis) {
+          throw new TypeError("Failed to execute 'fetch': Illegal invocation");
+        }
+        return Promise.resolve(
+          Response.json({
+            id: 'place-1',
+            displayName: { text: 'Food shop' },
+            location: { latitude: 3.139, longitude: 101.6869 },
+            types: ['restaurant'],
+          }),
+        );
+      });
+    const service = new LivePlacesService('https://places.example.test/api');
+
+    await expect(service.getPlaceDetails('place-1')).resolves.toMatchObject({
+      id: 'place-1',
+      name: 'Food shop',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('maps network failures without exposing provider details', async () => {
     jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('offline'));
     const service = new LivePlacesService('https://places.example.test/api');

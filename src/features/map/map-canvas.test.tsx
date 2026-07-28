@@ -85,6 +85,13 @@ describe('web MapCanvas', () => {
     await waitFor(() =>
       expect(mapOptions).toMatchObject({
         center: { lat: gpsCenter.latitude, lng: gpsCenter.longitude },
+        styles: expect.arrayContaining([
+          {
+            featureType: 'poi',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+        ]),
       }),
     );
 

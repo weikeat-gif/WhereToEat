@@ -49,7 +49,7 @@ export class LiveRoutesService implements RoutesService {
 
   constructor(
     proxyUrl: string | undefined,
-    private readonly fetcher = fetch,
+    private readonly fetcher: typeof fetch = (...args) => fetch(...args),
     private readonly timeoutMs = 10_000,
     private readonly apiKey?: string,
     private readonly getAccessToken?: () => Promise<string>,

@@ -57,6 +57,13 @@ const PREVIEW_MARKER_POSITIONS = [
   { left: '82%', top: '42%' },
   { left: '13%', top: '50%' },
 ] as const;
+const FOOD_DISCOVERY_MAP_STYLE = [
+  {
+    featureType: 'poi',
+    elementType: 'labels',
+    stylers: [{ visibility: 'off' }],
+  },
+] as const;
 const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#171C1B' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#A9B0AC' }] },
@@ -82,6 +89,12 @@ const DARK_MAP_STYLE = [
     stylers: [{ color: '#101817' }],
   },
 ];
+
+function mapStyleFor(mode: 'light' | 'dark') {
+  return mode === 'dark'
+    ? [...DARK_MAP_STYLE, ...FOOD_DISCOVERY_MAP_STYLE]
+    : [...FOOD_DISCOVERY_MAP_STYLE];
+}
 
 function loadGoogleMaps(apiKey: string) {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -179,8 +192,7 @@ export function MapCanvas({
           fullscreenControl: false,
           mapTypeControl: false,
           streetViewControl: false,
-          styles:
-            latestResolvedModeRef.current === 'dark' ? DARK_MAP_STYLE : [],
+          styles: mapStyleFor(latestResolvedModeRef.current),
           zoom: 14,
         });
         mapRef.current = map;
@@ -224,7 +236,7 @@ export function MapCanvas({
 
   useEffect(() => {
     mapRef.current?.setOptions?.({
-      styles: resolvedMode === 'dark' ? DARK_MAP_STYLE : [],
+      styles: mapStyleFor(resolvedMode),
     });
   }, [resolvedMode]);
 

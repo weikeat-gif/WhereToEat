@@ -14,6 +14,13 @@ import { useAppTheme } from '@/theme/theme-provider';
 
 const LATITUDE_DELTA = 0.075;
 const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
+const FOOD_DISCOVERY_MAP_STYLE: MapStyleElement[] = [
+  {
+    featureType: 'poi',
+    elementType: 'labels',
+    stylers: [{ visibility: 'off' }],
+  },
+];
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#171C1B' }] },
@@ -60,6 +67,12 @@ const DARK_MAP_STYLE: MapStyleElement[] = [
     stylers: [{ color: '#101817' }],
   },
 ];
+
+function mapStyleFor(mode: 'light' | 'dark'): MapStyleElement[] {
+  return mode === 'dark'
+    ? [...DARK_MAP_STYLE, ...FOOD_DISCOVERY_MAP_STYLE]
+    : FOOD_DISCOVERY_MAP_STYLE;
+}
 
 export function MapCanvas({
   center,
@@ -118,7 +131,7 @@ export function MapCanvas({
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LATITUDE_DELTA,
         }}
-        customMapStyle={resolvedMode === 'dark' ? DARK_MAP_STYLE : []}
+        customMapStyle={mapStyleFor(resolvedMode)}
         onPress={onMapPress}
         onRegionChangeComplete={handleRegionChange}
         provider={PROVIDER_GOOGLE}

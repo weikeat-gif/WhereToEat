@@ -15,7 +15,7 @@ export function createPlacesService(
   return mode === 'live'
     ? new LivePlacesService(
         proxyUrl,
-        fetch,
+        (...args) => fetch(...args),
         10_000,
         env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
         getFunctionsAccessToken,
