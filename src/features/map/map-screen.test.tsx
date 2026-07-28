@@ -26,6 +26,10 @@ jest.mock('@/features/map/map-canvas', () => {
       onViewportChange: (viewport: {
         center: { latitude: number; longitude: number };
         radiusMeters: number;
+        bounds?: {
+          northEast: { latitude: number; longitude: number };
+          southWest: { latitude: number; longitude: number };
+        };
       }) => void;
       onMapPress: () => void;
     }) => (
@@ -40,6 +44,10 @@ jest.mock('@/features/map/map-canvas', () => {
             onViewportChange({
               center: { latitude: 3.05, longitude: 101.45 },
               radiusMeters: 6800,
+              bounds: {
+                northEast: { latitude: 3.1, longitude: 101.5 },
+                southWest: { latitude: 3.0, longitude: 101.4 },
+              },
             })
           }
         />
@@ -267,6 +275,47 @@ describe('MapScreen states', () => {
         rankPreference: 'POPULARITY',
       }),
     );
+  });
+
+  it('keeps the map count and list limited to places inside visible bounds', () => {
+    const visiblePlace: PlaceSummary = {
+      ...trustedPlace,
+      id: 'visible-place',
+      name: 'Visible Place',
+      coordinates: { latitude: 3.05, longitude: 101.45 },
+    };
+    const outsidePlace: PlaceSummary = {
+      ...trustedPlace,
+      id: 'outside-place',
+      name: 'Outside Place',
+      coordinates: { latitude: 3.12, longitude: 101.45 },
+    };
+    const overlappingPlace: PlaceSummary = {
+      ...trustedPlace,
+      id: 'overlapping-place',
+      name: 'Overlapping Place',
+      coordinates: { latitude: 3.051, longitude: 101.451 },
+    };
+    mockUseSearch.mockReturnValue(
+      searchState({
+        results: [visiblePlace, overlappingPlace, outsidePlace],
+      }),
+    );
+
+    render(<MapScreen />);
+    fireEvent.press(screen.getByLabelText('Pan map test control'));
+
+    expect(screen.getByText('1 spot around Klang Valley')).toBeTruthy();
+    expect(screen.getByText('Visible Place')).toBeTruthy();
+    expect(screen.queryByText('Overlapping Place')).toBeNull();
+    expect(screen.queryByText('Outside Place')).toBeNull();
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Focus map view' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Show 1 place nearby' }),
+    ).toBeTruthy();
   });
 
   it('requests GPS and nearby food from the in-app map', () => {

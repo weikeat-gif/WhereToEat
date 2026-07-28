@@ -9,7 +9,10 @@ import MapView, {
 } from 'react-native-maps';
 
 import type { MapCanvasProps } from '@/features/map/map-canvas';
-import { radiusForMapRegion } from '@/features/map/map-viewport';
+import {
+  boundsForMapRegion,
+  radiusForMapRegion,
+} from '@/features/map/map-viewport';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
 
@@ -133,6 +136,7 @@ export function MapCanvas({
     onViewportChange({
       center: nextCenter,
       radiusMeters: radiusForMapRegion(region),
+      bounds: boundsForMapRegion(region),
     });
   };
 

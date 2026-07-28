@@ -122,6 +122,16 @@ describe('web MapCanvas', () => {
         longitude: 101.46,
       },
       radiusMeters: expect.any(Number),
+      bounds: {
+        northEast: {
+          latitude: 3.0975,
+          longitude: 101.4975,
+        },
+        southWest: {
+          latitude: 3.0225,
+          longitude: 101.4225,
+        },
+      },
     });
 
     act(() => mapPressListener?.());

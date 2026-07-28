@@ -251,6 +251,19 @@ export function MapCanvas({
                     },
                   )
                 : 3000,
+            bounds:
+              northEast && southWest
+                ? {
+                    northEast: {
+                      latitude: northEast.lat(),
+                      longitude: northEast.lng(),
+                    },
+                    southWest: {
+                      latitude: southWest.lat(),
+                      longitude: southWest.lng(),
+                    },
+                  }
+                : undefined,
           };
           if (!viewportChanged(lastViewportRef.current, nextViewport)) return;
           lastViewportRef.current = nextViewport;

@@ -246,7 +246,7 @@ describe('HomeScreen', () => {
     jest.useRealTimers();
   });
 
-  it('keeps one sharp, uncropped Malaysian food image mounted at a time', () => {
+  it('keeps one full-bleed Malaysian food image mounted at a time', () => {
     const screen = renderScreen();
 
     expect(HERO_SLIDES).toHaveLength(5);
@@ -255,7 +255,7 @@ describe('HomeScreen', () => {
     );
     expect(
       screen.UNSAFE_getByProps({ testID: 'hero-slide-0' }).props.contentFit,
-    ).toBe('contain');
+    ).toBe('cover');
     expect(
       screen.UNSAFE_queryAllByProps({ testID: 'hero-slide-1' }),
     ).toHaveLength(0);

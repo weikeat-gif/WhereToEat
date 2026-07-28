@@ -21,7 +21,10 @@ import { CompactPlaceRow } from '@/components/ui/compact-place-row';
 import type { PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
 import { MapCanvas } from '@/features/map/map-canvas';
-import type { MapViewport } from '@/features/map/map-viewport';
+import {
+  selectMapPlacesForViewport,
+  type MapViewport,
+} from '@/features/map/map-viewport';
 import { DISCOVERY_PLACES } from '@/features/home/discovery-data';
 import { useSearch } from '@/features/search/search-provider';
 import { i18n } from '@/i18n';
@@ -67,6 +70,15 @@ export function MapScreen() {
   const [viewMode, setViewMode] = useState<MapViewMode>('split');
   const mapFocused = viewMode === 'map';
   const listFocused = viewMode === 'list';
+  const visibleResults = useMemo(
+    () => {
+      const bounds = mapViewport.bounds;
+      return bounds
+        ? selectMapPlacesForViewport(results, bounds)
+        : results;
+    },
+    [mapViewport.bounds, results],
+  );
   const nearbyDockPanResponder = useMemo(
     () =>
       PanResponder.create({
@@ -250,9 +262,11 @@ export function MapScreen() {
           </Text>
           <Text style={{ color: colors.textMuted }}>
             {i18n.t('mapResultCount', {
-              count: results.length,
+              count: visibleResults.length,
               spotLabel:
-                results.length === 1 ? i18n.t('mapSpot') : i18n.t('mapSpots'),
+                visibleResults.length === 1
+                  ? i18n.t('mapSpot')
+                  : i18n.t('mapSpots'),
               area: criteria.areaLabel,
             })}
           </Text>
@@ -388,7 +402,7 @@ export function MapScreen() {
             onViewportChange={setMapViewport}
             onMapPress={() => setViewMode('map')}
             onPlacePress={openPlace}
-            places={results}
+            places={visibleResults}
             showsUserLocation={locationStatus === 'granted'}
           />
 
@@ -482,7 +496,7 @@ export function MapScreen() {
           </Pressable>
           <FlatList
             contentContainerStyle={styles.resultsContent}
-            data={results}
+            data={visibleResults}
             ItemSeparatorComponent={() => <View style={styles.resultGap} />}
             keyboardShouldPersistTaps="handled"
             keyExtractor={(place) => place.id}
@@ -521,9 +535,9 @@ export function MapScreen() {
           {...nearbyDockPanResponder.panHandlers}
           accessibilityHint={i18n.t('mapNearbyHint')}
           accessibilityLabel={i18n.t('mapShowNearbyAccessibility', {
-            count: results.length,
+            count: visibleResults.length,
             placeLabel:
-              results.length === 1
+              visibleResults.length === 1
                 ? i18n.t('mapNearbyPlace')
                 : i18n.t('mapNearbyPlaces'),
           })}
@@ -542,9 +556,9 @@ export function MapScreen() {
           <View style={styles.dockCopy}>
             <Text style={[styles.dockTitle, { color: colors.text }]}>
               {i18n.t('mapNearbyDock', {
-                count: results.length,
+                count: visibleResults.length,
                 placeLabel:
-                  results.length === 1
+                  visibleResults.length === 1
                     ? i18n.t('mapNearbyPlace')
                     : i18n.t('mapNearbyPlaces'),
               })}

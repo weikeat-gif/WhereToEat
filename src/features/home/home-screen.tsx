@@ -156,7 +156,7 @@ export function HomeScreen() {
           <Image
             accessibilityIgnoresInvertColors
             cachePolicy="memory-disk"
-            contentFit="contain"
+            contentFit="cover"
             contentPosition="center"
             recyclingKey={HERO_SLIDES[activeHeroSlide].label}
             source={HERO_SLIDES[activeHeroSlide].source}
