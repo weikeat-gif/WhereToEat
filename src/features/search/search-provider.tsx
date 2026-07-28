@@ -159,6 +159,7 @@ export function SearchProvider({
           ...criteriaRef.current,
           center: coordinates,
           areaLabel: area.label,
+          rankPreference: 'DISTANCE',
         });
       } catch (areaError) {
         if (operationId !== requestIdRef.current) return undefined;
@@ -200,6 +201,7 @@ export function SearchProvider({
       ...criteriaRef.current,
       center: location.coordinates,
       areaLabel: 'Current location',
+      rankPreference: 'DISTANCE',
     });
   }, [locationClient, search]);
 

@@ -21,7 +21,11 @@ import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
 import { fontFamily } from '@/theme/tokens';
 
-import { DISCOVERY_PLACES, heroImage } from './discovery-data';
+import {
+  DISCOVERY_PLACES,
+  HERO_SLIDE_INTERVAL_MS,
+  HERO_SLIDES,
+} from './discovery-data';
 
 const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
 
@@ -40,6 +44,8 @@ export function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [openNowActive, setOpenNowActive] = useState(criteria.openNow);
   const [notice, setNotice] = useState<string | null>(null);
+  const [activeHeroSlide, setActiveHeroSlide] = useState(0);
+  const heroScrollRef = useRef<ScrollView>(null);
   const nearbyRequestInFlight = useRef(false);
   const isLiveDiscovery = env.EXPO_PUBLIC_DATA_MODE === 'live';
   const visiblePlaces =
@@ -75,6 +81,21 @@ export function HomeScreen() {
   useEffect(() => {
     setOpenNowActive(criteria.openNow);
   }, [criteria.openNow]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveHeroSlide((current) => {
+        const next = (current + 1) % HERO_SLIDES.length;
+        heroScrollRef.current?.scrollTo({
+          animated: true,
+          x: next * width,
+          y: 0,
+        });
+        return next;
+      });
+    }, HERO_SLIDE_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [width]);
 
   async function applyDiscovery(
     category?: string | null,
@@ -141,15 +162,37 @@ export function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, compact && styles.heroCompact]}>
-          <Image
-            accessibilityLabel="Steaming char kway teow with teh tarik"
-            contentFit="cover"
-            contentPosition="center"
-            source={heroImage}
-            style={StyleSheet.absoluteFill}
-            transition={180}
-          />
+          <ScrollView
+            ref={heroScrollRef}
+            accessibilityElementsHidden
+            contentContainerStyle={styles.heroSlides}
+            horizontal
+            importantForAccessibility="no-hide-descendants"
+            pagingEnabled
+            scrollEnabled={false}
+            showsHorizontalScrollIndicator={false}
+            style={StyleSheet.absoluteFill}>
+            {HERO_SLIDES.map((slide) => (
+              <View key={slide.label} style={[styles.heroSlide, { width }]}>
+                <Image
+                  accessibilityIgnoresInvertColors
+                  contentFit="cover"
+                  contentPosition="center"
+                  source={slide.source}
+                  style={StyleSheet.absoluteFill}
+                  transition={180}
+                />
+              </View>
+            ))}
+          </ScrollView>
           <View style={[StyleSheet.absoluteFill, styles.heroShade]} />
+          <View
+            accessible
+            accessibilityLabel={`Featured Malaysian food: ${HERO_SLIDES[activeHeroSlide].label}`}
+            accessibilityLiveRegion="polite"
+            pointerEvents="none"
+            style={StyleSheet.absoluteFill}
+          />
 
           <View
             accessible
@@ -180,6 +223,18 @@ export function HomeScreen() {
               <Ionicons color="#F7F7F3" name="options-outline" size={19} />
             </View>
           </Pressable>
+
+          <View pointerEvents="none" style={styles.heroDots}>
+            {HERO_SLIDES.map((slide, index) => (
+              <View
+                key={slide.label}
+                style={[
+                  styles.heroDot,
+                  index === activeHeroSlide && styles.heroDotActive,
+                ]}
+              />
+            ))}
+          </View>
         </View>
 
         <View style={styles.primaryActions}>
@@ -338,7 +393,23 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   heroCompact: { height: 350, paddingHorizontal: 14 },
+  heroSlides: { height: '100%' },
+  heroSlide: { height: '100%' },
   heroShade: { backgroundColor: 'rgba(0,0,0,0.16)' },
+  heroDots: {
+    alignSelf: 'center',
+    bottom: 82,
+    flexDirection: 'row',
+    gap: 6,
+    position: 'absolute',
+  },
+  heroDot: {
+    backgroundColor: 'rgba(255,255,255,0.48)',
+    borderRadius: 4,
+    height: 6,
+    width: 6,
+  },
+  heroDotActive: { backgroundColor: '#C6FF00', width: 18 },
   brand: {
     alignItems: 'center',
     flexDirection: 'row',

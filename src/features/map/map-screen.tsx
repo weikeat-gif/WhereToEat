@@ -18,9 +18,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { CompactPlaceRow } from '@/components/ui/compact-place-row';
-import type { Coordinates, PriceLevel } from '@/contracts/place';
+import type { PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
 import { MapCanvas } from '@/features/map/map-canvas';
+import type { MapViewport } from '@/features/map/map-viewport';
 import { DISCOVERY_PLACES } from '@/features/home/discovery-data';
 import { useSearch } from '@/features/search/search-provider';
 import { i18n } from '@/i18n';
@@ -54,7 +55,10 @@ export function MapScreen() {
     surpriseMe,
     updateCriteriaAndSearch,
   } = useSearch();
-  const [mapCenter, setMapCenter] = useState<Coordinates>(criteria.center);
+  const [mapViewport, setMapViewport] = useState<MapViewport>({
+    center: criteria.center,
+    radiusMeters: criteria.radiusMeters,
+  });
   const [queryInput, setQueryInput] = useState(criteria.query ?? '');
   const [areaInput, setAreaInput] = useState(criteria.areaLabel);
   const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
@@ -92,7 +96,10 @@ export function MapScreen() {
   };
 
   useEffect(() => {
-    setMapCenter(criteria.center);
+    setMapViewport((current) => ({
+      ...current,
+      center: criteria.center,
+    }));
     setAreaInput(criteria.areaLabel);
   }, [criteria.areaLabel, criteria.center]);
 
@@ -152,8 +159,10 @@ export function MapScreen() {
   const searchMapArea = () =>
     search({
       ...criteria,
-      center: mapCenter,
+      center: mapViewport.center,
       areaLabel: i18n.t('mapAreaLabel'),
+      radiusMeters: mapViewport.radiusMeters,
+      rankPreference: 'POPULARITY',
     });
 
   const listHeader = (
@@ -282,7 +291,7 @@ export function MapScreen() {
         <FilterChip
           active
           label={i18n.t('mapRadius', {
-            distance: criteria.radiusMeters / 1000,
+            distance: Number((criteria.radiusMeters / 1000).toFixed(1)),
           })}
           onPress={cycleRadius}
         />
@@ -371,8 +380,8 @@ export function MapScreen() {
       style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <View testID="map-pane" style={styles.mapPane}>
         <MapCanvas
-          center={mapCenter}
-          onCenterChange={setMapCenter}
+          center={mapViewport.center}
+          onViewportChange={setMapViewport}
           onMapPress={() => setMapFocused(true)}
           onPlacePress={openPlace}
           places={results}

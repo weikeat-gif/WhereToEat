@@ -8,6 +8,7 @@ export type PlacesAction =
       query?: string;
       openNow?: boolean;
       priceLevels?: number[];
+      rankPreference?: 'DISTANCE' | 'POPULARITY';
     }
   | { action: 'autocomplete'; input: string; sessionToken: string }
   | { action: 'details'; placeId: string }
@@ -161,7 +162,7 @@ export function buildGoogleRequest(
               radius: input.radiusMeters,
             },
           },
-          rankPreference: 'DISTANCE',
+          rankPreference: input.rankPreference ?? 'DISTANCE',
         }),
       },
     };
@@ -383,6 +384,16 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
           ? [...new Set(value.priceLevels)]
           : null;
     if (priceLevels === null) throw new Error('priceLevels is invalid.');
+    const rankPreference =
+      value.rankPreference === undefined
+        ? undefined
+        : value.rankPreference === 'DISTANCE' ||
+            value.rankPreference === 'POPULARITY'
+          ? value.rankPreference
+          : null;
+    if (rankPreference === null) {
+      throw new Error('rankPreference is invalid.');
+    }
     return {
       action: 'nearby',
       latitude: value.latitude,
@@ -392,6 +403,7 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
       query,
       openNow,
       priceLevels,
+      rankPreference,
     };
   }
 

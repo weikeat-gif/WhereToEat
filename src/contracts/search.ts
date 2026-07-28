@@ -5,6 +5,7 @@ export type SearchCriteria = {
   center: Coordinates;
   areaLabel: string;
   radiusMeters: number;
+  rankPreference?: 'DISTANCE' | 'POPULARITY';
   openNow: boolean;
   priceLevels: PriceLevel[];
   categories: string[];

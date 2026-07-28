@@ -1,6 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 import MapView, {
   Marker,
   PROVIDER_GOOGLE,
@@ -9,11 +9,11 @@ import MapView, {
 } from 'react-native-maps';
 
 import type { MapCanvasProps } from '@/features/map/map-canvas';
+import { radiusForMapRegion } from '@/features/map/map-viewport';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
 
 const LATITUDE_DELTA = 0.075;
-const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
 const FOOD_DISCOVERY_MAP_STYLE: MapStyleElement[] = [
   {
     featureType: 'poi',
@@ -77,23 +77,31 @@ function mapStyleFor(mode: 'light' | 'dark'): MapStyleElement[] {
 export function MapCanvas({
   center,
   places,
-  onCenterChange,
+  onViewportChange,
   onMapPress,
   onPlacePress,
   showsUserLocation,
 }: MapCanvasProps) {
   const { colors, resolvedMode } = useAppTheme();
   const mapRef = useRef<MapView>(null);
-  const lastRegionCenterRef = useRef(center);
+  const lastRegionRef = useRef<Region>({
+    ...center,
+    latitudeDelta: 0,
+    longitudeDelta: 0,
+  });
 
   useEffect(() => {
-    const previousCenter = lastRegionCenterRef.current;
+    const previousCenter = lastRegionRef.current;
     const centerChangedExternally =
       Math.abs(previousCenter.latitude - center.latitude) > 0.00001 ||
       Math.abs(previousCenter.longitude - center.longitude) > 0.00001;
     if (!centerChangedExternally) return;
 
-    lastRegionCenterRef.current = center;
+    lastRegionRef.current = {
+      ...center,
+      latitudeDelta: LATITUDE_DELTA,
+      longitudeDelta: LATITUDE_DELTA,
+    };
     mapRef.current?.animateToRegion(
       {
         ...center,
@@ -109,16 +117,23 @@ export function MapCanvas({
       latitude: region.latitude,
       longitude: region.longitude,
     };
-    const previousCenter = lastRegionCenterRef.current;
+    const previousRegion = lastRegionRef.current;
     if (
-      Math.abs(previousCenter.latitude - nextCenter.latitude) <= 0.00001 &&
-      Math.abs(previousCenter.longitude - nextCenter.longitude) <= 0.00001
+      Math.abs(previousRegion.latitude - nextCenter.latitude) <= 0.00001 &&
+      Math.abs(previousRegion.longitude - nextCenter.longitude) <= 0.00001 &&
+      Math.abs(previousRegion.latitudeDelta - region.latitudeDelta) <=
+        0.00001 &&
+      Math.abs(previousRegion.longitudeDelta - region.longitudeDelta) <=
+        0.00001
     ) {
       return;
     }
 
-    lastRegionCenterRef.current = nextCenter;
-    onCenterChange(nextCenter);
+    lastRegionRef.current = region;
+    onViewportChange({
+      center: nextCenter,
+      radiusMeters: radiusForMapRegion(region),
+    });
   };
 
   return (
@@ -151,12 +166,14 @@ export function MapCanvas({
             onPress={() => onPlacePress(place.id)}
             title={place.name}
             tracksViewChanges={false}>
-            <Image
-              accessibilityIgnoresInvertColors
-              contentFit="contain"
-              source={brandMark}
-              style={styles.marker}
-            />
+            <View style={styles.marker}>
+              <View style={styles.markerHead}>
+                <View style={styles.markerCore}>
+                  <Ionicons color="#171C1B" name="restaurant" size={16} />
+                </View>
+              </View>
+              <View style={styles.markerTail} />
+            </View>
           </Marker>
         ))}
       </MapView>
@@ -170,4 +187,34 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   marker: { height: 52, width: 40 },
+  markerHead: {
+    alignItems: 'center',
+    backgroundColor: '#E64B3C',
+    borderColor: '#171C1B',
+    borderRadius: 20,
+    borderWidth: 2,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  markerCore: {
+    alignItems: 'center',
+    backgroundColor: '#C6FF00',
+    borderColor: '#FFFFFF',
+    borderRadius: 13,
+    borderWidth: 2,
+    height: 26,
+    justifyContent: 'center',
+    width: 26,
+  },
+  markerTail: {
+    alignSelf: 'center',
+    borderLeftColor: 'transparent',
+    borderLeftWidth: 7,
+    borderRightColor: 'transparent',
+    borderRightWidth: 7,
+    borderTopColor: '#E64B3C',
+    borderTopWidth: 12,
+    marginTop: -3,
+  },
 });

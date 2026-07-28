@@ -14,6 +14,21 @@ const burgerImage = require('../../../assets/images/makanmana/ramly-burger.png')
 const nasiLemakImage = require('../../../assets/images/makanmana/nasi-lemak.png');
 
 export const heroImage = require('../../../assets/images/makanmana/char-kway-teow-hero.png');
+export const HERO_SLIDE_INTERVAL_MS = 4500;
+export const HERO_SLIDES = [
+  {
+    source: heroImage,
+    label: 'Char kway teow with teh tarik',
+  },
+  {
+    source: nasiLemakImage,
+    label: 'Nasi lemak ayam berempah',
+  },
+  {
+    source: burgerImage,
+    label: 'Ramly burger special',
+  },
+] as const;
 
 export function demoImageForPlace(
   placeId: string,

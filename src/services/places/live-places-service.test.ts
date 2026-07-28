@@ -281,6 +281,28 @@ describe('LivePlacesService', () => {
     );
   });
 
+  it('forwards popularity ranking for a visible-map search', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ places: [] }));
+    const service = new LivePlacesService(
+      'https://project.supabase.co/functions/v1/places',
+    );
+
+    await service.searchNearby({
+      ...criteria,
+      radiusMeters: 6800,
+      rankPreference: 'POPULARITY',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://project.supabase.co/functions/v1/places',
+      expect.objectContaining({
+        body: expect.stringContaining('"rankPreference":"POPULARITY"'),
+      }),
+    );
+  });
+
   it.each([
     {
       label: 'Cafe filter',

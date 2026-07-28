@@ -1,5 +1,5 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Share } from 'react-native';
+import { Linking, Share } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { PlaceSummary } from '@/contracts/place';
@@ -103,8 +103,9 @@ describe('PlaceDetailsScreen', () => {
     expect(mockToggle).toHaveBeenCalledWith('jalan-21-burger');
   });
 
-  it('announces Share failures and keeps Directions inside MakanMana', async () => {
+  it('announces Share failures and offers external navigation apps', async () => {
     jest.spyOn(Share, 'share').mockRejectedValue(new Error('share unavailable'));
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     const screen = render(
       <SafeAreaProvider
         initialMetrics={{
@@ -123,10 +124,14 @@ describe('PlaceDetailsScreen', () => {
     );
 
     fireEvent.press(screen.getByTestId('directions-button'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/directions/[id]',
-      params: { id: 'jalan-21-burger' },
-    });
+    expect(screen.getByText('Choose your navigation app')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Navigate with Waze' }));
+    expect(openUrl).toHaveBeenCalledWith(
+      expect.stringContaining('https://waze.com/ul?'),
+    );
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/directions/[id]' }),
+    );
   });
 
   it('discloses a sponsored restaurant and records its unique profile view', async () => {

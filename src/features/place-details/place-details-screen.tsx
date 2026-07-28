@@ -4,6 +4,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -19,6 +21,10 @@ import { IconButton } from '@/components/ui/icon-button';
 import { SemanticChip } from '@/components/ui/semantic-chip';
 import { env } from '@/config/env';
 import { useAuth } from '@/features/auth/auth-provider';
+import {
+  buildGoogleMapsNavigationUrl,
+  buildWazeNavigationUrl,
+} from '@/features/directions/external-navigation';
 import {
   DISCOVERY_PLACES,
   formatDistance,
@@ -59,6 +65,7 @@ export function PlaceDetailsScreen() {
   const [loadedPlace, setLoadedPlace] = useState(initialPlace);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const summary = results.find((candidate) => candidate.id === loadedPlace?.id);
   const place = loadedPlace && summary
     ? { ...loadedPlace, ...summary }
@@ -126,10 +133,22 @@ export function PlaceDetailsScreen() {
   function openDirections() {
     if (!place) return;
     setActionError(null);
-    router.push({
-      pathname: '/directions/[id]',
-      params: { id: place.id },
-    });
+    setNavigationOpen(true);
+  }
+
+  async function openNavigationApp(provider: 'waze' | 'google') {
+    if (!place) return;
+    const url =
+      provider === 'waze'
+        ? buildWazeNavigationUrl(place.coordinates)
+        : buildGoogleMapsNavigationUrl(place.coordinates, place.id);
+    setNavigationOpen(false);
+    setActionError(null);
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setActionError('Unable to open that navigation app.');
+    }
   }
 
   if (!place) {
@@ -432,6 +451,98 @@ export function PlaceDetailsScreen() {
           />
         </View>
       </View>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setNavigationOpen(false)}
+        transparent
+        visible={navigationOpen}>
+        <View style={styles.navigationModal}>
+          <Pressable
+            accessibilityLabel="Close navigation options"
+            accessibilityRole="button"
+            onPress={() => setNavigationOpen(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            style={[
+              styles.navigationSheet,
+              {
+                backgroundColor: colors.navBackground,
+                borderColor: colors.border,
+                paddingBottom: Math.max(insets.bottom, 18),
+              },
+            ]}>
+            <View style={styles.navigationHandle} />
+            <Text style={[styles.navigationTitle, { color: colors.text }]}>
+              Choose your navigation app
+            </Text>
+            <Text
+              style={[styles.navigationSubtitle, { color: colors.textMuted }]}>
+              MakanMana will open this restaurant in an external navigation
+              app.
+            </Text>
+            <Pressable
+              accessibilityLabel="Navigate with Waze"
+              accessibilityRole="button"
+              onPress={() => void openNavigationApp('waze')}
+              style={({ pressed }) => [
+                styles.navigationOption,
+                {
+                  backgroundColor: colors.accent,
+                  opacity: pressed ? 0.76 : 1,
+                },
+              ]}>
+              <Ionicons color={colors.accentText} name="navigate" size={22} />
+              <Text
+                style={[
+                  styles.navigationOptionText,
+                  { color: colors.accentText },
+                ]}>
+                Waze
+              </Text>
+              <Ionicons
+                color={colors.accentText}
+                name="open-outline"
+                size={18}
+              />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Navigate with Google Maps"
+              accessibilityRole="button"
+              onPress={() => void openNavigationApp('google')}
+              style={({ pressed }) => [
+                styles.navigationOption,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}>
+              <Ionicons color={colors.text} name="map-outline" size={22} />
+              <Text
+                style={[styles.navigationOptionText, { color: colors.text }]}>
+                Google Maps
+              </Text>
+              <Ionicons color={colors.text} name="open-outline" size={18} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Cancel navigation"
+              accessibilityRole="button"
+              onPress={() => setNavigationOpen(false)}
+              style={styles.navigationCancel}>
+              <Text
+                style={[
+                  styles.navigationCancelText,
+                  { color: colors.textMuted },
+                ]}>
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -562,4 +673,57 @@ const styles = StyleSheet.create({
   },
   distanceText: { fontFamily: fontFamily.semibold, fontSize: 15 },
   directionAction: { flex: 1 },
+  navigationModal: {
+    backgroundColor: 'rgba(0,0,0,0.56)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  navigationSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    gap: 10,
+    padding: 18,
+  },
+  navigationHandle: {
+    alignSelf: 'center',
+    backgroundColor: '#6D746F',
+    borderRadius: 3,
+    height: 5,
+    marginBottom: 4,
+    width: 46,
+  },
+  navigationTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: 22,
+    letterSpacing: -0.35,
+  },
+  navigationSubtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  navigationOption: {
+    alignItems: 'center',
+    borderRadius: 17,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 56,
+    paddingHorizontal: 16,
+  },
+  navigationOptionText: {
+    flex: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: 16,
+  },
+  navigationCancel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  navigationCancelText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 14,
+  },
 });

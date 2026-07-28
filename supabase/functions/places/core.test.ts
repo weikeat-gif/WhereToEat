@@ -201,6 +201,34 @@ describe('places Edge Function core', () => {
     });
   });
 
+  it('uses popularity ranking for a visible-map food search', () => {
+    const input = validatePlacesRequest({
+      action: 'nearby',
+      latitude: 3.139,
+      longitude: 101.6869,
+      radiusMeters: 6800,
+      includedTypes: ['restaurant', 'cafe'],
+      rankPreference: 'POPULARITY',
+    });
+    const request = buildGoogleRequest('server-key', input);
+
+    expect(JSON.parse(request.init.body as string)).toMatchObject({
+      locationRestriction: {
+        circle: { radius: 6800 },
+      },
+      rankPreference: 'POPULARITY',
+    });
+    expect(() =>
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 3.139,
+        longitude: 101.6869,
+        radiusMeters: 6800,
+        rankPreference: 'RANDOM',
+      }),
+    ).toThrow('rankPreference');
+  });
+
   it('accepts the complete nearby food discovery type set', () => {
     expect(
       validatePlacesRequest({

@@ -1,9 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { env } from '@/config/env';
 import type { Coordinates, PlaceSummary } from '@/contracts/place';
+import {
+  radiusForMapBounds,
+  type MapViewport,
+} from '@/features/map/map-viewport';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
 import { fontFamily, radius, spacing } from '@/theme/tokens';
@@ -11,7 +16,7 @@ import { fontFamily, radius, spacing } from '@/theme/tokens';
 export type MapCanvasProps = {
   center: Coordinates;
   places: PlaceSummary[];
-  onCenterChange: (center: Coordinates) => void;
+  onViewportChange: (viewport: MapViewport) => void;
   onMapPress: () => void;
   onPlacePress: (placeId: string) => void;
   showsUserLocation: boolean;
@@ -19,8 +24,13 @@ export type MapCanvasProps = {
 
 type MapsListener = { remove(): void };
 type MapsLatLng = { lat(): number; lng(): number };
+type MapsBounds = {
+  getNorthEast(): MapsLatLng;
+  getSouthWest(): MapsLatLng;
+};
 type WebMap = {
   addListener(event: string, listener: () => void): MapsListener;
+  getBounds(): MapsBounds | undefined;
   getCenter(): MapsLatLng | undefined;
   setCenter(center: { lat: number; lng: number }): void;
   setOptions?(options: Record<string, unknown>): void;
@@ -46,7 +56,13 @@ declare global {
 
 let mapsLoader: Promise<GoogleMapsApi> | undefined;
 const mapPreview = require('../../../assets/images/makanmana/kl-map-preview.png');
-const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
+export const FOOD_PIN_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="42" height="54" viewBox="0 0 42 54">
+    <path d="M21 52C18.2 45.7 5 34.3 5 21C5 11.6 12.2 4 21 4s16 7.6 16 17c0 13.3-13.2 24.7-16 31z" fill="#E64B3C" stroke="#171C1B" stroke-width="2.5"/>
+    <circle cx="21" cy="21" r="11.5" fill="#C6FF00" stroke="#FFFFFF" stroke-width="2"/>
+    <path d="M16.5 14v6.5M19 14v6.5M16.5 17h2.5M17.75 20.5V28M25 14v14M25 14c3.2 2.4 3.2 7 0 8.8" fill="none" stroke="#171C1B" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
+  </svg>
+`)}`;
 const PREVIEW_MARKER_POSITIONS = [
   { left: '20%', top: '24%' },
   { left: '65%', top: '31%' },
@@ -138,10 +154,17 @@ function coordinatesChanged(left: Coordinates, right: Coordinates) {
   );
 }
 
+function viewportChanged(left: MapViewport, right: MapViewport) {
+  return (
+    coordinatesChanged(left.center, right.center) ||
+    Math.abs(left.radiusMeters - right.radiusMeters) > 25
+  );
+}
+
 export function MapCanvas({
   center,
   places,
-  onCenterChange,
+  onViewportChange,
   onMapPress,
   onPlacePress,
   showsUserLocation: _showsUserLocation,
@@ -152,10 +175,13 @@ export function MapCanvas({
   const mapListenerRef = useRef<MapsListener | null>(null);
   const mapPressListenerRef = useRef<MapsListener | null>(null);
   const markerRefs = useRef<WebMarker[]>([]);
-  const lastCenterRef = useRef(center);
+  const lastViewportRef = useRef<MapViewport>({
+    center,
+    radiusMeters: 0,
+  });
   const latestCenterRef = useRef(center);
   const latestResolvedModeRef = useRef(resolvedMode);
-  const onCenterChangeRef = useRef(onCenterChange);
+  const onViewportChangeRef = useRef(onViewportChange);
   const onMapPressRef = useRef(onMapPress);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -165,8 +191,8 @@ export function MapCanvas({
   latestResolvedModeRef.current = resolvedMode;
 
   useEffect(() => {
-    onCenterChangeRef.current = onCenterChange;
-  }, [onCenterChange]);
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
 
   useEffect(() => {
     onMapPressRef.current = onMapPress;
@@ -182,7 +208,10 @@ export function MapCanvas({
         const element = hostRef.current as unknown as HTMLElement | null;
         if (!element) throw new Error('Map container is unavailable.');
         const latestCenter = latestCenterRef.current;
-        lastCenterRef.current = latestCenter;
+        lastViewportRef.current = {
+          ...lastViewportRef.current,
+          center: latestCenter,
+        };
         const map = new maps.Map(element, {
           center: {
             lat: latestCenter.latitude,
@@ -203,9 +232,29 @@ export function MapCanvas({
             latitude: next.lat(),
             longitude: next.lng(),
           };
-          if (!coordinatesChanged(lastCenterRef.current, nextCenter)) return;
-          lastCenterRef.current = nextCenter;
-          onCenterChangeRef.current(nextCenter);
+          const bounds = map.getBounds();
+          const northEast = bounds?.getNorthEast();
+          const southWest = bounds?.getSouthWest();
+          const nextViewport = {
+            center: nextCenter,
+            radiusMeters:
+              northEast && southWest
+                ? radiusForMapBounds(
+                    nextCenter,
+                    {
+                      latitude: northEast.lat(),
+                      longitude: northEast.lng(),
+                    },
+                    {
+                      latitude: southWest.lat(),
+                      longitude: southWest.lng(),
+                    },
+                  )
+                : 3000,
+          };
+          if (!viewportChanged(lastViewportRef.current, nextViewport)) return;
+          lastViewportRef.current = nextViewport;
+          onViewportChangeRef.current(nextViewport);
         });
         mapPressListenerRef.current = map.addListener('click', () => {
           onMapPressRef.current();
@@ -241,10 +290,16 @@ export function MapCanvas({
   }, [resolvedMode]);
 
   useEffect(() => {
-    if (!mapRef.current || !coordinatesChanged(lastCenterRef.current, center)) {
+    if (
+      !mapRef.current ||
+      !coordinatesChanged(lastViewportRef.current.center, center)
+    ) {
       return;
     }
-    lastCenterRef.current = center;
+    lastViewportRef.current = {
+      ...lastViewportRef.current,
+      center,
+    };
     mapRef.current.setCenter({
       lat: center.latitude,
       lng: center.longitude,
@@ -264,6 +319,7 @@ export function MapCanvas({
           lat: place.coordinates.latitude,
           lng: place.coordinates.longitude,
         },
+        icon: FOOD_PIN_ICON_URL,
         title: place.name,
       });
       marker.addListener('click', () => onPlacePress(place.id));
@@ -315,12 +371,12 @@ export function MapCanvas({
                 styles.previewMarker,
                 PREVIEW_MARKER_POSITIONS[index],
               ]}>
-              <Image
-                accessibilityIgnoresInvertColors
-                contentFit="contain"
-                source={brandMark}
-                style={styles.previewMarkerImage}
-              />
+              <View style={styles.previewMarkerHead}>
+                <View style={styles.previewMarkerCore}>
+                  <Ionicons color="#171C1B" name="restaurant" size={15} />
+                </View>
+              </View>
+              <View style={styles.previewMarkerTail} />
             </Pressable>
           ))}
           <View
@@ -399,5 +455,34 @@ const styles = StyleSheet.create({
     marginTop: -27,
     position: 'absolute',
   },
-  previewMarkerImage: { height: 54, width: 40 },
+  previewMarkerHead: {
+    alignItems: 'center',
+    backgroundColor: '#E64B3C',
+    borderColor: '#171C1B',
+    borderRadius: 20,
+    borderWidth: 2,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  previewMarkerCore: {
+    alignItems: 'center',
+    backgroundColor: '#C6FF00',
+    borderColor: '#FFFFFF',
+    borderRadius: 13,
+    borderWidth: 2,
+    height: 26,
+    justifyContent: 'center',
+    width: 26,
+  },
+  previewMarkerTail: {
+    alignSelf: 'center',
+    borderLeftColor: 'transparent',
+    borderLeftWidth: 7,
+    borderRightColor: 'transparent',
+    borderRightWidth: 7,
+    borderTopColor: '#E64B3C',
+    borderTopWidth: 12,
+    marginTop: -3,
+  },
 });

@@ -4,7 +4,7 @@ import { act, render, waitFor } from '@testing-library/react-native';
 
 import type { Coordinates } from '@/contracts/place';
 
-import { MapCanvas } from './map-canvas.tsx';
+import { FOOD_PIN_ICON_URL, MapCanvas } from './map-canvas.tsx';
 
 jest.mock('@/config/env', () => ({
   env: { EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY: 'browser-restricted-key' },
@@ -21,6 +21,13 @@ describe('web MapCanvas', () => {
     document.getElementById('makanmana-google-maps-js')?.remove();
     delete window.google;
     delete window.__makanManaGoogleMapsReady;
+  });
+
+  it('uses the MakanMana red and lime food pin artwork', () => {
+    const icon = decodeURIComponent(FOOD_PIN_ICON_URL);
+
+    expect(icon).toContain('#E64B3C');
+    expect(icon).toContain('#C6FF00');
   });
 
   it('initializes at the latest area when GPS changes while Maps is loading', async () => {
@@ -41,6 +48,18 @@ describe('web MapCanvas', () => {
       }
       getCenter() {
         return currentCenter;
+      }
+      getBounds() {
+        return {
+          getNorthEast: () => ({
+            lat: () => 3.0975,
+            lng: () => 101.4975,
+          }),
+          getSouthWest: () => ({
+            lat: () => 3.0225,
+            lng: () => 101.4225,
+          }),
+        };
       }
       setCenter(next: { lat: number; lng: number }) {
         currentCenter = { lat: () => next.lat, lng: () => next.lng };
@@ -63,7 +82,7 @@ describe('web MapCanvas', () => {
     const props = {
       center: firstCenter,
       places: [],
-      onCenterChange,
+      onViewportChange: onCenterChange,
       onMapPress,
       onPlacePress: jest.fn(),
       showsUserLocation: true,
@@ -98,8 +117,11 @@ describe('web MapCanvas', () => {
     currentCenter = { lat: () => 3.06, lng: () => 101.46 };
     act(() => idleListener?.());
     expect(onCenterChange).toHaveBeenCalledWith({
-      latitude: 3.06,
-      longitude: 101.46,
+      center: {
+        latitude: 3.06,
+        longitude: 101.46,
+      },
+      radiusMeters: expect.any(Number),
     });
 
     act(() => mapPressListener?.());

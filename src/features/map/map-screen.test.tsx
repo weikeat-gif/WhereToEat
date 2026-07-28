@@ -20,10 +20,13 @@ jest.mock('@/features/map/map-canvas', () => {
   const { TouchableOpacity, View } = jest.requireActual('react-native');
   return {
     MapCanvas: ({
-      onCenterChange,
+      onViewportChange,
       onMapPress,
     }: {
-      onCenterChange: (center: { latitude: number; longitude: number }) => void;
+      onViewportChange: (viewport: {
+        center: { latitude: number; longitude: number };
+        radiusMeters: number;
+      }) => void;
       onMapPress: () => void;
     }) => (
       <View accessibilityLabel="Map test canvas">
@@ -34,7 +37,10 @@ jest.mock('@/features/map/map-canvas', () => {
         <TouchableOpacity
           accessibilityLabel="Pan map test control"
           onPress={() =>
-            onCenterChange({ latitude: 3.05, longitude: 101.45 })
+            onViewportChange({
+              center: { latitude: 3.05, longitude: 101.45 },
+              radiusMeters: 6800,
+            })
           }
         />
       </View>
@@ -239,6 +245,8 @@ describe('MapScreen states', () => {
       expect.objectContaining({
         areaLabel: 'Map area',
         center: { latitude: 3.05, longitude: 101.45 },
+        radiusMeters: 6800,
+        rankPreference: 'POPULARITY',
       }),
     );
   });

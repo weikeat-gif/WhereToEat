@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { PlaceSummary } from '@/contracts/place';
@@ -211,6 +211,28 @@ describe('HomeScreen', () => {
       require('../../../assets/images/brand/makanmana-mark-tight.png'),
     );
     expect(mark).toHaveStyle({ height: 52, width: 40 });
+  });
+
+  it('automatically advances through Malaysian food hero slides', () => {
+    jest.useFakeTimers();
+    const screen = renderScreen();
+
+    expect(
+      screen.getByLabelText(
+        'Featured Malaysian food: Char kway teow with teh tarik',
+      ),
+    ).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(4500);
+    });
+
+    expect(
+      screen.getByLabelText(
+        'Featured Malaysian food: Nasi lemak ayam berempah',
+      ),
+    ).toBeTruthy();
+    jest.useRealTimers();
   });
 
   it('never flashes demo restaurants while live discovery starts', () => {

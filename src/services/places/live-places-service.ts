@@ -82,6 +82,7 @@ type PlacesAction =
       query?: string;
       openNow?: boolean;
       priceLevels?: PriceLevel[];
+      rankPreference?: 'DISTANCE' | 'POPULARITY';
     }
   | { action: 'autocomplete'; input: string; sessionToken: string }
   | { action: 'details'; placeId: string };
@@ -289,6 +290,7 @@ export class LivePlacesService implements PlacesService {
         query: criteria.query,
         openNow: criteria.openNow,
         priceLevels: criteria.priceLevels,
+        rankPreference: criteria.rankPreference,
       }),
     );
     const places = payload.places
