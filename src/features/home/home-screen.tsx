@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +29,17 @@ import {
 } from './discovery-data';
 
 const brandMark = require('../../../assets/images/brand/makanmana-mark-tight.png');
+const HERO_SWIPE_THRESHOLD = 36;
+
+export function heroSlideOffsetForGesture(dx: number, dy: number): -1 | 0 | 1 {
+  if (
+    Math.abs(dx) < HERO_SWIPE_THRESHOLD ||
+    Math.abs(dx) <= Math.abs(dy)
+  ) {
+    return 0;
+  }
+  return dx < 0 ? 1 : -1;
+}
 
 export function HomeScreen() {
   const { colors } = useAppTheme();
@@ -50,6 +62,11 @@ export function HomeScreen() {
   const visiblePlaces =
     searchStatus === 'idle' && !isLiveDiscovery ? DISCOVERY_PLACES : results;
   const compact = width < 360 || fontScale > 1.25;
+  const moveHeroSlide = useCallback((offset: -1 | 1) => {
+    setActiveHeroSlide(
+      (current) => (current + offset + HERO_SLIDES.length) % HERO_SLIDES.length,
+    );
+  }, []);
 
   const filters = useMemo(
     () => [
@@ -76,17 +93,30 @@ export function HomeScreen() {
     ],
     [colors],
   );
+  const heroPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          Math.abs(gesture.dx) > 12 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderRelease: (_event, gesture) => {
+          const offset = heroSlideOffsetForGesture(gesture.dx, gesture.dy);
+          if (offset) moveHeroSlide(offset);
+        },
+      }),
+    [moveHeroSlide],
+  );
 
   useEffect(() => {
     setOpenNowActive(criteria.openNow);
   }, [criteria.openNow]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveHeroSlide((current) => (current + 1) % HERO_SLIDES.length);
+    const timeout = setTimeout(() => {
+      moveHeroSlide(1);
     }, HERO_SLIDE_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearTimeout(timeout);
+  }, [activeHeroSlide, moveHeroSlide]);
 
   async function applyDiscovery(
     category?: string | null,
@@ -152,7 +182,10 @@ export function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={[styles.hero, compact && styles.heroCompact]}>
+        <View
+          {...heroPanResponder.panHandlers}
+          style={[styles.hero, compact && styles.heroCompact]}
+          testID="hero-carousel">
           <Image
             accessibilityIgnoresInvertColors
             cachePolicy="memory-disk"
@@ -169,6 +202,18 @@ export function HomeScreen() {
             accessible
             accessibilityLabel={`Featured Malaysian food: ${HERO_SLIDES[activeHeroSlide].label}`}
             accessibilityLiveRegion="polite"
+            accessibilityActions={[
+              { name: 'increment', label: 'Next featured food' },
+              { name: 'decrement', label: 'Previous featured food' },
+            ]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === 'increment') {
+                moveHeroSlide(1);
+              }
+              if (event.nativeEvent.actionName === 'decrement') {
+                moveHeroSlide(-1);
+              }
+            }}
             pointerEvents="none"
             style={StyleSheet.absoluteFill}
           />

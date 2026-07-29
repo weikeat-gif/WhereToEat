@@ -79,7 +79,7 @@ export function CompactPlaceRow({
           maxFontSizeMultiplier={1.25}
           numberOfLines={1}
           style={[styles.meta, { color: colors.textMuted }]}>
-          {place.subtitle} · {formatDistance(place.distanceMeters)}
+          {place.subtitle}
         </Text>
         <View style={styles.labelRow}>
           {place.promotion ? (
@@ -103,6 +103,16 @@ export function CompactPlaceRow({
                 { color: isSupper ? colors.supper : colors.price },
               ]}>
               {isSupper ? 'SUPPER' : formatPrice(place.priceLevel)}
+            </Text>
+          </View>
+          <View style={styles.label}>
+            <Ionicons
+              color={colors.textMuted}
+              name="navigate-outline"
+              size={13}
+            />
+            <Text style={[styles.distanceText, { color: colors.textMuted }]}>
+              {formatDistance(place.distanceMeters)}
             </Text>
           </View>
         </View>
@@ -150,13 +160,22 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 3,
   },
-  labelRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  labelRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 8,
+  },
   label: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   labelDot: { borderRadius: 3, height: 6, width: 6 },
   labelText: {
     fontFamily: fontFamily.bold,
     fontSize: 10,
     letterSpacing: 0.35,
+  },
+  distanceText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
   },
   rating: {
     alignItems: 'center',

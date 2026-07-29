@@ -7,7 +7,7 @@ import {
   HERO_SLIDES,
 } from '@/features/home/discovery-data';
 
-import { HomeScreen } from './home-screen';
+import { heroSlideOffsetForGesture, HomeScreen } from './home-screen';
 
 const mockPush = jest.fn();
 const mockSearch = jest.fn();
@@ -244,6 +244,42 @@ describe('HomeScreen', () => {
     ).toHaveLength(0);
     expect(screen.UNSAFE_getByProps({ testID: 'hero-slide-1' })).toBeTruthy();
     jest.useRealTimers();
+  });
+
+  it('moves to the next and previous food with horizontal swipes', () => {
+    const screen = renderScreen();
+    const currentSlide = screen.getByLabelText(
+      'Featured Malaysian food: Char kway teow with teh tarik',
+    );
+
+    expect(heroSlideOffsetForGesture(-80, 4)).toBe(1);
+    expect(heroSlideOffsetForGesture(80, 4)).toBe(-1);
+    expect(heroSlideOffsetForGesture(8, 80)).toBe(0);
+    act(() => {
+      currentSlide.props.onAccessibilityAction({
+        nativeEvent: { actionName: 'increment' },
+      });
+    });
+    expect(
+      screen.getByLabelText(
+        'Featured Malaysian food: Nasi lemak ayam berempah',
+      ),
+    ).toBeTruthy();
+
+    act(() => {
+      screen
+        .getByLabelText(
+          'Featured Malaysian food: Nasi lemak ayam berempah',
+        )
+        .props.onAccessibilityAction({
+          nativeEvent: { actionName: 'decrement' },
+        });
+    });
+    expect(
+      screen.getByLabelText(
+        'Featured Malaysian food: Char kway teow with teh tarik',
+      ),
+    ).toBeTruthy();
   });
 
   it('keeps one full-bleed Malaysian food image mounted at a time', () => {
