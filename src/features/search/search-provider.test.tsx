@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import type { PlaceDetails, PlaceSummary } from '@/contracts/place';
@@ -71,11 +72,14 @@ function Harness() {
 }
 
 function AreaHarness() {
-  const { criteria, error, selectArea, status } = useSearch();
+  const { criteria, error, results, selectArea, status, surpriseMe } = useSearch();
+  const [surpriseId, setSurpriseId] = useState('none');
   return (
     <View>
       <Text testID="area">{criteria.areaLabel}</Text>
       <Text testID="area-status">{`${status}:${error ?? 'none'}`}</Text>
+      <Text testID="area-results">{results.length}</Text>
+      <Text testID="area-surprise">{surpriseId}</Text>
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel="Select Klang"
@@ -86,6 +90,12 @@ function AreaHarness() {
           )
         }>
         <Text>Select</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Pick selected-area surprise"
+        onPress={() => setSurpriseId(surpriseMe()?.id ?? 'none')}>
+        <Text>Surprise</Text>
       </TouchableOpacity>
     </View>
   );
@@ -161,6 +171,10 @@ describe('SearchProvider synchronization', () => {
       ...result,
       id: 'klang-1',
       coordinates: { latitude: 3.0449, longitude: 101.4456 },
+      viewport: {
+        northEast: { latitude: 3.0849, longitude: 101.4856 },
+        southWest: { latitude: 3.0049, longitude: 101.4056 },
+      },
       address: 'Klang, Selangor',
       openingHours: [],
       photoUrls: [],
@@ -179,10 +193,50 @@ describe('SearchProvider synchronization', () => {
     expect(service.getPlaceDetails).toHaveBeenCalledWith('klang-1');
     expect(searchNearby).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        areaBounds: {
+          northEast: { latitude: 3.0849, longitude: 101.4856 },
+          southWest: { latitude: 3.0049, longitude: 101.4056 },
+        },
         areaLabel: 'Klang, Selangor',
         query: undefined,
+        radiusMeters: expect.any(Number),
       }),
     );
+    expect(
+      (searchNearby.mock.calls.at(-1)?.[0] as SearchCriteria).radiusMeters,
+    ).toBeGreaterThan(6_000);
+  });
+
+  it('keeps out-of-area results out of shared state and Surprise me', async () => {
+    const service = new FakePlacesService();
+    jest.spyOn(service, 'getPlaceDetails').mockResolvedValue({
+      ...result,
+      id: 'klang-1',
+      coordinates: { latitude: 3.0449, longitude: 101.4456 },
+      viewport: {
+        northEast: { latitude: 3.0849, longitude: 101.4856 },
+        southWest: { latitude: 3.0049, longitude: 101.4056 },
+      },
+      address: 'Klang, Selangor',
+      openingHours: [],
+      photoUrls: [],
+    });
+    render(
+      <SearchProvider service={service}>
+        <AreaHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Select Klang' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('area-status')).toHaveTextContent('empty:none'),
+    );
+    expect(screen.getByTestId('area-results')).toHaveTextContent('0');
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Pick selected-area surprise' }),
+    );
+    expect(screen.getByTestId('area-surprise')).toHaveTextContent('none');
   });
 
   it('does not let a late location result overwrite a newer manual area', async () => {

@@ -18,36 +18,70 @@ const AREA_SUGGESTIONS: AreaSuggestion[] = [
     label: 'Kuala Lumpur City Centre',
     secondaryLabel: 'Kuala Lumpur',
     coordinates: { latitude: 3.1579, longitude: 101.7123 },
+    viewport: {
+      northEast: { latitude: 3.181, longitude: 101.735 },
+      southWest: { latitude: 3.135, longitude: 101.689 },
+    },
   },
   {
     id: 'klang',
     label: 'Klang',
     secondaryLabel: 'Selangor',
     coordinates: { latitude: 3.0449, longitude: 101.4456 },
+    viewport: {
+      northEast: { latitude: 3.0849, longitude: 101.4856 },
+      southWest: { latitude: 3.0049, longitude: 101.4056 },
+    },
+  },
+  {
+    id: 'taman-sentosa-klang',
+    label: 'Taman Sentosa',
+    secondaryLabel: 'Klang, Selangor',
+    coordinates: { latitude: 3.0268, longitude: 101.4372 },
+    viewport: {
+      northEast: { latitude: 3.046, longitude: 101.458 },
+      southWest: { latitude: 3.008, longitude: 101.418 },
+    },
   },
   {
     id: 'petaling-jaya',
     label: 'Petaling Jaya',
     secondaryLabel: 'Selangor',
     coordinates: { latitude: 3.1073, longitude: 101.6067 },
+    viewport: {
+      northEast: { latitude: 3.1473, longitude: 101.6467 },
+      southWest: { latitude: 3.0673, longitude: 101.5667 },
+    },
   },
   {
     id: 'subang-jaya',
     label: 'Subang Jaya',
     secondaryLabel: 'Selangor',
     coordinates: { latitude: 3.0567, longitude: 101.5851 },
+    viewport: {
+      northEast: { latitude: 3.0967, longitude: 101.6251 },
+      southWest: { latitude: 3.0167, longitude: 101.5451 },
+    },
   },
   {
     id: 'shah-alam',
     label: 'Shah Alam',
     secondaryLabel: 'Selangor',
     coordinates: { latitude: 3.0733, longitude: 101.5185 },
+    viewport: {
+      northEast: { latitude: 3.1133, longitude: 101.5585 },
+      southWest: { latitude: 3.0333, longitude: 101.4785 },
+    },
   },
   {
     id: 'bangsar',
     label: 'Bangsar',
     secondaryLabel: 'Kuala Lumpur',
     coordinates: { latitude: 3.1292, longitude: 101.6784 },
+    viewport: {
+      northEast: { latitude: 3.1492, longitude: 101.6984 },
+      southWest: { latitude: 3.1092, longitude: 101.6584 },
+    },
   },
 ];
 

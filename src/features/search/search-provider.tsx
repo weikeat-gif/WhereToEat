@@ -19,6 +19,10 @@ import {
   requestSearchLocation,
   type SearchLocationClient,
 } from '@/features/search/location';
+import {
+  isCoordinateWithinMapBounds,
+  radiusForMapBounds,
+} from '@/features/map/map-viewport';
 import { pickSurprise } from '@/features/search/surprise';
 import { placesService } from '@/services/places';
 import type { PlacesService } from '@/services/places/places-service';
@@ -117,12 +121,22 @@ export function SearchProvider({
       try {
         const nextResults = await service.searchNearby(nextCriteria);
         if (requestId !== requestIdRef.current) return undefined;
-        setSynchronizedCriteria(nextResults.criteria);
-        setResults(nextResults.places);
+        const areaBounds = nextResults.criteria.areaBounds;
+        const boundedPlaces = areaBounds
+          ? nextResults.places.filter((place) =>
+              isCoordinateWithinMapBounds(place.coordinates, areaBounds),
+            )
+          : nextResults.places;
+        const boundedResults = {
+          ...nextResults,
+          places: boundedPlaces,
+        };
+        setSynchronizedCriteria(boundedResults.criteria);
+        setResults(boundedResults.places);
         setSurprise(undefined);
-        setSearchResults(nextResults);
-        setStatus(nextResults.places.length === 0 ? 'empty' : 'success');
-        return nextResults;
+        setSearchResults(boundedResults);
+        setStatus(boundedResults.places.length === 0 ? 'empty' : 'success');
+        return boundedResults;
       } catch (searchError) {
         if (requestId !== requestIdRef.current) return undefined;
         setResults([]);
@@ -160,15 +174,26 @@ export function SearchProvider({
       setStatus('loading');
       setError(null);
       try {
-        const coordinates =
-          area.coordinates ??
-          (await service.getPlaceDetails(area.id)).coordinates;
+        const details = area.coordinates
+          ? undefined
+          : await service.getPlaceDetails(area.id);
+        const coordinates = area.coordinates ?? details?.coordinates;
+        if (!coordinates) throw new Error('Unable to resolve that area.');
+        const areaBounds = area.viewport ?? details?.viewport;
         if (operationId !== requestIdRef.current) return undefined;
         return search({
           ...criteriaRef.current,
           ...changes,
           center: coordinates,
+          areaBounds,
           areaLabel: area.label,
+          radiusMeters: areaBounds
+            ? radiusForMapBounds(
+                coordinates,
+                areaBounds.northEast,
+                areaBounds.southWest,
+              )
+            : criteriaRef.current.radiusMeters,
           rankPreference: 'DISTANCE',
         });
       } catch (areaError) {
@@ -212,6 +237,7 @@ export function SearchProvider({
     return search({
       ...criteriaRef.current,
       center: location.coordinates,
+      areaBounds: undefined,
       areaLabel: 'Current location',
       rankPreference: 'DISTANCE',
     });

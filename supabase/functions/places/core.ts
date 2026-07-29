@@ -4,6 +4,10 @@ export type PlacesAction =
       latitude: number;
       longitude: number;
       radiusMeters: number;
+      areaBounds?: {
+        northEast: { latitude: number; longitude: number };
+        southWest: { latitude: number; longitude: number };
+      };
       includedTypes?: string[];
       query?: string;
       openNow?: boolean;
@@ -57,7 +61,7 @@ const FIELD_MASKS = {
   autocomplete:
     'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
   details:
-    'id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
+    'id,displayName,formattedAddress,location,viewport,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
   route:
     'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
 } as const;
@@ -114,23 +118,35 @@ export function buildGoogleRequest(
   };
 
   if (input.action === 'nearby') {
-    if (input.query) {
+    if (input.query || input.areaBounds) {
+      const rectangle = input.areaBounds
+        ? {
+            low: input.areaBounds.southWest,
+            high: input.areaBounds.northEast,
+          }
+        : textSearchRectangle(
+            input.latitude,
+            input.longitude,
+            input.radiusMeters,
+          );
+      const restrictToSingleType =
+        Boolean(input.query) || input.includedTypes?.length === 1;
       return {
         url: 'https://places.googleapis.com/v1/places:searchText',
         init: {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            textQuery: input.query,
-            includedType: input.includedTypes?.[0] ?? 'restaurant',
-            strictTypeFiltering: true,
+            textQuery: input.query ?? 'food',
+            ...(restrictToSingleType
+              ? {
+                  includedType: input.includedTypes?.[0] ?? 'restaurant',
+                  strictTypeFiltering: true,
+                }
+              : {}),
             pageSize: 20,
             locationRestriction: {
-              rectangle: textSearchRectangle(
-                input.latitude,
-                input.longitude,
-                input.radiusMeters,
-              ),
+              rectangle,
             },
             ...(input.openNow ? { openNow: true } : {}),
             ...(input.priceLevels?.length
@@ -356,6 +372,30 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
           ? value.includedTypes
           : null;
     if (includedTypes === null) throw new Error('includedTypes is invalid.');
+    const areaBounds =
+      value.areaBounds === undefined
+        ? undefined
+        : isRecord(value.areaBounds) &&
+            validCoordinates(value.areaBounds.northEast) &&
+            validCoordinates(value.areaBounds.southWest) &&
+            value.areaBounds.southWest.latitude <
+              value.areaBounds.northEast.latitude &&
+            value.areaBounds.southWest.longitude <
+              value.areaBounds.northEast.longitude &&
+            isSupportedServiceCoordinate(value.areaBounds.northEast) &&
+            isSupportedServiceCoordinate(value.areaBounds.southWest)
+          ? {
+              northEast: {
+                latitude: value.areaBounds.northEast.latitude,
+                longitude: value.areaBounds.northEast.longitude,
+              },
+              southWest: {
+                latitude: value.areaBounds.southWest.latitude,
+                longitude: value.areaBounds.southWest.longitude,
+              },
+            }
+          : null;
+    if (areaBounds === null) throw new Error('Nearby search area bounds are invalid.');
     const query =
       value.query === undefined
         ? undefined
@@ -400,6 +440,7 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
       latitude: value.latitude,
       longitude: value.longitude,
       radiusMeters: value.radiusMeters,
+      areaBounds,
       includedTypes,
       query,
       openNow,

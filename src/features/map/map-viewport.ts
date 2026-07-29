@@ -1,4 +1,4 @@
-import type { Coordinates } from '@/contracts/place';
+import type { CoordinateBounds, Coordinates } from '@/contracts/place';
 
 export type MapViewport = {
   center: Coordinates;
@@ -6,10 +6,7 @@ export type MapViewport = {
   bounds?: MapBounds;
 };
 
-export type MapBounds = {
-  northEast: Coordinates;
-  southWest: Coordinates;
-};
+export type MapBounds = CoordinateBounds;
 
 const EARTH_RADIUS_METERS = 6_371_000;
 const MIN_SEARCH_RADIUS_METERS = 100;

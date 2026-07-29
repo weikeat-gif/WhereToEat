@@ -89,6 +89,19 @@ describe('places Edge Function core', () => {
     });
   });
 
+  it('requests the display viewport when resolving an area prediction', () => {
+    const request = buildGoogleRequest('server-key', {
+      action: 'details',
+      placeId: 'ChIJTamanSentosa',
+    });
+
+    expect(request.init).toMatchObject({
+      headers: expect.objectContaining({
+        'X-Goog-FieldMask': expect.stringContaining('viewport'),
+      }),
+    });
+  });
+
   it('builds Text Search New for a non-empty restaurant query', () => {
     const request = buildGoogleRequest('server-key', {
       action: 'nearby',
@@ -243,6 +256,50 @@ describe('places Edge Function core', () => {
         rankPreference: 'RANDOM',
       }),
     ).toThrow('rankPreference');
+  });
+
+  it('uses the exact selected-area rectangle for capped Google results', () => {
+    const input = validatePlacesRequest({
+      action: 'nearby',
+      latitude: 3.0268,
+      longitude: 101.4372,
+      radiusMeters: 3000,
+      areaBounds: {
+        northEast: { latitude: 3.046, longitude: 101.458 },
+        southWest: { latitude: 3.008, longitude: 101.418 },
+      },
+      includedTypes: ['restaurant', 'cafe'],
+    });
+    const request = buildGoogleRequest('server-key', input);
+
+    expect(request.url).toBe(
+      'https://places.googleapis.com/v1/places:searchText',
+    );
+    expect(JSON.parse(request.init.body as string)).toMatchObject({
+      textQuery: 'food',
+      pageSize: 20,
+      locationRestriction: {
+        rectangle: {
+          low: { latitude: 3.008, longitude: 101.418 },
+          high: { latitude: 3.046, longitude: 101.458 },
+        },
+      },
+    });
+  });
+
+  it('rejects inverted selected-area bounds', () => {
+    expect(() =>
+      validatePlacesRequest({
+        action: 'nearby',
+        latitude: 3.0268,
+        longitude: 101.4372,
+        radiusMeters: 3000,
+        areaBounds: {
+          northEast: { latitude: 3.008, longitude: 101.418 },
+          southWest: { latitude: 3.046, longitude: 101.458 },
+        },
+      }),
+    ).toThrow('area bounds');
   });
 
   it('accepts the complete nearby food discovery type set', () => {

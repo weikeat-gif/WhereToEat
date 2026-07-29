@@ -33,6 +33,8 @@ describe('web MapCanvas', () => {
   it('initializes at the latest area when GPS changes while Maps is loading', async () => {
     let mapOptions: Record<string, unknown> | undefined;
     const markerOptions: Record<string, unknown>[] = [];
+    const rectangleOptions: Record<string, unknown>[] = [];
+    const fitBounds = jest.fn();
     let currentCenter = { lat: () => 3.2, lng: () => 101.7 };
     let idleListener: (() => void) | undefined;
     let dragStartListener: (() => void) | undefined;
@@ -67,6 +69,9 @@ describe('web MapCanvas', () => {
       setCenter(next: { lat: number; lng: number }) {
         currentCenter = { lat: () => next.lat, lng: () => next.lng };
       }
+      fitBounds(bounds: Record<string, number>, padding?: number) {
+        fitBounds(bounds, padding);
+      }
     }
     class FakeMarker {
       constructor(options: Record<string, unknown>) {
@@ -74,6 +79,12 @@ describe('web MapCanvas', () => {
       }
       addListener() {
         return { remove: jest.fn() };
+      }
+      setMap() {}
+    }
+    class FakeRectangle {
+      constructor(options: Record<string, unknown>) {
+        rectangleOptions.push(options);
       }
       setMap() {}
     }
@@ -85,8 +96,13 @@ describe('web MapCanvas', () => {
       latitude: 3.05,
       longitude: 101.45,
     };
+    const highlightedArea = {
+      northEast: { latitude: 3.0975, longitude: 101.4975 },
+      southWest: { latitude: 3.0225, longitude: 101.4225 },
+    };
     const props = {
       center: firstCenter,
+      highlightedArea,
       places: [],
       onViewportChange: onCenterChange,
       onMapPress,
@@ -102,6 +118,7 @@ describe('web MapCanvas', () => {
         maps: {
           Map: FakeMap,
           Marker: FakeMarker,
+          Rectangle: FakeRectangle,
         },
       };
       window.__makanManaGoogleMapsReady?.();
@@ -118,6 +135,27 @@ describe('web MapCanvas', () => {
             stylers: [{ visibility: 'off' }],
           },
         ]),
+      }),
+    );
+    expect(fitBounds).toHaveBeenCalledWith(
+      {
+        east: 101.4975,
+        north: 3.0975,
+        south: 3.0225,
+        west: 101.4225,
+      },
+      48,
+    );
+    expect(rectangleOptions).toContainEqual(
+      expect.objectContaining({
+        bounds: {
+          east: 101.4975,
+          north: 3.0975,
+          south: 3.0225,
+          west: 101.4225,
+        },
+        fillOpacity: expect.any(Number),
+        strokeOpacity: expect.any(Number),
       }),
     );
 
@@ -165,4 +203,5 @@ describe('web MapCanvas', () => {
     act(() => mapPressListener?.());
     expect(onMapPress).toHaveBeenCalledTimes(1);
   });
+
 });

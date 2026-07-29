@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
+  Polygon,
   PROVIDER_GOOGLE,
   type Details,
   type MapStyleElement,
@@ -80,6 +81,7 @@ function mapStyleFor(mode: 'light' | 'dark'): MapStyleElement[] {
 
 export function MapCanvas({
   center,
+  highlightedArea,
   places,
   onViewportChange,
   onMapPress,
@@ -89,6 +91,7 @@ export function MapCanvas({
 }: MapCanvasProps) {
   const { colors, resolvedMode } = useAppTheme();
   const mapRef = useRef<MapView>(null);
+  const [mapLaidOut, setMapLaidOut] = useState(false);
   const lastRegionRef = useRef<Region>({
     ...center,
     latitudeDelta: 0,
@@ -100,7 +103,7 @@ export function MapCanvas({
     const centerChangedExternally =
       Math.abs(previousCenter.latitude - center.latitude) > 0.00001 ||
       Math.abs(previousCenter.longitude - center.longitude) > 0.00001;
-    if (!centerChangedExternally) return;
+    if (!centerChangedExternally || highlightedArea) return;
 
     lastRegionRef.current = {
       ...center,
@@ -115,7 +118,29 @@ export function MapCanvas({
       },
       350,
     );
-  }, [center]);
+  }, [center, highlightedArea]);
+
+  useEffect(() => {
+    if (!mapLaidOut || !highlightedArea) return;
+    mapRef.current?.fitToCoordinates(
+      [
+        highlightedArea.northEast,
+        {
+          latitude: highlightedArea.northEast.latitude,
+          longitude: highlightedArea.southWest.longitude,
+        },
+        highlightedArea.southWest,
+        {
+          latitude: highlightedArea.southWest.latitude,
+          longitude: highlightedArea.northEast.longitude,
+        },
+      ],
+      {
+        edgePadding: { top: 104, right: 32, bottom: 152, left: 32 },
+        animated: true,
+      },
+    );
+  }, [highlightedArea, mapLaidOut]);
 
   const handleRegionChange = (region: Region, details: Details) => {
     const nextCenter = {
@@ -153,6 +178,7 @@ export function MapCanvas({
           longitudeDelta: LATITUDE_DELTA,
         }}
         customMapStyle={mapStyleFor(resolvedMode)}
+        onLayout={() => setMapLaidOut(true)}
         onPress={onMapPress}
         onRegionChangeComplete={handleRegionChange}
         provider={PROVIDER_GOOGLE}
@@ -160,6 +186,25 @@ export function MapCanvas({
         showsMyLocationButton={false}
         showsUserLocation={showsUserLocation && Boolean(userCoordinates)}
         style={StyleSheet.absoluteFill}>
+        {highlightedArea ? (
+          <Polygon
+            coordinates={[
+              highlightedArea.northEast,
+              {
+                latitude: highlightedArea.northEast.latitude,
+                longitude: highlightedArea.southWest.longitude,
+              },
+              highlightedArea.southWest,
+              {
+                latitude: highlightedArea.southWest.latitude,
+                longitude: highlightedArea.northEast.longitude,
+              },
+            ]}
+            fillColor={`${colors.accent}2B`}
+            strokeColor={colors.accentForeground}
+            strokeWidth={2}
+          />
+        ) : null}
         {places.map((place) => (
           <Marker
             key={place.id}

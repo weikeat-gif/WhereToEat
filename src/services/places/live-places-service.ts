@@ -37,6 +37,12 @@ const rawPlaceSchema = z.object({
   displayName: z.object({ text: z.string().min(1) }),
   formattedAddress: z.string().optional(),
   location: coordinatesSchema,
+  viewport: z
+    .object({
+      low: coordinatesSchema,
+      high: coordinatesSchema,
+    })
+    .optional(),
   rating: z.number().min(0).max(5).optional(),
   userRatingCount: z.number().int().nonnegative().optional(),
   priceLevel: z.string().optional(),
@@ -78,6 +84,7 @@ type PlacesAction =
       latitude: number;
       longitude: number;
       radiusMeters: number;
+      areaBounds?: SearchCriteria['areaBounds'];
       includedTypes: string[];
       query?: string;
       openNow?: boolean;
@@ -121,6 +128,15 @@ function includedTypesFor(criteria: SearchCriteria) {
     return ['cafe'];
   }
   return criteria.query ? ['restaurant'] : [...NEARBY_FOOD_TYPES];
+}
+
+function isFoodPlace(place: RawPlace) {
+  return (place.types ?? []).some(
+    (type) =>
+      NEARBY_FOOD_TYPES.includes(
+        type as (typeof NEARBY_FOOD_TYPES)[number],
+      ) || type.endsWith('_restaurant'),
+  );
 }
 
 function errorForStatus(status: number) {
@@ -237,6 +253,12 @@ function toDetails(place: RawPlace): PlaceDetails {
     address: place.formattedAddress ?? '',
     openingHours: place.currentOpeningHours?.weekdayDescriptions ?? [],
     photoUrls: [],
+    viewport: place.viewport
+      ? {
+          northEast: place.viewport.high,
+          southWest: place.viewport.low,
+        }
+      : undefined,
   };
 }
 
@@ -286,6 +308,7 @@ export class LivePlacesService implements PlacesService {
         latitude: criteria.center.latitude,
         longitude: criteria.center.longitude,
         radiusMeters: criteria.radiusMeters,
+        areaBounds: criteria.areaBounds,
         includedTypes: includedTypesFor(criteria),
         query: criteria.query,
         openNow: criteria.openNow,
@@ -294,6 +317,7 @@ export class LivePlacesService implements PlacesService {
       }),
     );
     const places = payload.places
+      .filter(isFoodPlace)
       .map((place) => toSummary(place, criteria))
       .filter((place) => matchesCriteria(place, criteria))
       .sort(

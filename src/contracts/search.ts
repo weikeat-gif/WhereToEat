@@ -1,9 +1,15 @@
-import type { Coordinates, PlaceSummary, PriceLevel } from '@/contracts/place';
+import type {
+  CoordinateBounds,
+  Coordinates,
+  PlaceSummary,
+  PriceLevel,
+} from '@/contracts/place';
 
 export type SearchCriteria = {
   query?: string;
   center: Coordinates;
   areaLabel: string;
+  areaBounds?: CoordinateBounds;
   radiusMeters: number;
   rankPreference?: 'DISTANCE' | 'POPULARITY';
   openNow: boolean;
@@ -17,6 +23,7 @@ export type AreaSuggestion = {
   label: string;
   secondaryLabel?: string;
   coordinates?: Coordinates;
+  viewport?: CoordinateBounds;
 };
 
 export type SearchResults = {

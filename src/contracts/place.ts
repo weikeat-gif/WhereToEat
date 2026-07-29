@@ -5,6 +5,11 @@ export type Coordinates = {
   longitude: number;
 };
 
+export type CoordinateBounds = {
+  northEast: Coordinates;
+  southWest: Coordinates;
+};
+
 export type HalalVerification = {
   sourceName: string;
   sourceUrl: string;
@@ -39,6 +44,7 @@ export type PlaceDetails = PlaceSummary & {
   openingHours: string[];
   description?: string;
   photoUrls: string[];
+  viewport?: CoordinateBounds;
 };
 
 export type SavedPlace = {

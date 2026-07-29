@@ -37,6 +37,7 @@ const translations = {
     mapSettingsError:
       'Unable to open app settings. Open Settings on your phone and allow Location for MakanMana.',
     mapAreaLabel: 'Map area',
+    mapApproximateArea: 'Approximate area: %{area}',
     mapCategoryMalaysian: 'Malaysian',
     mapCategoryCafe: 'Cafe',
     mapCategoryChinese: 'Chinese',

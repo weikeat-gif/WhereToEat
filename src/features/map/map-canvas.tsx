@@ -7,6 +7,7 @@ import { env } from '@/config/env';
 import type { Coordinates, PlaceSummary } from '@/contracts/place';
 import {
   radiusForMapBounds,
+  type MapBounds,
   type MapViewport,
 } from '@/features/map/map-viewport';
 import { i18n } from '@/i18n';
@@ -15,6 +16,7 @@ import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 export type MapCanvasProps = {
   center: Coordinates;
+  highlightedArea?: MapBounds;
   places: PlaceSummary[];
   onViewportChange: (
     viewport: MapViewport,
@@ -36,11 +38,18 @@ type WebMap = {
   addListener(event: string, listener: () => void): MapsListener;
   getBounds(): MapsBounds | undefined;
   getCenter(): MapsLatLng | undefined;
+  fitBounds(
+    bounds: { north: number; east: number; south: number; west: number },
+    padding?: number,
+  ): void;
   setCenter(center: { lat: number; lng: number }): void;
   setOptions?(options: Record<string, unknown>): void;
 };
 type WebMarker = {
   addListener(event: string, listener: () => void): MapsListener;
+  setMap(map: WebMap | null): void;
+};
+type WebRectangle = {
   setMap(map: WebMap | null): void;
 };
 type GoogleMapsApi = {
@@ -49,6 +58,7 @@ type GoogleMapsApi = {
     options: Record<string, unknown>,
   ) => WebMap;
   Marker: new (options: Record<string, unknown>) => WebMarker;
+  Rectangle: new (options: Record<string, unknown>) => WebRectangle;
 };
 
 declare global {
@@ -171,8 +181,18 @@ function viewportChanged(left: MapViewport, right: MapViewport) {
   );
 }
 
+function webBounds(bounds: MapBounds) {
+  return {
+    north: bounds.northEast.latitude,
+    east: bounds.northEast.longitude,
+    south: bounds.southWest.latitude,
+    west: bounds.southWest.longitude,
+  };
+}
+
 export function MapCanvas({
   center,
+  highlightedArea,
   places,
   onViewportChange,
   onMapPress,
@@ -188,6 +208,7 @@ export function MapCanvas({
   const mapPressListenerRef = useRef<MapsListener | null>(null);
   const mapWasDraggedRef = useRef(false);
   const markerRefs = useRef<WebMarker[]>([]);
+  const rectangleRef = useRef<WebRectangle | null>(null);
   const lastViewportRef = useRef<MapViewport>({
     center,
     radiusMeters: 0,
@@ -307,6 +328,8 @@ export function MapCanvas({
       mapPressListenerRef.current?.remove();
       mapPressListenerRef.current = null;
       mapRef.current = null;
+      rectangleRef.current?.setMap(null);
+      rectangleRef.current = null;
     };
   }, [retryNonce, webKey]);
 
@@ -325,8 +348,42 @@ export function MapCanvas({
   }, [resolvedMode]);
 
   useEffect(() => {
+    rectangleRef.current?.setMap(null);
+    rectangleRef.current = null;
+    if (
+      !highlightedArea ||
+      !mapReady ||
+      !mapRef.current ||
+      !window.google?.maps
+    ) {
+      return;
+    }
+
+    const bounds = webBounds(highlightedArea);
+    mapRef.current.fitBounds(bounds, 48);
+    const rectangle = new window.google.maps.Rectangle({
+      bounds,
+      clickable: false,
+      fillColor: colors.accent,
+      fillOpacity: 0.16,
+      map: mapRef.current,
+      strokeColor: colors.accentForeground,
+      strokeOpacity: 0.78,
+      strokeWeight: 2,
+      zIndex: 1,
+    });
+    rectangleRef.current = rectangle;
+
+    return () => {
+      rectangle.setMap(null);
+      if (rectangleRef.current === rectangle) rectangleRef.current = null;
+    };
+  }, [colors.accent, colors.accentForeground, highlightedArea, mapReady]);
+
+  useEffect(() => {
     if (
       !mapRef.current ||
+      highlightedArea ||
       !coordinatesChanged(lastViewportRef.current.center, center)
     ) {
       return;
@@ -339,7 +396,7 @@ export function MapCanvas({
       lat: center.latitude,
       lng: center.longitude,
     });
-  }, [center]);
+  }, [center, highlightedArea]);
 
   useEffect(() => {
     markerRefs.current.forEach((marker) => marker.setMap(null));

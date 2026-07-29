@@ -297,6 +297,51 @@ describe('MapScreen states', () => {
     );
     expect(updateCriteriaAndSearch).not.toHaveBeenCalled();
     expect(query).toHaveProp('value', '');
+    expect(screen.queryByTestId('results-pane')).toBeNull();
+  });
+
+  it('limits selected-area restaurants to the highlighted area bounds', () => {
+    const insidePlace: PlaceSummary = {
+      ...trustedPlace,
+      id: 'inside-place',
+      name: 'Inside Taman Sentosa',
+      coordinates: { latitude: 3.0268, longitude: 101.4372 },
+    };
+    const outsidePlace: PlaceSummary = {
+      ...trustedPlace,
+      id: 'outside-place',
+      name: 'Outside Taman Sentosa',
+      coordinates: { latitude: 3.08, longitude: 101.5 },
+    };
+    const state = searchState({
+      results: [insidePlace, outsidePlace],
+    });
+    mockUseSearch.mockReturnValue({
+      ...state,
+      criteria: {
+        ...state.criteria,
+        areaLabel: 'Taman Sentosa, Klang',
+        center: { latitude: 3.0268, longitude: 101.4372 },
+        areaBounds: {
+          northEast: { latitude: 3.046, longitude: 101.458 },
+          southWest: { latitude: 3.008, longitude: 101.418 },
+        },
+      },
+    });
+
+    render(<MapScreen />);
+
+    expect(
+      screen.getByText('Approximate area: Taman Sentosa, Klang'),
+    ).toBeTruthy();
+    expect(screen.getByText('Inside Taman Sentosa')).toBeTruthy();
+    expect(screen.queryByText('Outside Taman Sentosa')).toBeNull();
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Focus map view' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Show 1 place nearby' }),
+    ).toBeTruthy();
   });
 
   it('applies RM price filters through the shared search criteria', () => {
@@ -355,6 +400,7 @@ describe('MapScreen states', () => {
     });
     expect(search).toHaveBeenCalledWith(
       expect.objectContaining({
+        areaBounds: undefined,
         areaLabel: 'Map area',
         center: { latitude: 3.05, longitude: 101.45 },
         radiusMeters: 6800,
@@ -369,6 +415,7 @@ describe('MapScreen states', () => {
     );
     expect(search).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        areaBounds: undefined,
         areaLabel: 'Map area',
         center: { latitude: 3.05, longitude: 101.45 },
         radiusMeters: 6800,

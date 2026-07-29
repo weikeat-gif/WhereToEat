@@ -73,6 +73,32 @@ describe('LivePlacesService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the Google display viewport when resolving a searched area', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        id: 'taman-sentosa',
+        displayName: { text: 'Taman Sentosa' },
+        formattedAddress: 'Taman Sentosa, Klang, Selangor, Malaysia',
+        location: { latitude: 3.0268, longitude: 101.4372 },
+        viewport: {
+          low: { latitude: 3.008, longitude: 101.418 },
+          high: { latitude: 3.046, longitude: 101.458 },
+        },
+        types: ['neighborhood', 'political'],
+      }),
+    );
+    const service = new LivePlacesService('https://places.example.test/api');
+
+    await expect(service.getPlaceDetails('taman-sentosa')).resolves.toMatchObject(
+      {
+        viewport: {
+          northEast: { latitude: 3.046, longitude: 101.458 },
+          southWest: { latitude: 3.008, longitude: 101.418 },
+        },
+      },
+    );
+  });
+
   it('maps network failures without exposing provider details', async () => {
     jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('offline'));
     const service = new LivePlacesService('https://places.example.test/api');
@@ -301,6 +327,27 @@ describe('LivePlacesService', () => {
         body: expect.stringContaining('"rankPreference":"POPULARITY"'),
       }),
     );
+  });
+
+  it('forwards exact selected-area bounds before Google applies its result cap', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ places: [] }));
+    const service = new LivePlacesService(
+      'https://project.supabase.co/functions/v1/places',
+    );
+    const areaBounds = {
+      northEast: { latitude: 3.046, longitude: 101.458 },
+      southWest: { latitude: 3.008, longitude: 101.418 },
+    };
+
+    await service.searchNearby({ ...criteria, areaBounds, openNow: false });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      action: 'nearby',
+      areaBounds,
+    });
   });
 
   it.each([

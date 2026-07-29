@@ -23,6 +23,7 @@ import type { PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
 import { MapCanvas } from '@/features/map/map-canvas';
 import {
+  isCoordinateWithinMapBounds,
   selectMapPlacesForViewport,
   type MapViewport,
 } from '@/features/map/map-viewport';
@@ -92,12 +93,18 @@ export function MapScreen() {
   const listFocused = viewMode === 'list';
   const visibleResults = useMemo(
     () => {
+      const areaBounds = criteria.areaBounds;
+      const areaResults = areaBounds
+        ? results.filter((place) =>
+            isCoordinateWithinMapBounds(place.coordinates, areaBounds),
+          )
+        : results;
       const bounds = mapViewport.bounds;
       return bounds
-        ? selectMapPlacesForViewport(results, bounds)
-        : results;
+        ? selectMapPlacesForViewport(areaResults, bounds)
+        : areaResults;
     },
-    [mapViewport.bounds, results],
+    [criteria.areaBounds, mapViewport.bounds, results],
   );
   const nearbyDockPanResponder = useMemo(
     () =>
@@ -135,9 +142,15 @@ export function MapScreen() {
     setMapViewport({
       center: criteria.center,
       radiusMeters: criteria.radiusMeters,
+      bounds: criteria.areaBounds,
     });
     setAreaInput(criteria.areaLabel);
-  }, [criteria.areaLabel, criteria.center, criteria.radiusMeters]);
+  }, [
+    criteria.areaBounds,
+    criteria.areaLabel,
+    criteria.center,
+    criteria.radiusMeters,
+  ]);
 
   useEffect(() => {
     setQueryInput(criteria.query ?? '');
@@ -213,6 +226,7 @@ export function MapScreen() {
     const selectedArea = { ...area, label: areaDisplayLabel(area) };
     setSuggestions([]);
     setAreaInput(selectedArea.label);
+    setViewMode('map');
     void selectArea(selectedArea);
   };
 
@@ -222,6 +236,7 @@ export function MapScreen() {
     setQueryAreaSuggestions([]);
     setQueryInput('');
     setAreaInput(selectedArea.label);
+    setViewMode('map');
     void selectArea(selectedArea, { query: undefined });
   };
 
@@ -229,6 +244,7 @@ export function MapScreen() {
     (viewport: MapViewport) =>
       search({
         ...criteria,
+        areaBounds: undefined,
         center: viewport.center,
         areaLabel: i18n.t('mapAreaLabel'),
         radiusMeters: viewport.radiusMeters,
@@ -481,6 +497,7 @@ export function MapScreen() {
         <View testID="map-pane" style={styles.mapPane}>
           <MapCanvas
             center={mapViewport.center}
+            highlightedArea={criteria.areaBounds}
             onViewportChange={handleViewportChange}
             onMapPress={() => setViewMode('map')}
             onPlacePress={openPlace}
@@ -488,6 +505,29 @@ export function MapScreen() {
             showsUserLocation={locationStatus === 'granted'}
             userCoordinates={userCoordinates}
           />
+
+        {criteria.areaBounds ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.areaBoundsBadge,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.accentForeground,
+              },
+            ]}>
+            <Ionicons
+              color={colors.accentForeground}
+              name="map-outline"
+              size={16}
+            />
+            <Text
+              numberOfLines={1}
+              style={[styles.areaBoundsText, { color: colors.text }]}>
+              {i18n.t('mapApproximateArea', { area: criteria.areaLabel })}
+            </Text>
+          </View>
+        ) : null}
 
         <TouchableOpacity
           accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
@@ -794,6 +834,25 @@ const styles = StyleSheet.create({
   },
   searchAreaButtonExpanded: { bottom: '48%' },
   searchAreaButtonFocused: { bottom: 128 },
+  areaBoundsBadge: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    left: spacing.lg,
+    maxWidth: '78%',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    position: 'absolute',
+    top: 84,
+    zIndex: 2,
+  },
+  areaBoundsText: {
+    flexShrink: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: 12,
+  },
   queryRow: {
     alignItems: 'center',
     flexDirection: 'row',
