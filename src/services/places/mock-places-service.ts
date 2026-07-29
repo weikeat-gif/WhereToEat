@@ -333,6 +333,28 @@ export class MockPlacesService implements PlacesService {
     ).slice(0, 5);
   }
 
+  async getAreaBoundary(label: string) {
+    if (!/sentosa/i.test(label)) return null;
+    return {
+      source: 'openstreetmap' as const,
+      sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+      label: 'Bandar Sentosa, Klang, Selangor, Malaysia',
+      polygons: [
+        {
+          outer: [
+            { latitude: 2.9981, longitude: 101.4603 },
+            { latitude: 2.9879, longitude: 101.487 },
+            { latitude: 3.0045, longitude: 101.4881 },
+            { latitude: 3.0255, longitude: 101.4731 },
+            { latitude: 3.0204, longitude: 101.4687 },
+            { latitude: 2.9981, longitude: 101.4603 },
+          ],
+          holes: [],
+        },
+      ],
+    };
+  }
+
   async searchNearby(criteria: SearchCriteria): Promise<SearchResults> {
     const places = MOCK_PLACES.map((place) => toSummary(place, criteria))
       .filter((place) => matchesCriteria(place, criteria))

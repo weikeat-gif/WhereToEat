@@ -10,6 +10,8 @@ export type SearchCriteria = {
   center: Coordinates;
   areaLabel: string;
   areaBounds?: CoordinateBounds;
+  areaBoundary?: AreaBoundary;
+  areaPlaceId?: string;
   radiusMeters: number;
   rankPreference?: 'DISTANCE' | 'POPULARITY';
   openNow: boolean;
@@ -18,12 +20,25 @@ export type SearchCriteria = {
   verifiedHalalOnly: boolean;
 };
 
+export type AreaBoundaryPolygon = {
+  outer: Coordinates[];
+  holes: Coordinates[][];
+};
+
+export type AreaBoundary = {
+  source: 'openstreetmap';
+  sourceUrl: string;
+  label: string;
+  polygons: AreaBoundaryPolygon[];
+};
+
 export type AreaSuggestion = {
   id: string;
   label: string;
   secondaryLabel?: string;
   coordinates?: Coordinates;
   viewport?: CoordinateBounds;
+  boundary?: AreaBoundary;
 };
 
 export type SearchResults = {

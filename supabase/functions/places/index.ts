@@ -2,7 +2,10 @@ import {
   buildGoogleRequest,
   createPlacesHandler,
   fetchWithTimeout,
+  type GooglePlacesAction,
   type HalalRecord,
+  normalizeBoundaryResponse,
+  readJsonResponseWithLimit,
   type PlacesAction,
   type PromotionRecord,
   setBoundedMapValue,
@@ -24,6 +27,12 @@ const RATE_LIMIT_HMAC_SECRET = Deno.env.get('RATE_LIMIT_HMAC_SECRET');
 
 const rate = new Map<string, { count: number; resetAt: number }>();
 const MAX_RATE_ENTRIES = 5_000;
+const boundaryCache = new Map<
+  string,
+  { expiresAt: number; value: unknown }
+>();
+const MAX_BOUNDARY_CACHE_ENTRIES = 500;
+let lastBoundaryRequestAt = 0;
 
 async function rateBucketKey(value: string) {
   if (!RATE_LIMIT_HMAC_SECRET) {
@@ -47,6 +56,7 @@ async function consumeDurableRateLimit(
   bucket: string,
   action: PlacesAction['action'],
   requestLimit: number,
+  windowSeconds = 60,
 ): Promise<boolean | undefined> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return undefined;
   if (!RATE_LIMIT_HMAC_SECRET) return false;
@@ -69,7 +79,7 @@ async function consumeDurableRateLimit(
         body: JSON.stringify({
           p_bucket_key: bucket,
           p_request_limit: requestLimit,
-          p_window_seconds: 60,
+          p_window_seconds: windowSeconds,
         }),
       },
       async (response) => {
@@ -82,7 +92,7 @@ async function consumeDurableRateLimit(
   }
 }
 
-async function googleRequest(input: PlacesAction): Promise<unknown> {
+async function googleRequest(input: GooglePlacesAction): Promise<unknown> {
   if (!GOOGLE_API_KEY) throw new Error('Google Places is not configured.');
   const { url, init } = buildGoogleRequest(GOOGLE_API_KEY, input);
 
@@ -124,6 +134,91 @@ async function loadHalal(placeIds: string[]): Promise<HalalRecord[]> {
   );
 }
 
+async function waitForBoundaryRequestSlot() {
+  const delay = Math.max(0, lastBoundaryRequestAt + 1_100 - Date.now());
+  if (delay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  lastBoundaryRequestAt = Date.now();
+}
+
+async function loadBoundary(
+  input: Extract<PlacesAction, { action: 'boundary' }>,
+): Promise<unknown> {
+  const cacheKey = `${input.label.toLocaleLowerCase()}|${input.center.latitude.toFixed(3)}|${input.center.longitude.toFixed(3)}`;
+  const cached = boundaryCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const globalBoundaryBucket = await rateBucketKey('boundary-provider:global');
+  if (
+    (await consumeDurableRateLimit(
+      globalBoundaryBucket,
+      input.action,
+      1,
+      2,
+    )) !== true
+  ) {
+    throw new UpstreamError(
+      'OpenStreetMap boundary request is temporarily rate limited.',
+      429,
+    );
+  }
+  await waitForBoundaryRequestSlot();
+  const query = new URL('https://nominatim.openstreetmap.org/search');
+  query.searchParams.set('format', 'jsonv2');
+  query.searchParams.set('countrycodes', 'my');
+  query.searchParams.set('limit', '5');
+  query.searchParams.set('polygon_geojson', '1');
+  query.searchParams.set('polygon_threshold', '0.00015');
+  query.searchParams.set(
+    'viewbox',
+    [
+      input.center.longitude - 0.12,
+      input.center.latitude + 0.12,
+      input.center.longitude + 0.12,
+      input.center.latitude - 0.12,
+    ].join(','),
+  );
+  query.searchParams.set('q', input.label);
+  const value = await fetchWithTimeout(
+    fetch,
+    query,
+    {
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'en-MY,en;q=0.9',
+        'User-Agent':
+          'MakanMana/1.0 boundary lookup (https://github.com/weikeat-gif/WhereToEat)',
+      },
+    },
+    async (response) => {
+      if (!response.ok) {
+        throw new UpstreamError(
+          'OpenStreetMap boundary request failed.',
+          response.status,
+        );
+      }
+      return readJsonResponseWithLimit(
+        response,
+        2_000_000,
+        'OpenStreetMap boundary',
+      );
+    },
+  );
+  const boundary = normalizeBoundaryResponse(value, input.center);
+  setBoundedMapValue(
+    boundaryCache,
+    MAX_BOUNDARY_CACHE_ENTRIES,
+    cacheKey,
+    {
+      expiresAt:
+        Date.now() + (boundary ? 30 * 24 * 60 * 60_000 : 24 * 60 * 60_000),
+      value: boundary,
+    },
+  );
+  return boundary;
+}
+
 async function loadPromotions(placeIds: string[]): Promise<PromotionRecord[]> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || placeIds.length === 0) {
     return [];
@@ -157,6 +252,7 @@ async function loadPromotions(placeIds: string[]): Promise<PromotionRecord[]> {
 
 const handler = createPlacesHandler({
   callGoogle: googleRequest,
+  loadBoundary,
   loadHalal,
   loadPromotions,
   async allowRequest(key, input) {
@@ -165,6 +261,8 @@ const handler = createPlacesHandler({
     const requestLimit =
       input.action === 'route'
         ? 12
+        : input.action === 'boundary'
+          ? 10
         : input.action === 'nearby' && input.query
           ? 20
           : 60;

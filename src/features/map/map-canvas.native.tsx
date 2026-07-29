@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
+  Polygon,
   PROVIDER_GOOGLE,
   type Details,
   type MapStyleElement,
@@ -81,6 +82,7 @@ function mapStyleFor(mode: 'light' | 'dark'): MapStyleElement[] {
 export function MapCanvas({
   center,
   focusedAreaBounds,
+  focusedAreaBoundary,
   places,
   onViewportChange,
   onMapPress,
@@ -102,7 +104,13 @@ export function MapCanvas({
     const centerChangedExternally =
       Math.abs(previousCenter.latitude - center.latitude) > 0.00001 ||
       Math.abs(previousCenter.longitude - center.longitude) > 0.00001;
-    if (!centerChangedExternally || focusedAreaBounds) return;
+    if (
+      !centerChangedExternally ||
+      focusedAreaBounds ||
+      focusedAreaBoundary
+    ) {
+      return;
+    }
 
     lastRegionRef.current = {
       ...center,
@@ -117,29 +125,35 @@ export function MapCanvas({
       },
       350,
     );
-  }, [center, focusedAreaBounds]);
+  }, [center, focusedAreaBoundary, focusedAreaBounds]);
 
   useEffect(() => {
-    if (!mapLaidOut || !focusedAreaBounds) return;
+    if (!mapLaidOut) return;
+    const boundaryCoordinates = focusedAreaBoundary?.polygons.flatMap(
+      (polygon) => polygon.outer,
+    );
+    if (!boundaryCoordinates?.length && !focusedAreaBounds) return;
     mapRef.current?.fitToCoordinates(
-      [
-        focusedAreaBounds.northEast,
-        {
-          latitude: focusedAreaBounds.northEast.latitude,
-          longitude: focusedAreaBounds.southWest.longitude,
-        },
-        focusedAreaBounds.southWest,
-        {
-          latitude: focusedAreaBounds.southWest.latitude,
-          longitude: focusedAreaBounds.northEast.longitude,
-        },
-      ],
+      boundaryCoordinates?.length
+        ? boundaryCoordinates
+        : [
+            focusedAreaBounds!.northEast,
+            {
+              latitude: focusedAreaBounds!.northEast.latitude,
+              longitude: focusedAreaBounds!.southWest.longitude,
+            },
+            focusedAreaBounds!.southWest,
+            {
+              latitude: focusedAreaBounds!.southWest.latitude,
+              longitude: focusedAreaBounds!.northEast.longitude,
+            },
+          ],
       {
         edgePadding: { top: 104, right: 32, bottom: 152, left: 32 },
         animated: true,
       },
     );
-  }, [focusedAreaBounds, mapLaidOut]);
+  }, [focusedAreaBoundary, focusedAreaBounds, mapLaidOut]);
 
   const handleRegionChange = (region: Region, details: Details) => {
     const nextCenter = {
@@ -185,6 +199,16 @@ export function MapCanvas({
         showsMyLocationButton={false}
         showsUserLocation={showsUserLocation && Boolean(userCoordinates)}
         style={StyleSheet.absoluteFill}>
+        {focusedAreaBoundary?.polygons.map((polygon, index) => (
+          <Polygon
+            key={`${focusedAreaBoundary.sourceUrl}-${index}`}
+            coordinates={polygon.outer}
+            holes={polygon.holes}
+            fillColor={`${colors.accent}2E`}
+            strokeColor={colors.accentForeground}
+            strokeWidth={3}
+          />
+        ))}
         {places.map((place) => (
           <Marker
             key={place.id}

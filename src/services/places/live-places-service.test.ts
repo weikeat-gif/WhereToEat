@@ -139,6 +139,43 @@ describe('LivePlacesService', () => {
     );
   });
 
+  it('loads a validated irregular area boundary through the protected proxy', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        source: 'openstreetmap',
+        sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+        label: 'Bandar Sentosa, Klang, Selangor, Malaysia',
+        polygons: [
+          {
+            outer: [
+              { latitude: 2.998, longitude: 101.46 },
+              { latitude: 2.988, longitude: 101.487 },
+              { latitude: 3.025, longitude: 101.488 },
+              { latitude: 2.998, longitude: 101.46 },
+            ],
+            holes: [],
+          },
+        ],
+      }),
+    );
+    const service = new LivePlacesService('https://places.example.test/api');
+
+    await expect(
+      service.getAreaBoundary('Taman Sentosa, Klang, Selangor', {
+        latitude: 2.999458,
+        longitude: 101.4745,
+      }),
+    ).resolves.toMatchObject({
+      source: 'openstreetmap',
+      polygons: [{ outer: expect.any(Array) }],
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+      action: 'boundary',
+      label: 'Taman Sentosa, Klang, Selangor',
+      center: { latitude: 2.999458, longitude: 101.4745 },
+    });
+  });
+
   it('keeps the timeout active while the proxy response body is parsed', async () => {
     jest.useFakeTimers();
     const fetcher = jest.fn(

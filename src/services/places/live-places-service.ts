@@ -7,6 +7,7 @@ import type {
   PriceLevel,
 } from '@/contracts/place';
 import type {
+  AreaBoundary,
   AreaSuggestion,
   SearchCriteria,
   SearchResults,
@@ -24,6 +25,33 @@ const coordinatesSchema = z.object({
   latitude: z.number().finite(),
   longitude: z.number().finite(),
 });
+
+const areaBoundarySchema = z.object({
+  source: z.literal('openstreetmap'),
+  sourceUrl: z
+    .string()
+    .url()
+    .refine((value) => value.startsWith('https://www.openstreetmap.org/')),
+  label: z.string().min(1),
+  polygons: z
+    .array(
+      z.object({
+        outer: z.array(coordinatesSchema).min(4).max(2_000),
+        holes: z.array(z.array(coordinatesSchema).min(4).max(2_000)).max(50),
+      }),
+    )
+    .min(1)
+    .max(50),
+}).refine(
+  (boundary) =>
+    boundary.polygons.reduce(
+      (sum, polygon) =>
+        sum +
+        polygon.outer.length +
+        polygon.holes.reduce((holeSum, hole) => holeSum + hole.length, 0),
+      0,
+    ) <= 10_000,
+);
 
 const halalVerificationSchema = z.object({
   sourceName: z.string().min(1),
@@ -92,7 +120,12 @@ type PlacesAction =
       rankPreference?: 'DISTANCE' | 'POPULARITY';
     }
   | { action: 'autocomplete'; input: string; sessionToken: string }
-  | { action: 'details'; placeId: string };
+  | { action: 'details'; placeId: string }
+  | {
+      action: 'boundary';
+      label: string;
+      center: { latitude: number; longitude: number };
+    };
 
 const PRICE_LEVELS: Record<string, PriceLevel | undefined> = {
   PRICE_LEVEL_FREE: 1,
@@ -337,6 +370,15 @@ export class LivePlacesService implements PlacesService {
       places,
       fetchedAt: new Date().toISOString(),
     };
+  }
+
+  async getAreaBoundary(
+    label: string,
+    center: { latitude: number; longitude: number },
+  ): Promise<AreaBoundary | null> {
+    return areaBoundarySchema
+      .nullable()
+      .parse(await this.request({ action: 'boundary', label, center }));
   }
 
   async getPlaceDetails(placeId: string): Promise<PlaceDetails> {

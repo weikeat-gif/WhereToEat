@@ -3,6 +3,8 @@ import {
   createPlacesHandler,
   fetchWithTimeout,
   filterCurrentHalalRecords,
+  normalizeBoundaryResponse,
+  readJsonResponseWithLimit,
   setBoundedMapValue,
   type PlacesDependencies,
   UpstreamError,
@@ -99,6 +101,166 @@ describe('places Edge Function core', () => {
       headers: expect.objectContaining({
         'X-Goog-FieldMask': expect.stringContaining('viewport'),
       }),
+    });
+  });
+
+  it('validates a boundary request inside the Klang Valley service area', () => {
+    expect(
+      validatePlacesRequest({
+        action: 'boundary',
+        label: '  Taman Sentosa, Klang, Selangor  ',
+        center: { latitude: 2.999458, longitude: 101.4745 },
+      }),
+    ).toEqual({
+      action: 'boundary',
+      label: 'Taman Sentosa, Klang, Selangor',
+      center: { latitude: 2.999458, longitude: 101.4745 },
+    });
+    expect(() =>
+      validatePlacesRequest({
+        action: 'boundary',
+        label: 'Taman Sentosa',
+        center: { latitude: 1.5, longitude: 110 },
+      }),
+    ).toThrow('Boundary');
+  });
+
+  it('chooses the enclosing place polygon over a smaller nearby land-use shape', () => {
+    const boundary = normalizeBoundaryResponse(
+      [
+        {
+          display_name: 'Taman Sentosa retail',
+          category: 'landuse',
+          osm_type: 'way',
+          osm_id: 22,
+          lat: '3.008',
+          lon: '101.467',
+          boundingbox: ['3.006', '3.011', '101.463', '101.469'],
+          geojson: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [101.463, 3.006],
+                [101.469, 3.006],
+                [101.469, 3.011],
+                [101.463, 3.006],
+              ],
+            ],
+          },
+        },
+        {
+          display_name: 'Bandar Sentosa, Klang, Selangor, Malaysia',
+          category: 'place',
+          osm_type: 'relation',
+          osm_id: 18743759,
+          lat: '3.009',
+          lon: '101.468',
+          boundingbox: ['2.988', '3.026', '101.460', '101.488'],
+          geojson: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [101.46, 2.998],
+                [101.488, 2.988],
+                [101.488, 3.025],
+                [101.46, 2.998],
+              ],
+            ],
+          },
+        },
+      ],
+      { latitude: 2.999458, longitude: 101.4745 },
+    );
+
+    expect(boundary).toMatchObject({
+      source: 'openstreetmap',
+      sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+      label: 'Bandar Sentosa, Klang, Selangor, Malaysia',
+    });
+  });
+
+  it('rejects a concave polygon whose bounding box contains the search center', () => {
+    const boundary = normalizeBoundaryResponse(
+      [
+        {
+          display_name: 'Concave wrong area',
+          category: 'place',
+          osm_type: 'relation',
+          osm_id: 99,
+          lat: '3.01',
+          lon: '101.47',
+          boundingbox: ['3', '3.04', '101.45', '101.50'],
+          geojson: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [101.45, 3],
+                [101.5, 3],
+                [101.5, 3.01],
+                [101.46, 3.01],
+                [101.46, 3.04],
+                [101.45, 3.04],
+                [101.45, 3],
+              ],
+            ],
+          },
+        },
+      ],
+      { latitude: 3.02, longitude: 101.48 },
+    );
+
+    expect(boundary).toBeNull();
+  });
+
+  it('rejects polygons when the center is inside a polygon hole', () => {
+    const boundary = normalizeBoundaryResponse(
+      [
+        {
+          display_name: 'Area with excluded center',
+          category: 'place',
+          osm_type: 'relation',
+          osm_id: 100,
+          lat: '3.02',
+          lon: '101.48',
+          geojson: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [101.45, 3],
+                [101.5, 3],
+                [101.5, 3.04],
+                [101.45, 3.04],
+                [101.45, 3],
+              ],
+              [
+                [101.47, 3.01],
+                [101.49, 3.01],
+                [101.49, 3.03],
+                [101.47, 3.03],
+                [101.47, 3.01],
+              ],
+            ],
+          },
+        },
+      ],
+      { latitude: 3.02, longitude: 101.48 },
+    );
+
+    expect(boundary).toBeNull();
+  });
+
+  it('rejects oversized streamed JSON before parsing it', async () => {
+    await expect(
+      readJsonResponseWithLimit(
+        new Response('{"value":"too large"}', {
+          headers: { 'Content-Length': '2000001' },
+        }),
+        2_000_000,
+        'Boundary',
+      ),
+    ).rejects.toMatchObject({
+      name: 'UpstreamError',
+      status: 502,
     });
   });
 
@@ -480,6 +642,33 @@ describe('places Edge Function core', () => {
         },
       ],
     });
+  });
+
+  it('routes boundary lookups without calling Google Places', async () => {
+    const callGoogle = jest.fn();
+    const loadBoundary = jest.fn().mockResolvedValue({
+      source: 'openstreetmap',
+      sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+      label: 'Bandar Sentosa',
+      polygons: [],
+    });
+    const handler = createPlacesHandler(
+      dependencies({ callGoogle, loadBoundary }),
+    );
+
+    const response = await handler(
+      authorizedRequest({
+        action: 'boundary',
+        label: 'Taman Sentosa, Klang, Selangor',
+        center: { latitude: 2.999458, longitude: 101.4745 },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(loadBoundary).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'boundary' }),
+    );
+    expect(callGoogle).not.toHaveBeenCalled();
   });
 
   it('maps Google rate limits without exposing upstream payloads', async () => {

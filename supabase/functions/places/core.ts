@@ -17,11 +17,21 @@ export type PlacesAction =
   | { action: 'autocomplete'; input: string; sessionToken: string }
   | { action: 'details'; placeId: string }
   | {
+      action: 'boundary';
+      label: string;
+      center: { latitude: number; longitude: number };
+    }
+  | {
       action: 'route';
       origin: { latitude: number; longitude: number };
       destination: { latitude: number; longitude: number };
       travelMode: 'DRIVE';
     };
+
+export type GooglePlacesAction = Exclude<
+  PlacesAction,
+  { action: 'boundary' }
+>;
 
 export type HalalRecord = {
   google_place_id: string;
@@ -39,7 +49,10 @@ export type PromotionRecord = {
 };
 
 export interface PlacesDependencies {
-  callGoogle(input: PlacesAction): Promise<unknown>;
+  callGoogle(input: GooglePlacesAction): Promise<unknown>;
+  loadBoundary?(
+    input: Extract<PlacesAction, { action: 'boundary' }>,
+  ): Promise<unknown>;
   loadHalal(placeIds: string[]): Promise<HalalRecord[]>;
   loadPromotions?(placeIds: string[]): Promise<PromotionRecord[]>;
   allowRequest(key: string, input: PlacesAction): Promise<boolean> | boolean;
@@ -111,6 +124,9 @@ export function buildGoogleRequest(
   apiKey: string,
   input: PlacesAction,
 ): { url: string; init: RequestInit } {
+  if (input.action === 'boundary') {
+    throw new Error('Boundary requests do not use Google Places.');
+  }
   const headers = {
     'Content-Type': 'application/json',
     'X-Goog-Api-Key': apiKey,
@@ -273,6 +289,48 @@ export async function fetchWithTimeout<Result>(
   }
 }
 
+export async function readJsonResponseWithLimit(
+  response: Response,
+  maxBytes: number,
+  sourceName = 'Upstream',
+): Promise<unknown> {
+  const declaredLength = response.headers.get('content-length');
+  if (
+    declaredLength &&
+    /^\d+$/.test(declaredLength) &&
+    Number(declaredLength) > maxBytes
+  ) {
+    throw new UpstreamError(`${sourceName} response is too large.`, 502);
+  }
+  if (!response.body) {
+    throw new UpstreamError(`${sourceName} returned an empty response.`, 502);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new UpstreamError(`${sourceName} response is too large.`, 502);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    if (error instanceof UpstreamError) throw error;
+    throw new UpstreamError(`${sourceName} returned invalid JSON.`, 502);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -293,6 +351,218 @@ function validCoordinates(
     value.longitude >= -180 &&
     value.longitude <= 180
   );
+}
+
+type BoundaryCoordinate = { latitude: number; longitude: number };
+type BoundaryPolygon = {
+  outer: BoundaryCoordinate[];
+  holes: BoundaryCoordinate[][];
+};
+
+function geoJsonRing(value: unknown): BoundaryCoordinate[] | undefined {
+  if (!Array.isArray(value) || value.length < 4 || value.length > 2_000) {
+    return undefined;
+  }
+  const points = value.map((point) =>
+    Array.isArray(point) &&
+    point.length >= 2 &&
+    isFiniteNumber(point[0]) &&
+    point[0] >= -180 &&
+    point[0] <= 180 &&
+    isFiniteNumber(point[1]) &&
+    point[1] >= -90 &&
+    point[1] <= 90
+      ? { latitude: point[1], longitude: point[0] }
+      : undefined,
+  );
+  return points.every(
+    (point): point is BoundaryCoordinate => point !== undefined,
+  )
+    ? points
+    : undefined;
+}
+
+function geoJsonPolygons(value: unknown): BoundaryPolygon[] | undefined {
+  if (!isRecord(value) || !Array.isArray(value.coordinates)) return undefined;
+  const polygonValues =
+    value.type === 'Polygon'
+      ? [value.coordinates]
+      : value.type === 'MultiPolygon'
+        ? value.coordinates
+        : undefined;
+  if (!polygonValues || polygonValues.length === 0 || polygonValues.length > 50) {
+    return undefined;
+  }
+  const polygons = polygonValues.map((polygon): BoundaryPolygon | undefined => {
+    if (!Array.isArray(polygon) || polygon.length === 0) return undefined;
+    const outer = geoJsonRing(polygon[0]);
+    const holes = polygon.slice(1).map(geoJsonRing);
+    return outer &&
+      holes.every((hole): hole is BoundaryCoordinate[] => Boolean(hole))
+      ? { outer, holes }
+      : undefined;
+  });
+  if (
+    !polygons.every(
+      (polygon): polygon is BoundaryPolygon => polygon !== undefined,
+    )
+  ) {
+    return undefined;
+  }
+  const totalPoints = polygons.reduce(
+    (sum, polygon) =>
+      sum +
+      polygon.outer.length +
+      polygon.holes.reduce((holeSum, hole) => holeSum + hole.length, 0),
+    0,
+  );
+  return totalPoints <= 10_000
+    ? polygons
+    : undefined;
+}
+
+function pointIsOnSegment(
+  point: BoundaryCoordinate,
+  start: BoundaryCoordinate,
+  end: BoundaryCoordinate,
+) {
+  const cross =
+    (point.longitude - start.longitude) *
+      (end.latitude - start.latitude) -
+    (point.latitude - start.latitude) *
+      (end.longitude - start.longitude);
+  if (Math.abs(cross) > 1e-10) return false;
+  return (
+    point.longitude >= Math.min(start.longitude, end.longitude) - 1e-10 &&
+    point.longitude <= Math.max(start.longitude, end.longitude) + 1e-10 &&
+    point.latitude >= Math.min(start.latitude, end.latitude) - 1e-10 &&
+    point.latitude <= Math.max(start.latitude, end.latitude) + 1e-10
+  );
+}
+
+function pointIsInRing(
+  point: BoundaryCoordinate,
+  ring: BoundaryCoordinate[],
+) {
+  let inside = false;
+  for (
+    let currentIndex = 0, previousIndex = ring.length - 1;
+    currentIndex < ring.length;
+    previousIndex = currentIndex, currentIndex += 1
+  ) {
+    const current = ring[currentIndex];
+    const previous = ring[previousIndex];
+    if (pointIsOnSegment(point, previous, current)) return true;
+    const crossesLatitude =
+      current.latitude > point.latitude !==
+      previous.latitude > point.latitude;
+    if (
+      crossesLatitude &&
+      point.longitude <
+        ((previous.longitude - current.longitude) *
+          (point.latitude - current.latitude)) /
+          (previous.latitude - current.latitude) +
+          current.longitude
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function boundaryContainsCenter(
+  polygons: BoundaryPolygon[],
+  center: BoundaryCoordinate,
+) {
+  return polygons.some(
+    (polygon) =>
+      pointIsInRing(center, polygon.outer) &&
+      !polygon.holes.some((hole) => pointIsInRing(center, hole)),
+  );
+}
+
+function osmSourceUrl(value: Record<string, unknown>) {
+  const kind =
+    value.osm_type === 'relation'
+      ? 'relation'
+      : value.osm_type === 'way'
+        ? 'way'
+        : value.osm_type === 'node'
+          ? 'node'
+          : undefined;
+  const id =
+    typeof value.osm_id === 'number' && Number.isInteger(value.osm_id)
+      ? value.osm_id
+      : typeof value.osm_id === 'string' && /^\d+$/.test(value.osm_id)
+        ? value.osm_id
+        : undefined;
+  return kind && id
+    ? `https://www.openstreetmap.org/${kind}/${id}`
+    : undefined;
+}
+
+export function normalizeBoundaryResponse(
+  value: unknown,
+  center: BoundaryCoordinate,
+) {
+  if (!Array.isArray(value)) return null;
+  const candidates = value
+    .map((candidate) => {
+      if (!isRecord(candidate)) return undefined;
+      const polygons = geoJsonPolygons(candidate.geojson);
+      const sourceUrl = osmSourceUrl(candidate);
+      if (
+        !polygons ||
+        !boundaryContainsCenter(polygons, center) ||
+        !sourceUrl ||
+        typeof candidate.display_name !== 'string' ||
+        candidate.display_name.length === 0
+      ) {
+        return undefined;
+      }
+      const category =
+        typeof candidate.category === 'string'
+          ? candidate.category
+          : typeof candidate.class === 'string'
+            ? candidate.class
+            : '';
+      const candidateLatitude = Number(candidate.lat);
+      const candidateLongitude = Number(candidate.lon);
+      const centerDistance =
+        Number.isFinite(candidateLatitude) && Number.isFinite(candidateLongitude)
+          ? straightLineDistanceMeters(center, {
+              latitude: candidateLatitude,
+              longitude: candidateLongitude,
+            })
+          : 100_000;
+      const score =
+        (category === 'place' ? 100_000 : category === 'boundary' ? 50_000 : 0) -
+        centerDistance;
+      return {
+        boundary: {
+          source: 'openstreetmap' as const,
+          sourceUrl,
+          label: candidate.display_name,
+          polygons,
+        },
+        score,
+      };
+    })
+    .filter(
+      (
+        candidate,
+      ): candidate is {
+        boundary: {
+          source: 'openstreetmap';
+          sourceUrl: string;
+          label: string;
+          polygons: BoundaryPolygon[];
+        };
+        score: number;
+      } => Boolean(candidate),
+    )
+    .sort((left, right) => right.score - left.score);
+  return candidates[0]?.boundary ?? null;
 }
 
 const SUPPORTED_KLANG_VALLEY_BOUNDS = {
@@ -477,6 +747,26 @@ export function validatePlacesRequest(value: unknown): PlacesAction {
     return { action: 'details', placeId: value.placeId };
   }
 
+  if (value.action === 'boundary') {
+    if (
+      typeof value.label !== 'string' ||
+      value.label.trim().length < 2 ||
+      value.label.length > 120 ||
+      !validCoordinates(value.center) ||
+      !isSupportedServiceCoordinate(value.center)
+    ) {
+      throw new Error('Boundary label or center is invalid.');
+    }
+    return {
+      action: 'boundary',
+      label: value.label.trim(),
+      center: {
+        latitude: value.center.latitude,
+        longitude: value.center.longitude,
+      },
+    };
+  }
+
   if (value.action === 'route') {
     if (
       !validCoordinates(value.origin) ||
@@ -576,7 +866,11 @@ async function enrichLocalData(
   action: PlacesAction,
   dependencies: PlacesDependencies,
 ): Promise<unknown> {
-  if (action.action === 'autocomplete' || action.action === 'route') {
+  if (
+    action.action === 'autocomplete' ||
+    action.action === 'route' ||
+    action.action === 'boundary'
+  ) {
     return value;
   }
   const places =
@@ -715,6 +1009,12 @@ export function createPlacesHandler(dependencies: PlacesDependencies) {
     }
 
     try {
+      if (input.action === 'boundary') {
+        if (!dependencies.loadBoundary) {
+          return json(200, null);
+        }
+        return json(200, await dependencies.loadBoundary(input));
+      }
       const googleResult = await dependencies.callGoogle(input);
       const result = await enrichLocalData(googleResult, input, dependencies);
       return json(200, result);

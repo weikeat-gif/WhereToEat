@@ -5,6 +5,8 @@ import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-nativ
 
 import { env } from '@/config/env';
 import type { Coordinates, PlaceSummary } from '@/contracts/place';
+import type { AreaBoundary } from '@/contracts/search';
+import { mapBoundsForAreaBoundary } from '@/features/map/area-boundary';
 import {
   radiusForMapBounds,
   type MapBounds,
@@ -17,6 +19,7 @@ import { fontFamily, radius, spacing } from '@/theme/tokens';
 export type MapCanvasProps = {
   center: Coordinates;
   focusedAreaBounds?: MapBounds;
+  focusedAreaBoundary?: AreaBoundary;
   places: PlaceSummary[];
   onViewportChange: (
     viewport: MapViewport,
@@ -49,12 +52,16 @@ type WebMarker = {
   addListener(event: string, listener: () => void): MapsListener;
   setMap(map: WebMap | null): void;
 };
+type WebPolygon = {
+  setMap(map: WebMap | null): void;
+};
 type GoogleMapsApi = {
   Map: new (
     element: HTMLElement,
     options: Record<string, unknown>,
   ) => WebMap;
   Marker: new (options: Record<string, unknown>) => WebMarker;
+  Polygon?: new (options: Record<string, unknown>) => WebPolygon;
 };
 
 declare global {
@@ -189,6 +196,7 @@ function webBounds(bounds: MapBounds) {
 export function MapCanvas({
   center,
   focusedAreaBounds,
+  focusedAreaBoundary,
   places,
   onViewportChange,
   onMapPress,
@@ -204,6 +212,7 @@ export function MapCanvas({
   const mapPressListenerRef = useRef<MapsListener | null>(null);
   const mapWasDraggedRef = useRef(false);
   const markerRefs = useRef<WebMarker[]>([]);
+  const polygonRefs = useRef<WebPolygon[]>([]);
   const lastViewportRef = useRef<MapViewport>({
     center,
     radiusMeters: 0,
@@ -322,6 +331,8 @@ export function MapCanvas({
       mapDragListenerRef.current = null;
       mapPressListenerRef.current?.remove();
       mapPressListenerRef.current = null;
+      polygonRefs.current.forEach((polygon) => polygon.setMap(null));
+      polygonRefs.current = [];
       mapRef.current = null;
     };
   }, [retryNonce, webKey]);
@@ -341,16 +352,58 @@ export function MapCanvas({
   }, [resolvedMode]);
 
   useEffect(() => {
-    if (!focusedAreaBounds || !mapReady || !mapRef.current) return;
+    const fitBounds =
+      (focusedAreaBoundary
+        ? mapBoundsForAreaBoundary(focusedAreaBoundary)
+        : undefined) ?? focusedAreaBounds;
+    if (!fitBounds || !mapReady || !mapRef.current) return;
 
-    const bounds = webBounds(focusedAreaBounds);
+    const bounds = webBounds(fitBounds);
     mapRef.current.fitBounds(bounds, 48);
-  }, [focusedAreaBounds, mapReady]);
+  }, [focusedAreaBoundary, focusedAreaBounds, mapReady]);
+
+  useEffect(() => {
+    polygonRefs.current.forEach((polygon) => polygon.setMap(null));
+    polygonRefs.current = [];
+    const Polygon = window.google?.maps?.Polygon;
+    if (!focusedAreaBoundary || !mapReady || !mapRef.current || !Polygon) {
+      return;
+    }
+    polygonRefs.current = focusedAreaBoundary.polygons.map(
+      (polygon) =>
+        new Polygon({
+          clickable: false,
+          fillColor: colors.accent,
+          fillOpacity: 0.18,
+          map: mapRef.current,
+          paths: [polygon.outer, ...polygon.holes].map((ring) =>
+            ring.map((point) => ({
+              lat: point.latitude,
+              lng: point.longitude,
+            })),
+          ),
+          strokeColor: colors.accentForeground,
+          strokeOpacity: 0.9,
+          strokeWeight: 3,
+          zIndex: 1,
+        }),
+    );
+    return () => {
+      polygonRefs.current.forEach((polygon) => polygon.setMap(null));
+      polygonRefs.current = [];
+    };
+  }, [
+    colors.accent,
+    colors.accentForeground,
+    focusedAreaBoundary,
+    mapReady,
+  ]);
 
   useEffect(() => {
     if (
       !mapRef.current ||
       focusedAreaBounds ||
+      focusedAreaBoundary ||
       !coordinatesChanged(lastViewportRef.current.center, center)
     ) {
       return;
@@ -363,7 +416,7 @@ export function MapCanvas({
       lat: center.latitude,
       lng: center.longitude,
     });
-  }, [center, focusedAreaBounds]);
+  }, [center, focusedAreaBoundary, focusedAreaBounds]);
 
   useEffect(() => {
     markerRefs.current.forEach((marker) => marker.setMap(null));

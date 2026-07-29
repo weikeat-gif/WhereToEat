@@ -112,6 +112,7 @@ const trustedPlace: PlaceSummary = {
 function searchState(overrides: Record<string, unknown> = {}) {
   return {
     autocompleteArea: jest.fn().mockResolvedValue([]),
+    clearRecentAreas: jest.fn(),
     criteria: {
       center: { latitude: 3.139, longitude: 101.6869 },
       areaLabel: 'Klang Valley',
@@ -127,6 +128,7 @@ function searchState(overrides: Record<string, unknown> = {}) {
     locationStatus: 'idle',
     userCoordinates: null,
     results: [trustedPlace],
+    recentAreas: [],
     search: jest.fn(),
     searchCurrentLocation: jest.fn(),
     selectArea: jest.fn(),
@@ -300,7 +302,54 @@ describe('MapScreen states', () => {
     expect(screen.queryByTestId('results-pane')).toBeNull();
   });
 
-  it('limits selected-area restaurants to the highlighted area bounds', () => {
+  it('keeps recent areas out of the restaurant and cuisine query field', () => {
+    const recentArea = {
+      id: 'taman-sentosa',
+      label: 'Taman Sentosa, Klang, Selangor',
+      coordinates: { latitude: 2.999458, longitude: 101.4745 },
+    };
+    mockUseSearch.mockReturnValue(
+      searchState({
+        recentAreas: [recentArea],
+      }),
+    );
+
+    render(<MapScreen />);
+    const query = screen.getByLabelText(
+      'Search restaurants, cuisines, or locations',
+    );
+    fireEvent(query, 'focus');
+
+    expect(screen.queryByText('Recent areas')).toBeNull();
+  });
+
+  it('shows recent selected areas in the dedicated area finder', () => {
+    const recentArea = {
+      id: 'taman-sentosa',
+      label: 'Taman Sentosa, Klang, Selangor',
+      coordinates: { latitude: 2.999458, longitude: 101.4745 },
+    };
+    const selectArea = jest.fn();
+    mockUseSearch.mockReturnValue(
+      searchState({
+        recentAreas: [recentArea],
+        selectArea,
+      }),
+    );
+
+    render(<MapScreen />);
+    fireEvent(screen.getByLabelText('Search area manually'), 'focus');
+
+    expect(screen.getAllByText('Recent areas').length).toBeGreaterThan(0);
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Go to Taman Sentosa, Klang, Selangor',
+      }),
+    );
+    expect(selectArea).toHaveBeenCalledWith(recentArea);
+  });
+
+  it('limits selected-area restaurants to the irregular area boundary', () => {
     const insidePlace: PlaceSummary = {
       ...trustedPlace,
       id: 'inside-place',
@@ -326,6 +375,22 @@ describe('MapScreen states', () => {
           northEast: { latitude: 3.046, longitude: 101.458 },
           southWest: { latitude: 3.008, longitude: 101.418 },
         },
+        areaBoundary: {
+          source: 'openstreetmap',
+          sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+          label: 'Bandar Sentosa',
+          polygons: [
+            {
+              outer: [
+                { latitude: 3, longitude: 101.42 },
+                { latitude: 3.05, longitude: 101.42 },
+                { latitude: 3.05, longitude: 101.46 },
+                { latitude: 3, longitude: 101.42 },
+              ],
+              holes: [],
+            },
+          ],
+        },
       },
     });
 
@@ -336,6 +401,9 @@ describe('MapScreen states', () => {
     ).toBeNull();
     expect(screen.getByText('Inside Taman Sentosa')).toBeTruthy();
     expect(screen.queryByText('Outside Taman Sentosa')).toBeNull();
+    expect(
+      screen.getByText('Boundary © OpenStreetMap contributors'),
+    ).toBeTruthy();
     fireEvent.press(
       screen.getByRole('button', { name: 'Focus map view' }),
     );

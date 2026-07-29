@@ -33,6 +33,7 @@ describe('web MapCanvas', () => {
   it('initializes at the latest area when GPS changes while Maps is loading', async () => {
     let mapOptions: Record<string, unknown> | undefined;
     const markerOptions: Record<string, unknown>[] = [];
+    const polygonOptions: Record<string, unknown>[] = [];
     const fitBounds = jest.fn();
     let currentCenter = { lat: () => 3.2, lng: () => 101.7 };
     let idleListener: (() => void) | undefined;
@@ -81,6 +82,12 @@ describe('web MapCanvas', () => {
       }
       setMap() {}
     }
+    class FakePolygon {
+      constructor(options: Record<string, unknown>) {
+        polygonOptions.push(options);
+      }
+      setMap() {}
+    }
     const firstCenter: Coordinates = {
       latitude: 3.139,
       longitude: 101.6869,
@@ -93,8 +100,25 @@ describe('web MapCanvas', () => {
       northEast: { latitude: 3.0975, longitude: 101.4975 },
       southWest: { latitude: 3.0225, longitude: 101.4225 },
     };
+    const focusedAreaBoundary = {
+      source: 'openstreetmap' as const,
+      sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+      label: 'Bandar Sentosa',
+      polygons: [
+        {
+          outer: [
+            { latitude: 3.0225, longitude: 101.4225 },
+            { latitude: 3.0975, longitude: 101.43 },
+            { latitude: 3.08, longitude: 101.4975 },
+            { latitude: 3.0225, longitude: 101.4225 },
+          ],
+          holes: [],
+        },
+      ],
+    };
     const props = {
       center: firstCenter,
+      focusedAreaBoundary,
       focusedAreaBounds,
       places: [],
       onViewportChange: onCenterChange,
@@ -111,6 +135,7 @@ describe('web MapCanvas', () => {
         maps: {
           Map: FakeMap,
           Marker: FakeMarker,
+          Polygon: FakePolygon,
         },
       };
       window.__makanManaGoogleMapsReady?.();
@@ -137,6 +162,20 @@ describe('web MapCanvas', () => {
         west: 101.4225,
       },
       48,
+    );
+    expect(polygonOptions).toContainEqual(
+      expect.objectContaining({
+        fillOpacity: expect.any(Number),
+        paths: [
+          [
+            { lat: 3.0225, lng: 101.4225 },
+            { lat: 3.0975, lng: 101.43 },
+            { lat: 3.08, lng: 101.4975 },
+            { lat: 3.0225, lng: 101.4225 },
+          ],
+        ],
+        strokeWeight: 3,
+      }),
     );
     currentCenter = { lat: () => 3.06, lng: () => 101.46 };
     act(() => dragStartListener?.());

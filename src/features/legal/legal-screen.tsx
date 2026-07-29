@@ -11,6 +11,9 @@ type LegalKind = 'privacy' | 'terms';
 
 const GOOGLE_PRIVACY_URL = 'https://policies.google.com/privacy';
 const GOOGLE_TERMS_URL = 'https://maps.google.com/help/terms_maps/';
+const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
+const NOMINATIM_POLICY_URL =
+  'https://operations.osmfoundation.org/policies/nominatim/';
 
 export function LegalScreen({ kind }: { kind: LegalKind }) {
   const { colors } = useAppTheme();
@@ -44,8 +47,12 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
               title="Location and Google"
             />
             <Section
-              body="We do not store precise GPS coordinates in your account or request background location. Google responses are not cached. Security rate-limit identifiers are deleted after they become older than 24 hours when the service next processes a request."
+              body="We do not store precise GPS coordinates in your account or request background location. Up to five areas you choose are stored locally for 30 days so you can revisit them. Signed-in histories are separated by account; guest history belongs to this app installation. The provider place ID, area name and optional secondary name, center, map viewport, and selection time are kept; the boundary is fetched again. You can clear this history from area search."
               title="Storage and retention"
+            />
+            <Section
+              body="When you choose a named area, its name and Google-provided center are sent through our Supabase service to OpenStreetMap's Nominatim service to find an available real-world boundary. This is used only after you select an area, is cached to reduce requests, and is shown with OpenStreetMap attribution."
+              title="Area boundaries and OpenStreetMap"
             />
             <Section
               body="Guest discovery creates a random anonymous Supabase account and session on your device so the protected search service can identify requests. It contains no email and is not treated as a signed-in MakanMana profile. Production cleanup must remove anonymous accounts after the published retention period."
@@ -71,6 +78,10 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
               title="Google Maps content"
             />
             <Section
+              body="Highlighted area boundaries come from OpenStreetMap contributors when a suitable outline is available. Boundaries are informational and may be incomplete or change over time."
+              title="OpenStreetMap boundaries"
+            />
+            <Section
               body="Verified Halal labels appear only when a current trusted verification record is available. Missing verification is never a Halal claim."
               title="Halal information"
             />
@@ -90,10 +101,18 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
             label="Google Maps Terms"
             onPress={() => void Linking.openURL(GOOGLE_TERMS_URL)}
           />
+          <LegalLink
+            label="OpenStreetMap copyright"
+            onPress={() => void Linking.openURL(OSM_COPYRIGHT_URL)}
+          />
+          <LegalLink
+            label="Nominatim usage policy"
+            onPress={() => void Linking.openURL(NOMINATIM_POLICY_URL)}
+          />
         </View>
 
         <Text style={[styles.updated, { color: colors.textMuted }]}>
-          English MVP notice · Updated 27 July 2026
+          English MVP notice · Updated 29 July 2026
         </Text>
       </ScrollView>
     </SafeAreaView>

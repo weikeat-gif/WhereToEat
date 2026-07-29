@@ -5,11 +5,13 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import type { PlaceDetails, PlaceSummary } from '@/contracts/place';
 import type {
+  AreaBoundary,
   AreaSuggestion,
   SearchCriteria,
   SearchResults,
@@ -39,6 +41,10 @@ class FakePlacesService implements PlacesService {
     _sessionToken: string,
   ): Promise<AreaSuggestion[]> {
     return [];
+  }
+
+  async getAreaBoundary(): Promise<AreaBoundary | null> {
+    return null;
   }
 
   async searchNearby(criteria: SearchCriteria): Promise<SearchResults> {
@@ -72,13 +78,30 @@ function Harness() {
 }
 
 function AreaHarness() {
-  const { criteria, error, results, selectArea, status, surpriseMe } = useSearch();
+  const {
+    criteria,
+    clearRecentAreas,
+    error,
+    recentAreas,
+    results,
+    selectArea,
+    status,
+    surpriseMe,
+    updateCriteriaAndSearch,
+  } = useSearch();
   const [surpriseId, setSurpriseId] = useState('none');
   return (
     <View>
       <Text testID="area">{criteria.areaLabel}</Text>
       <Text testID="area-status">{`${status}:${error ?? 'none'}`}</Text>
       <Text testID="area-results">{results.length}</Text>
+      <Text testID="area-boundary">
+        {criteria.areaBoundary?.label ?? 'none'}
+      </Text>
+      <Text testID="area-filter">{criteria.openNow ? 'open' : 'any'}</Text>
+      <Text testID="recent-areas">
+        {recentAreas.map((area) => area.label).join('|') || 'none'}
+      </Text>
       <Text testID="area-surprise">{surpriseId}</Text>
       <TouchableOpacity
         accessibilityRole="button"
@@ -96,6 +119,18 @@ function AreaHarness() {
         accessibilityLabel="Pick selected-area surprise"
         onPress={() => setSurpriseId(surpriseMe()?.id ?? 'none')}>
         <Text>Surprise</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Show open selected-area restaurants"
+        onPress={() => void updateCriteriaAndSearch({ openNow: true })}>
+        <Text>Open only</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Clear recent selected areas"
+        onPress={clearRecentAreas}>
+        <Text>Clear recents</Text>
       </TouchableOpacity>
     </View>
   );
@@ -205,6 +240,172 @@ describe('SearchProvider synchronization', () => {
     expect(
       (searchNearby.mock.calls.at(-1)?.[0] as SearchCriteria).radiusMeters,
     ).toBeGreaterThan(6_000);
+    expect(screen.getByTestId('recent-areas')).toHaveTextContent(
+      'Klang, Selangor',
+    );
+  });
+
+  it('adds the real area boundary and filters results to its polygon', async () => {
+    const service = new FakePlacesService();
+    jest.spyOn(service, 'getPlaceDetails').mockResolvedValue({
+      ...result,
+      id: 'klang-1',
+      coordinates: { latitude: 3.0449, longitude: 101.4456 },
+      address: 'Klang, Selangor',
+      openingHours: [],
+      photoUrls: [],
+    });
+    jest.spyOn(service, 'getAreaBoundary').mockResolvedValue({
+      source: 'openstreetmap',
+      sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+      label: 'Bandar Sentosa',
+      polygons: [
+        {
+          outer: [
+            { latitude: 3.03, longitude: 101.43 },
+            { latitude: 3.06, longitude: 101.43 },
+            { latitude: 3.06, longitude: 101.46 },
+            { latitude: 3.03, longitude: 101.43 },
+          ],
+          holes: [],
+        },
+      ],
+    });
+    render(
+      <SearchProvider service={service}>
+        <AreaHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Select Klang' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('area-boundary')).toHaveTextContent(
+        'Bandar Sentosa',
+      ),
+    );
+    expect(service.getAreaBoundary).toHaveBeenCalledWith(
+      'Klang, Selangor',
+      { latitude: 3.0449, longitude: 101.4456 },
+    );
+    expect(screen.getByTestId('area-results')).toHaveTextContent('0');
+  });
+
+  it('does not let a late boundary overwrite a newer filter search', async () => {
+    let resolveBoundary!: (value: AreaBoundary) => void;
+    const service = new FakePlacesService();
+    jest.spyOn(service, 'getPlaceDetails').mockResolvedValue({
+      ...result,
+      id: 'klang-1',
+      coordinates: { latitude: 3.0449, longitude: 101.4456 },
+      address: 'Klang, Selangor',
+      openingHours: [],
+      photoUrls: [],
+    });
+    jest.spyOn(service, 'getAreaBoundary').mockImplementation(
+      () =>
+        new Promise<AreaBoundary>((resolve) => {
+          resolveBoundary = resolve;
+        }),
+    );
+    render(
+      <SearchProvider service={service}>
+        <AreaHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Select Klang' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('area-results')).toHaveTextContent('1'),
+    );
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Show open selected-area restaurants',
+      }),
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('area-filter')).toHaveTextContent('open');
+      expect(screen.getByTestId('area-results')).toHaveTextContent('0');
+    });
+
+    await act(async () => {
+      resolveBoundary({
+        source: 'openstreetmap',
+        sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
+        label: 'Bandar Sentosa',
+        polygons: [
+          {
+            outer: [
+              { latitude: 3.03, longitude: 101.43 },
+              { latitude: 3.16, longitude: 101.43 },
+              { latitude: 3.16, longitude: 101.72 },
+              { latitude: 3.03, longitude: 101.43 },
+            ],
+            holes: [],
+          },
+        ],
+      });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('area-filter')).toHaveTextContent('open');
+    expect(screen.getByTestId('area-results')).toHaveTextContent('0');
+    expect(screen.getByTestId('area-boundary')).toHaveTextContent('none');
+  });
+
+  it('orders clearing persistent history after an in-flight save', async () => {
+    let resolveSave!: () => void;
+    const operations: string[] = [];
+    const service = new FakePlacesService();
+    jest.spyOn(service, 'getPlaceDetails').mockResolvedValue({
+      ...result,
+      id: 'klang-1',
+      coordinates: { latitude: 3.0449, longitude: 101.4456 },
+      address: 'Klang, Selangor',
+      openingHours: [],
+      photoUrls: [],
+    });
+    const setItem = AsyncStorage.setItem as jest.MockedFunction<
+      typeof AsyncStorage.setItem
+    >;
+    const removeItem = AsyncStorage.removeItem as jest.MockedFunction<
+      typeof AsyncStorage.removeItem
+    >;
+    setItem.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          operations.push('save-start');
+          resolveSave = () => {
+            operations.push('save-end');
+            resolve();
+          };
+        }),
+    );
+    removeItem.mockImplementation(async () => {
+      operations.push('remove');
+    });
+    render(
+      <SearchProvider historyScope="guest" service={service}>
+        <AreaHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Select Klang' }));
+    await waitFor(() => expect(setItem).toHaveBeenCalled());
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Clear recent selected areas' }),
+    );
+    expect(removeItem).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSave();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(removeItem).toHaveBeenCalled());
+    expect(operations).toEqual(['save-start', 'save-end', 'remove']);
+    setItem.mockReset().mockResolvedValue(undefined);
+    removeItem.mockReset().mockResolvedValue(undefined);
   });
 
   it('keeps out-of-area results out of shared state and Surprise me', async () => {

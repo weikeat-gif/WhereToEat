@@ -44,6 +44,20 @@ consume a durable Postgres rate bucket through the service role. Deploy
 and Places responses are not cached. Rate-limit bucket identifiers use a
 server-keyed HMAC and rows older than 24 hours are deleted.
 
+Selected-area outlines are not supplied by Google Places in Malaysia. The
+protected function therefore makes a user-triggered, rate-limited Nominatim
+lookup for an OpenStreetMap polygon after an area is selected. It sends an
+identifying User-Agent, stays below one upstream request per second per running
+function instance, uses a global durable two-second request slot, caches
+successful polygons for 30 days in memory, and the app persists recent selected
+areas locally. The map displays OpenStreetMap
+attribution whenever this boundary is shown. This public endpoint is suitable
+only for the moderate pilot described by the
+[Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/);
+move `loadBoundary` to a managed or self-hosted provider before higher traffic.
+The provider remains server-side so it can be changed without releasing a new
+app build.
+
 ## Manual restaurant promotion pilot
 
 Promotions are operator-managed in Supabase. Restaurants cannot write promotion

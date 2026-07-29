@@ -21,6 +21,7 @@ import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { CompactPlaceRow } from '@/components/ui/compact-place-row';
 import type { PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
+import { isCoordinateWithinAreaBoundary } from '@/features/map/area-boundary';
 import { MapCanvas } from '@/features/map/map-canvas';
 import {
   isCoordinateWithinMapBounds,
@@ -60,6 +61,7 @@ export function MapScreen() {
   const { colors } = useAppTheme();
   const {
     autocompleteArea,
+    clearRecentAreas,
     criteria,
     error,
     locationCanAskAgain,
@@ -67,6 +69,7 @@ export function MapScreen() {
     locationStatus,
     userCoordinates,
     results,
+    recentAreas,
     search,
     searchCurrentLocation,
     selectArea,
@@ -82,6 +85,7 @@ export function MapScreen() {
   const [queryInput, setQueryInput] = useState(criteria.query ?? '');
   const [areaInput, setAreaInput] = useState(criteria.areaLabel);
   const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
+  const [areaFocused, setAreaFocused] = useState(false);
   const [queryAreaSuggestions, setQueryAreaSuggestions] = useState<
     AreaSuggestion[]
   >([]);
@@ -93,18 +97,31 @@ export function MapScreen() {
   const listFocused = viewMode === 'list';
   const visibleResults = useMemo(
     () => {
+      const areaBoundary = criteria.areaBoundary;
       const areaBounds = criteria.areaBounds;
-      const areaResults = areaBounds
+      const areaResults = areaBoundary
         ? results.filter((place) =>
-            isCoordinateWithinMapBounds(place.coordinates, areaBounds),
+            isCoordinateWithinAreaBoundary(
+              place.coordinates,
+              areaBoundary,
+            ),
           )
-        : results;
+        : areaBounds
+          ? results.filter((place) =>
+              isCoordinateWithinMapBounds(place.coordinates, areaBounds),
+            )
+          : results;
       const bounds = mapViewport.bounds;
       return bounds
         ? selectMapPlacesForViewport(areaResults, bounds)
         : areaResults;
     },
-    [criteria.areaBounds, mapViewport.bounds, results],
+    [
+      criteria.areaBoundary,
+      criteria.areaBounds,
+      mapViewport.bounds,
+      results,
+    ],
   );
   const nearbyDockPanResponder = useMemo(
     () =>
@@ -224,6 +241,8 @@ export function MapScreen() {
 
   const chooseArea = (area: AreaSuggestion) => {
     const selectedArea = { ...area, label: areaDisplayLabel(area) };
+    Keyboard.dismiss();
+    setAreaFocused(false);
     setSuggestions([]);
     setAreaInput(selectedArea.label);
     setViewMode('map');
@@ -245,6 +264,8 @@ export function MapScreen() {
       search({
         ...criteria,
         areaBounds: undefined,
+        areaBoundary: undefined,
+        areaPlaceId: undefined,
         center: viewport.center,
         areaLabel: i18n.t('mapAreaLabel'),
         radiusMeters: viewport.radiusMeters,
@@ -294,6 +315,7 @@ export function MapScreen() {
           <TextInput
             accessibilityLabel={i18n.t('mapAreaAccessibility')}
             onChangeText={setAreaInput}
+            onFocus={() => setAreaFocused(true)}
             placeholder={i18n.t('mapAreaPlaceholder')}
             placeholderTextColor={colors.textMuted}
             style={[styles.areaInput, { color: colors.text }]}
@@ -323,32 +345,75 @@ export function MapScreen() {
             />
           </TouchableOpacity>
         </View>
-        {suggestions.length > 0 ? (
+        {suggestions.length > 0 ||
+        (areaFocused &&
+          recentAreas.length > 0 &&
+          (areaInput.trim().length === 0 ||
+            areaInput === criteria.areaLabel)) ? (
           <View style={styles.suggestions}>
-            {suggestions.slice(0, 4).map((area) => (
+            {suggestions.length === 0 ? (
+              <View style={styles.querySuggestionHeader}>
+                <Text
+                  accessibilityRole="header"
+                  style={[
+                    styles.querySuggestionHeading,
+                    { color: colors.textMuted },
+                  ]}>
+                  {i18n.t('mapRecentAreas')}
+                </Text>
+                <TouchableOpacity
+                  accessibilityLabel={i18n.t('mapClearRecentAreas')}
+                  accessibilityRole="button"
+                  onPress={clearRecentAreas}>
+                  <Text
+                    style={[
+                      styles.clearRecentAreas,
+                      { color: colors.accentForeground },
+                    ]}>
+                    {i18n.t('mapClear')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            {(suggestions.length > 0 ? suggestions : recentAreas)
+              .slice(0, 5)
+              .map((area) => (
               <TouchableOpacity
                 key={area.id}
-                accessibilityLabel={i18n.t('mapChooseArea', {
-                  area: area.label,
-                })}
+                accessibilityLabel={
+                  suggestions.length > 0
+                    ? i18n.t('mapChooseArea', { area: area.label })
+                    : i18n.t('mapGoToArea', {
+                        area: areaDisplayLabel(area),
+                      })
+                }
                 accessibilityRole="button"
                 onPress={() => chooseArea(area)}
                 style={[styles.suggestion, { borderColor: colors.border }]}>
-                <Text numberOfLines={1} style={{ color: colors.text }}>
-                  {area.label}
-                </Text>
-                {area.secondaryLabel ? (
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.suggestionSecondary,
-                      { color: colors.textMuted },
-                    ]}>
-                    {area.secondaryLabel}
+                <View style={styles.areaSuggestionCopy}>
+                  <Text numberOfLines={1} style={{ color: colors.text }}>
+                    {area.label}
                   </Text>
+                  {area.secondaryLabel ? (
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.suggestionSecondary,
+                        { color: colors.textMuted },
+                      ]}>
+                      {area.secondaryLabel}
+                    </Text>
+                  ) : null}
+                </View>
+                {suggestions.length === 0 ? (
+                  <Ionicons
+                    color={colors.accentForeground}
+                    name="time-outline"
+                    size={18}
+                  />
                 ) : null}
               </TouchableOpacity>
-            ))}
+              ))}
           </View>
         ) : null}
       </View>
@@ -497,6 +562,7 @@ export function MapScreen() {
         <View testID="map-pane" style={styles.mapPane}>
           <MapCanvas
             center={mapViewport.center}
+            focusedAreaBoundary={criteria.areaBoundary}
             focusedAreaBounds={criteria.areaBounds}
             onViewportChange={handleViewportChange}
             onMapPress={() => setViewMode('map')}
@@ -505,6 +571,26 @@ export function MapScreen() {
             showsUserLocation={locationStatus === 'granted'}
             userCoordinates={userCoordinates}
           />
+
+        {criteria.areaBoundary ? (
+          <TouchableOpacity
+            accessibilityLabel={i18n.t('mapBoundaryAttributionAccessibility')}
+            accessibilityRole="link"
+            onPress={() =>
+              void Linking.openURL('https://www.openstreetmap.org/copyright')
+            }
+            style={[
+              styles.boundaryAttribution,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}>
+            <Text style={[styles.boundaryAttributionText, { color: colors.textMuted }]}>
+              {i18n.t('mapBoundaryAttribution')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity
           accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
@@ -557,7 +643,9 @@ export function MapScreen() {
             <TouchableOpacity
               accessibilityLabel="Show search filters and nearby results"
               accessibilityRole="button"
-              onPress={() => setViewMode('split')}
+              onPress={() => {
+                setViewMode('split');
+              }}
               style={[
                 styles.submitButton,
                 { backgroundColor: colors.surfaceElevated },
@@ -571,15 +659,17 @@ export function MapScreen() {
                 styles.querySuggestions,
                 { borderColor: colors.border },
               ]}>
-              <Text
-                accessibilityRole="header"
-                style={[
-                  styles.querySuggestionHeading,
-                  { color: colors.textMuted },
-                ]}>
-                {i18n.t('mapLocationSuggestions')}
-              </Text>
-              {queryAreaSuggestions.slice(0, 4).map((area) => {
+              <View style={styles.querySuggestionHeader}>
+                <Text
+                  accessibilityRole="header"
+                  style={[
+                    styles.querySuggestionHeading,
+                    { color: colors.textMuted },
+                  ]}>
+                  {i18n.t('mapLocationSuggestions')}
+                </Text>
+              </View>
+              {queryAreaSuggestions.slice(0, 5).map((area) => {
                 const label = areaDisplayLabel(area);
                 return (
                   <TouchableOpacity
@@ -811,6 +901,20 @@ const styles = StyleSheet.create({
   },
   searchAreaButtonExpanded: { bottom: '48%' },
   searchAreaButtonFocused: { bottom: 128 },
+  boundaryAttribution: {
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    left: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    position: 'absolute',
+    top: 80,
+    zIndex: 2,
+  },
+  boundaryAttributionText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 10,
+  },
   queryRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -835,6 +939,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     paddingHorizontal: spacing.sm,
     textTransform: 'uppercase',
+  },
+  querySuggestionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+  },
+  clearRecentAreas: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 12,
+    padding: spacing.xs,
   },
   querySuggestion: {
     alignItems: 'center',
@@ -886,12 +1001,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   suggestion: {
+    alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
     minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
+  areaSuggestionCopy: { flex: 1 },
   suggestionSecondary: { fontSize: 12, marginTop: 2 },
   resultsContent: {
     paddingBottom: spacing.xxl,
