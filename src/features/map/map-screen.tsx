@@ -497,7 +497,7 @@ export function MapScreen() {
         <View testID="map-pane" style={styles.mapPane}>
           <MapCanvas
             center={mapViewport.center}
-            highlightedArea={criteria.areaBounds}
+            focusedAreaBounds={criteria.areaBounds}
             onViewportChange={handleViewportChange}
             onMapPress={() => setViewMode('map')}
             onPlacePress={openPlace}
@@ -505,29 +505,6 @@ export function MapScreen() {
             showsUserLocation={locationStatus === 'granted'}
             userCoordinates={userCoordinates}
           />
-
-        {criteria.areaBounds ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.areaBoundsBadge,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.accentForeground,
-              },
-            ]}>
-            <Ionicons
-              color={colors.accentForeground}
-              name="map-outline"
-              size={16}
-            />
-            <Text
-              numberOfLines={1}
-              style={[styles.areaBoundsText, { color: colors.text }]}>
-              {i18n.t('mapApproximateArea', { area: criteria.areaLabel })}
-            </Text>
-          </View>
-        ) : null}
 
         <TouchableOpacity
           accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
@@ -834,25 +811,6 @@ const styles = StyleSheet.create({
   },
   searchAreaButtonExpanded: { bottom: '48%' },
   searchAreaButtonFocused: { bottom: 128 },
-  areaBoundsBadge: {
-    alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    left: spacing.lg,
-    maxWidth: '78%',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    position: 'absolute',
-    top: 84,
-    zIndex: 2,
-  },
-  areaBoundsText: {
-    flexShrink: 1,
-    fontFamily: fontFamily.semibold,
-    fontSize: 12,
-  },
   queryRow: {
     alignItems: 'center',
     flexDirection: 'row',

@@ -332,8 +332,8 @@ describe('MapScreen states', () => {
     render(<MapScreen />);
 
     expect(
-      screen.getByText('Approximate area: Taman Sentosa, Klang'),
-    ).toBeTruthy();
+      screen.queryByText('Approximate area: Taman Sentosa, Klang'),
+    ).toBeNull();
     expect(screen.getByText('Inside Taman Sentosa')).toBeTruthy();
     expect(screen.queryByText('Outside Taman Sentosa')).toBeNull();
     fireEvent.press(

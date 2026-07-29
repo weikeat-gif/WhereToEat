@@ -16,7 +16,7 @@ import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 export type MapCanvasProps = {
   center: Coordinates;
-  highlightedArea?: MapBounds;
+  focusedAreaBounds?: MapBounds;
   places: PlaceSummary[];
   onViewportChange: (
     viewport: MapViewport,
@@ -49,16 +49,12 @@ type WebMarker = {
   addListener(event: string, listener: () => void): MapsListener;
   setMap(map: WebMap | null): void;
 };
-type WebRectangle = {
-  setMap(map: WebMap | null): void;
-};
 type GoogleMapsApi = {
   Map: new (
     element: HTMLElement,
     options: Record<string, unknown>,
   ) => WebMap;
   Marker: new (options: Record<string, unknown>) => WebMarker;
-  Rectangle: new (options: Record<string, unknown>) => WebRectangle;
 };
 
 declare global {
@@ -192,7 +188,7 @@ function webBounds(bounds: MapBounds) {
 
 export function MapCanvas({
   center,
-  highlightedArea,
+  focusedAreaBounds,
   places,
   onViewportChange,
   onMapPress,
@@ -208,7 +204,6 @@ export function MapCanvas({
   const mapPressListenerRef = useRef<MapsListener | null>(null);
   const mapWasDraggedRef = useRef(false);
   const markerRefs = useRef<WebMarker[]>([]);
-  const rectangleRef = useRef<WebRectangle | null>(null);
   const lastViewportRef = useRef<MapViewport>({
     center,
     radiusMeters: 0,
@@ -328,8 +323,6 @@ export function MapCanvas({
       mapPressListenerRef.current?.remove();
       mapPressListenerRef.current = null;
       mapRef.current = null;
-      rectangleRef.current?.setMap(null);
-      rectangleRef.current = null;
     };
   }, [retryNonce, webKey]);
 
@@ -348,42 +341,16 @@ export function MapCanvas({
   }, [resolvedMode]);
 
   useEffect(() => {
-    rectangleRef.current?.setMap(null);
-    rectangleRef.current = null;
-    if (
-      !highlightedArea ||
-      !mapReady ||
-      !mapRef.current ||
-      !window.google?.maps
-    ) {
-      return;
-    }
+    if (!focusedAreaBounds || !mapReady || !mapRef.current) return;
 
-    const bounds = webBounds(highlightedArea);
+    const bounds = webBounds(focusedAreaBounds);
     mapRef.current.fitBounds(bounds, 48);
-    const rectangle = new window.google.maps.Rectangle({
-      bounds,
-      clickable: false,
-      fillColor: colors.accent,
-      fillOpacity: 0.16,
-      map: mapRef.current,
-      strokeColor: colors.accentForeground,
-      strokeOpacity: 0.78,
-      strokeWeight: 2,
-      zIndex: 1,
-    });
-    rectangleRef.current = rectangle;
-
-    return () => {
-      rectangle.setMap(null);
-      if (rectangleRef.current === rectangle) rectangleRef.current = null;
-    };
-  }, [colors.accent, colors.accentForeground, highlightedArea, mapReady]);
+  }, [focusedAreaBounds, mapReady]);
 
   useEffect(() => {
     if (
       !mapRef.current ||
-      highlightedArea ||
+      focusedAreaBounds ||
       !coordinatesChanged(lastViewportRef.current.center, center)
     ) {
       return;
@@ -396,7 +363,7 @@ export function MapCanvas({
       lat: center.latitude,
       lng: center.longitude,
     });
-  }, [center, highlightedArea]);
+  }, [center, focusedAreaBounds]);
 
   useEffect(() => {
     markerRefs.current.forEach((marker) => marker.setMap(null));
