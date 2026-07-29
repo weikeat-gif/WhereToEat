@@ -51,7 +51,10 @@ type SearchContextValue = {
     changes: Partial<SearchCriteria>,
   ) => Promise<SearchResults | undefined>;
   autocompleteArea: (input: string) => Promise<AreaSuggestion[]>;
-  selectArea: (area: AreaSuggestion) => Promise<SearchResults | undefined>;
+  selectArea: (
+    area: AreaSuggestion,
+    changes?: Pick<SearchCriteria, 'query'>,
+  ) => Promise<SearchResults | undefined>;
   searchCurrentLocation: () => Promise<SearchResults | undefined>;
   surpriseMe: () => PlaceSummary | undefined;
 };
@@ -149,7 +152,10 @@ export function SearchProvider({
   );
 
   const selectArea = useCallback(
-    async (area: AreaSuggestion) => {
+    async (
+      area: AreaSuggestion,
+      changes: Pick<SearchCriteria, 'query'> = {},
+    ) => {
       const operationId = ++requestIdRef.current;
       setStatus('loading');
       setError(null);
@@ -160,6 +166,7 @@ export function SearchProvider({
         if (operationId !== requestIdRef.current) return undefined;
         return search({
           ...criteriaRef.current,
+          ...changes,
           center: coordinates,
           areaLabel: area.label,
           rankPreference: 'DISTANCE',

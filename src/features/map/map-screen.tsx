@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   Linking,
   PanResponder,
   Pressable,
@@ -41,6 +42,18 @@ const PRICES: PriceLevel[] = [1, 2, 3, 4];
 const RADII = [1000, 3000, 5000, 10_000];
 type MapViewMode = 'split' | 'map' | 'list';
 export const MAP_AUTO_SEARCH_DELAY_MS = 650;
+export const MAP_QUERY_SUGGESTION_DELAY_MS = 280;
+
+function areaDisplayLabel(area: AreaSuggestion) {
+  const secondaryLabel = area.secondaryLabel?.trim();
+  if (
+    !secondaryLabel ||
+    area.label.toLocaleLowerCase().includes(secondaryLabel.toLocaleLowerCase())
+  ) {
+    return area.label;
+  }
+  return `${area.label}, ${secondaryLabel}`;
+}
 
 export function MapScreen() {
   const { colors } = useAppTheme();
@@ -68,6 +81,9 @@ export function MapScreen() {
   const [queryInput, setQueryInput] = useState(criteria.query ?? '');
   const [areaInput, setAreaInput] = useState(criteria.areaLabel);
   const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
+  const [queryAreaSuggestions, setQueryAreaSuggestions] = useState<
+    AreaSuggestion[]
+  >([]);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<MapViewMode>('split');
   const [pendingMapSearch, setPendingMapSearch] =
@@ -116,12 +132,12 @@ export function MapScreen() {
 
   useEffect(() => {
     setPendingMapSearch(null);
-    setMapViewport((current) => ({
-      ...current,
+    setMapViewport({
       center: criteria.center,
-    }));
+      radiusMeters: criteria.radiusMeters,
+    });
     setAreaInput(criteria.areaLabel);
-  }, [criteria.areaLabel, criteria.center]);
+  }, [criteria.areaLabel, criteria.center, criteria.radiusMeters]);
 
   useEffect(() => {
     setQueryInput(criteria.query ?? '');
@@ -148,7 +164,30 @@ export function MapScreen() {
     };
   }, [areaInput, autocompleteArea, criteria.areaLabel]);
 
+  useEffect(() => {
+    let active = true;
+    const input = queryInput.trim();
+    if (input.length < 2 || input === (criteria.query ?? '').trim()) {
+      setQueryAreaSuggestions([]);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      void autocompleteArea(input)
+        .then((areas) => {
+          if (active) setQueryAreaSuggestions(areas);
+        })
+        .catch(() => {
+          if (active) setQueryAreaSuggestions([]);
+        });
+    }, MAP_QUERY_SUGGESTION_DELAY_MS);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [autocompleteArea, criteria.query, queryInput]);
+
   const submitQuery = () => {
+    setQueryAreaSuggestions([]);
     void updateCriteriaAndSearch({ query: queryInput.trim() });
   };
 
@@ -171,9 +210,19 @@ export function MapScreen() {
   };
 
   const chooseArea = (area: AreaSuggestion) => {
+    const selectedArea = { ...area, label: areaDisplayLabel(area) };
     setSuggestions([]);
-    setAreaInput(area.label);
-    void selectArea(area);
+    setAreaInput(selectedArea.label);
+    void selectArea(selectedArea);
+  };
+
+  const chooseQueryArea = (area: AreaSuggestion) => {
+    const selectedArea = { ...area, label: areaDisplayLabel(area) };
+    Keyboard.dismiss();
+    setQueryAreaSuggestions([]);
+    setQueryInput('');
+    setAreaInput(selectedArea.label);
+    void selectArea(selectedArea, { query: undefined });
   };
 
   const runMapAreaSearch = useCallback(
@@ -499,6 +548,58 @@ export function MapScreen() {
               <Ionicons color={colors.text} name="options-outline" size={20} />
             </TouchableOpacity>
           </View>
+          {queryAreaSuggestions.length > 0 ? (
+            <View
+              style={[
+                styles.querySuggestions,
+                { borderColor: colors.border },
+              ]}>
+              <Text
+                accessibilityRole="header"
+                style={[
+                  styles.querySuggestionHeading,
+                  { color: colors.textMuted },
+                ]}>
+                {i18n.t('mapLocationSuggestions')}
+              </Text>
+              {queryAreaSuggestions.slice(0, 4).map((area) => {
+                const label = areaDisplayLabel(area);
+                return (
+                  <TouchableOpacity
+                    key={area.id}
+                    accessibilityLabel={i18n.t('mapGoToArea', { area: label })}
+                    accessibilityRole="button"
+                    onPress={() => chooseQueryArea(area)}
+                    style={styles.querySuggestion}>
+                    <View
+                      style={[
+                        styles.querySuggestionIcon,
+                        { backgroundColor: colors.surfaceElevated },
+                      ]}>
+                      <Ionicons
+                        color={colors.accentForeground}
+                        name="location-outline"
+                        size={18}
+                      />
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.querySuggestionLabel,
+                        { color: colors.text },
+                      ]}>
+                      {label}
+                    </Text>
+                    <Ionicons
+                      color={colors.textMuted}
+                      name="chevron-forward"
+                      size={17}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
         </View>
       ) : null}
@@ -705,6 +806,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 44,
     paddingHorizontal: spacing.sm,
+  },
+  querySuggestions: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingBottom: spacing.xs,
+    paddingTop: spacing.sm,
+  },
+  querySuggestionHeading: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 0.7,
+    paddingHorizontal: spacing.sm,
+    textTransform: 'uppercase',
+  },
+  querySuggestion: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minHeight: 48,
+    paddingHorizontal: spacing.sm,
+  },
+  querySuggestionIcon: {
+    alignItems: 'center',
+    borderRadius: 12,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  querySuggestionLabel: {
+    flex: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: 14,
   },
   submitButton: {
     alignItems: 'center',

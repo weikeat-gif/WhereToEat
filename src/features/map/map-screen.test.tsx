@@ -3,7 +3,11 @@ import { FlatList, Linking, ScrollView } from 'react-native';
 
 import type { PlaceSummary } from '@/contracts/place';
 
-import { MAP_AUTO_SEARCH_DELAY_MS, MapScreen } from './map-screen';
+import {
+  MAP_AUTO_SEARCH_DELAY_MS,
+  MAP_QUERY_SUGGESTION_DELAY_MS,
+  MapScreen,
+} from './map-screen';
 
 const mockPush = jest.fn();
 const mockUseSearch = jest.fn();
@@ -238,7 +242,9 @@ describe('MapScreen states', () => {
 
     render(<MapScreen />);
 
-    const query = screen.getByLabelText('Search restaurants or cuisines');
+    const query = screen.getByLabelText(
+      'Search restaurants, cuisines, or locations',
+    );
     expect(query).toHaveProp('value', 'nasi lemak');
     fireEvent.changeText(query, '  roti canai  ');
     fireEvent(query, 'submitEditing');
@@ -246,6 +252,51 @@ describe('MapScreen states', () => {
     expect(updateCriteriaAndSearch).toHaveBeenCalledWith({
       query: 'roti canai',
     });
+  });
+
+  it('suggests a matching area before submission and moves the map there', async () => {
+    jest.useFakeTimers();
+    const area = {
+      id: 'klang',
+      label: 'Klang',
+      secondaryLabel: 'Selangor',
+      coordinates: { latitude: 3.0449, longitude: 101.4456 },
+    };
+    const autocompleteArea = jest.fn().mockResolvedValue([area]);
+    const selectArea = jest.fn().mockResolvedValue(undefined);
+    const updateCriteriaAndSearch = jest.fn();
+    mockUseSearch.mockReturnValue(
+      searchState({
+        autocompleteArea,
+        selectArea,
+        updateCriteriaAndSearch,
+      }),
+    );
+
+    render(<MapScreen />);
+    const query = screen.getByLabelText(
+      'Search restaurants, cuisines, or locations',
+    );
+    fireEvent.changeText(query, 'Klang');
+    await act(async () => {
+      jest.advanceTimersByTime(MAP_QUERY_SUGGESTION_DELAY_MS);
+      await Promise.resolve();
+    });
+
+    expect(autocompleteArea).toHaveBeenCalledWith('Klang');
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Go to Klang, Selangor' }),
+    );
+
+    expect(selectArea).toHaveBeenCalledWith(
+      {
+        ...area,
+        label: 'Klang, Selangor',
+      },
+      { query: undefined },
+    );
+    expect(updateCriteriaAndSearch).not.toHaveBeenCalled();
+    expect(query).toHaveProp('value', '');
   });
 
   it('applies RM price filters through the shared search criteria', () => {
@@ -264,7 +315,9 @@ describe('MapScreen states', () => {
     let currentState = firstState;
     mockUseSearch.mockImplementation(() => currentState);
     const view = render(<MapScreen />);
-    const query = screen.getByLabelText('Search restaurants or cuisines');
+    const query = screen.getByLabelText(
+      'Search restaurants, cuisines, or locations',
+    );
 
     fireEvent.changeText(query, 'coffee');
     currentState = {
@@ -277,10 +330,11 @@ describe('MapScreen states', () => {
     };
     view.rerender(<MapScreen />);
 
-    expect(screen.getByLabelText('Search restaurants or cuisines')).toHaveProp(
-      'value',
-      'coffee',
-    );
+    expect(
+      screen.getByLabelText(
+        'Search restaurants, cuisines, or locations',
+      ),
+    ).toHaveProp('value', 'coffee');
   });
 
   it('automatically searches a settled panned area and keeps manual search available', () => {
@@ -397,6 +451,36 @@ describe('MapScreen states', () => {
     expect(
       screen.getByRole('button', { name: 'Show 1 place nearby' }),
     ).toBeTruthy();
+  });
+
+  it('clears stale visible bounds when a selected suggestion recentres the map', () => {
+    const firstState = searchState();
+    let currentState = firstState;
+    mockUseSearch.mockImplementation(() => currentState);
+    const view = render(<MapScreen />);
+
+    fireEvent.press(screen.getByLabelText('Pan map test control'));
+    expect(screen.queryByText('Trusted Place')).toBeNull();
+
+    const selectedAreaPlace: PlaceSummary = {
+      ...trustedPlace,
+      id: 'selected-area-place',
+      name: 'Selected Area Place',
+      coordinates: { latitude: 5.4141, longitude: 100.3288 },
+    };
+    currentState = {
+      ...firstState,
+      criteria: {
+        ...firstState.criteria,
+        areaLabel: 'George Town, Penang',
+        center: { latitude: 5.4141, longitude: 100.3288 },
+      },
+      results: [selectedAreaPlace],
+    };
+    view.rerender(<MapScreen />);
+
+    expect(screen.getByText('Selected Area Place')).toBeTruthy();
+    expect(screen.getByText('1 spot around George Town, Penang')).toBeTruthy();
   });
 
   it('requests GPS and nearby food from the in-app map', () => {

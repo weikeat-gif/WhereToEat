@@ -80,7 +80,10 @@ function AreaHarness() {
         accessibilityRole="button"
         accessibilityLabel="Select Klang"
         onPress={() =>
-          void selectArea({ id: 'klang-1', label: 'Klang, Selangor' })
+          void selectArea(
+            { id: 'klang-1', label: 'Klang, Selangor' },
+            { query: undefined },
+          )
         }>
         <Text>Select</Text>
       </TouchableOpacity>
@@ -153,6 +156,7 @@ describe('SearchProvider synchronization', () => {
 
   it('resolves coordinates only after an autocomplete prediction is selected', async () => {
     const service = new FakePlacesService();
+    const searchNearby = jest.spyOn(service, 'searchNearby');
     jest.spyOn(service, 'getPlaceDetails').mockResolvedValue({
       ...result,
       id: 'klang-1',
@@ -173,6 +177,12 @@ describe('SearchProvider synchronization', () => {
       expect(screen.getByTestId('area')).toHaveTextContent('Klang, Selangor'),
     );
     expect(service.getPlaceDetails).toHaveBeenCalledWith('klang-1');
+    expect(searchNearby).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        areaLabel: 'Klang, Selangor',
+        query: undefined,
+      }),
+    );
   });
 
   it('does not let a late location result overwrite a newer manual area', async () => {

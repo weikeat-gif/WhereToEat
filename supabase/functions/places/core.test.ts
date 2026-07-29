@@ -73,6 +73,22 @@ describe('places Edge Function core', () => {
     ).toThrow('query');
   });
 
+  it('restricts region autocomplete suggestions to Malaysia', () => {
+    const request = buildGoogleRequest('server-key', {
+      action: 'autocomplete',
+      input: 'Klang',
+      sessionToken: 'area-session',
+    });
+
+    expect(JSON.parse(request.init.body as string)).toMatchObject({
+      input: 'Klang',
+      includedPrimaryTypes: ['(regions)'],
+      includedRegionCodes: ['my'],
+      regionCode: 'MY',
+      sessionToken: 'area-session',
+    });
+  });
+
   it('builds Text Search New for a non-empty restaurant query', () => {
     const request = buildGoogleRequest('server-key', {
       action: 'nearby',

@@ -178,6 +178,7 @@ export function buildGoogleRequest(
           input: input.input,
           sessionToken: input.sessionToken,
           includedPrimaryTypes: ['(regions)'],
+          includedRegionCodes: ['my'],
           regionCode: 'MY',
         }),
       },
