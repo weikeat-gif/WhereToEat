@@ -89,10 +89,16 @@ function AreaHarness() {
 }
 
 function LocationRaceHarness() {
-  const { criteria, searchCurrentLocation, selectArea } = useSearch();
+  const { criteria, searchCurrentLocation, selectArea, userCoordinates } =
+    useSearch();
   return (
     <View>
       <Text testID="race-area">{criteria.areaLabel}</Text>
+      <Text testID="user-coordinates">
+        {userCoordinates
+          ? `${userCoordinates.latitude},${userCoordinates.longitude}`
+          : 'unavailable'}
+      </Text>
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel="Use location"
@@ -200,6 +206,38 @@ describe('SearchProvider synchronization', () => {
       ),
     );
     expect(locationClient.getCurrentPositionAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('user-coordinates')).toHaveTextContent(
+      'unavailable',
+    );
+  });
+
+  it('keeps granted GPS coordinates available for the map location marker', async () => {
+    const locationClient = {
+      requestForegroundPermissionsAsync: jest
+        .fn()
+        .mockResolvedValue({ status: 'granted' }),
+      getCurrentPositionAsync: jest.fn().mockResolvedValue({
+        coords: { latitude: 3.2, longitude: 101.7 },
+      }),
+    };
+    render(
+      <SearchProvider
+        locationClient={locationClient}
+        service={new FakePlacesService()}>
+        <LocationRaceHarness />
+      </SearchProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Use location' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('user-coordinates')).toHaveTextContent(
+        '3.2,101.7',
+      ),
+    );
+    expect(screen.getByTestId('race-area')).toHaveTextContent(
+      'Current location',
+    );
   });
 
   it('does not let slow area resolution overwrite a newer manual area', async () => {

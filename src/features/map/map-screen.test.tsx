@@ -1,9 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { FlatList, Linking, ScrollView } from 'react-native';
 
 import type { PlaceSummary } from '@/contracts/place';
 
-import { MapScreen } from './map-screen';
+import { MAP_AUTO_SEARCH_DELAY_MS, MapScreen } from './map-screen';
 
 const mockPush = jest.fn();
 const mockUseSearch = jest.fn();
@@ -22,18 +22,30 @@ jest.mock('@/features/map/map-canvas', () => {
     MapCanvas: ({
       onViewportChange,
       onMapPress,
+      showsUserLocation,
+      userCoordinates,
     }: {
-      onViewportChange: (viewport: {
-        center: { latitude: number; longitude: number };
-        radiusMeters: number;
-        bounds?: {
-          northEast: { latitude: number; longitude: number };
-          southWest: { latitude: number; longitude: number };
-        };
-      }) => void;
+      onViewportChange: (
+        viewport: {
+          center: { latitude: number; longitude: number };
+          radiusMeters: number;
+          bounds?: {
+            northEast: { latitude: number; longitude: number };
+            southWest: { latitude: number; longitude: number };
+          };
+        },
+        source: 'gesture' | 'programmatic',
+      ) => void;
       onMapPress: () => void;
+      showsUserLocation: boolean;
+      userCoordinates?: { latitude: number; longitude: number } | null;
     }) => (
       <View accessibilityLabel="Map test canvas">
+        {showsUserLocation && userCoordinates ? (
+          <View
+            accessibilityLabel={`Current location marker ${userCoordinates.latitude},${userCoordinates.longitude}`}
+          />
+        ) : null}
         <TouchableOpacity
           accessibilityLabel="Focus map test control"
           onPress={onMapPress}
@@ -48,7 +60,19 @@ jest.mock('@/features/map/map-canvas', () => {
                 northEast: { latitude: 3.1, longitude: 101.5 },
                 southWest: { latitude: 3.0, longitude: 101.4 },
               },
-            })
+            }, 'gesture')
+          }
+        />
+        <TouchableOpacity
+          accessibilityLabel="Programmatic map update test control"
+          onPress={() =>
+            onViewportChange(
+              {
+                center: { latitude: 3.05, longitude: 101.45 },
+                radiusMeters: 6800,
+              },
+              'programmatic',
+            )
           }
         />
       </View>
@@ -97,6 +121,7 @@ function searchState(overrides: Record<string, unknown> = {}) {
     locationCanAskAgain: true,
     locationMessage: null,
     locationStatus: 'idle',
+    userCoordinates: null,
     results: [trustedPlace],
     search: jest.fn(),
     searchCurrentLocation: jest.fn(),
@@ -113,6 +138,10 @@ describe('MapScreen states', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseSearch.mockReturnValue(searchState());
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('focuses the full map on a deliberate tap and restores nearby results', () => {
@@ -254,19 +283,22 @@ describe('MapScreen states', () => {
     );
   });
 
-  it('searches the explicitly panned map area only after confirmation', () => {
-    const search = jest.fn();
+  it('automatically searches a settled panned area and keeps manual search available', () => {
+    jest.useFakeTimers();
+    const search = jest.fn().mockResolvedValue(undefined);
     mockUseSearch.mockReturnValue(searchState({ search }));
 
     render(<MapScreen />);
     fireEvent.press(screen.getByLabelText('Pan map test control'));
 
     expect(search).not.toHaveBeenCalled();
-    fireEvent.press(
-      screen.getByRole('button', {
-        name: 'Search restaurants in this map area',
-      }),
-    );
+    act(() => {
+      jest.advanceTimersByTime(MAP_AUTO_SEARCH_DELAY_MS - 1);
+    });
+    expect(search).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
     expect(search).toHaveBeenCalledWith(
       expect.objectContaining({
         areaLabel: 'Map area',
@@ -275,6 +307,55 @@ describe('MapScreen states', () => {
         rankPreference: 'POPULARITY',
       }),
     );
+
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Search restaurants in this map area',
+      }),
+    );
+    expect(search).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        areaLabel: 'Map area',
+        center: { latitude: 3.05, longitude: 101.45 },
+        radiusMeters: 6800,
+        rankPreference: 'POPULARITY',
+      }),
+    );
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not search again after an internal programmatic map movement', () => {
+    jest.useFakeTimers();
+    const search = jest.fn().mockResolvedValue(undefined);
+    mockUseSearch.mockReturnValue(searchState({ search }));
+
+    render(<MapScreen />);
+    fireEvent.press(
+      screen.getByLabelText('Programmatic map update test control'),
+    );
+    act(() => {
+      jest.advanceTimersByTime(MAP_AUTO_SEARCH_DELAY_MS);
+    });
+
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it('shows the exact granted GPS position separately from restaurant pins', () => {
+    mockUseSearch.mockReturnValue(
+      searchState({
+        locationStatus: 'granted',
+        userCoordinates: { latitude: 3.139, longitude: 101.6869 },
+      }),
+    );
+
+    render(<MapScreen />);
+
+    expect(
+      screen.getByLabelText('Current location marker 3.139,101.6869'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('GPS ready — your location is marked on the map.'),
+    ).toBeTruthy();
   });
 
   it('keeps the map count and list limited to places inside visible bounds', () => {

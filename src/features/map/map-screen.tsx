@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
@@ -40,6 +40,7 @@ const CATEGORIES = [
 const PRICES: PriceLevel[] = [1, 2, 3, 4];
 const RADII = [1000, 3000, 5000, 10_000];
 type MapViewMode = 'split' | 'map' | 'list';
+export const MAP_AUTO_SEARCH_DELAY_MS = 650;
 
 export function MapScreen() {
   const { colors } = useAppTheme();
@@ -50,6 +51,7 @@ export function MapScreen() {
     locationCanAskAgain,
     locationMessage,
     locationStatus,
+    userCoordinates,
     results,
     search,
     searchCurrentLocation,
@@ -68,6 +70,8 @@ export function MapScreen() {
   const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<MapViewMode>('split');
+  const [pendingMapSearch, setPendingMapSearch] =
+    useState<MapViewport | null>(null);
   const mapFocused = viewMode === 'map';
   const listFocused = viewMode === 'list';
   const visibleResults = useMemo(
@@ -111,6 +115,7 @@ export function MapScreen() {
   };
 
   useEffect(() => {
+    setPendingMapSearch(null);
     setMapViewport((current) => ({
       ...current,
       center: criteria.center,
@@ -171,14 +176,42 @@ export function MapScreen() {
     void selectArea(area);
   };
 
-  const searchMapArea = () =>
-    search({
-      ...criteria,
-      center: mapViewport.center,
-      areaLabel: i18n.t('mapAreaLabel'),
-      radiusMeters: mapViewport.radiusMeters,
-      rankPreference: 'POPULARITY',
-    });
+  const runMapAreaSearch = useCallback(
+    (viewport: MapViewport) =>
+      search({
+        ...criteria,
+        center: viewport.center,
+        areaLabel: i18n.t('mapAreaLabel'),
+        radiusMeters: viewport.radiusMeters,
+        rankPreference: 'POPULARITY',
+      }),
+    [criteria, search],
+  );
+
+  const searchMapArea = () => {
+    setPendingMapSearch(null);
+    return runMapAreaSearch(mapViewport);
+  };
+
+  const handleViewportChange = useCallback(
+    (
+      viewport: MapViewport,
+      source: 'gesture' | 'programmatic',
+    ) => {
+      setMapViewport(viewport);
+      if (source === 'gesture') setPendingMapSearch(viewport);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!pendingMapSearch || status === 'loading') return;
+    const timeout = setTimeout(() => {
+      setPendingMapSearch(null);
+      void runMapAreaSearch(pendingMapSearch);
+    }, MAP_AUTO_SEARCH_DELAY_MS);
+    return () => clearTimeout(timeout);
+  }, [pendingMapSearch, runMapAreaSearch, status]);
 
   const listHeader = (
     <View style={styles.listHeader}>
@@ -399,11 +432,12 @@ export function MapScreen() {
         <View testID="map-pane" style={styles.mapPane}>
           <MapCanvas
             center={mapViewport.center}
-            onViewportChange={setMapViewport}
+            onViewportChange={handleViewportChange}
             onMapPress={() => setViewMode('map')}
             onPlacePress={openPlace}
             places={visibleResults}
             showsUserLocation={locationStatus === 'granted'}
+            userCoordinates={userCoordinates}
           />
 
         <TouchableOpacity

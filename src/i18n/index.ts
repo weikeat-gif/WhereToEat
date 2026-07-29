@@ -33,7 +33,7 @@ const translations = {
     mapFilterOpenNow: 'Open now',
     mapFilterVerifiedHalal: 'Verified Halal',
     mapRadius: '%{distance} km radius',
-    mapGpsReady: 'GPS ready — results are centred on your current location.',
+    mapGpsReady: 'GPS ready — your location is marked on the map.',
     mapSettingsError:
       'Unable to open app settings. Open Settings on your phone and allow Location for MakanMana.',
     mapAreaLabel: 'Map area',

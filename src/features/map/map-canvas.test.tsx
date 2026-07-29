@@ -32,8 +32,10 @@ describe('web MapCanvas', () => {
 
   it('initializes at the latest area when GPS changes while Maps is loading', async () => {
     let mapOptions: Record<string, unknown> | undefined;
+    const markerOptions: Record<string, unknown>[] = [];
     let currentCenter = { lat: () => 3.2, lng: () => 101.7 };
     let idleListener: (() => void) | undefined;
+    let dragStartListener: (() => void) | undefined;
     let mapPressListener: (() => void) | undefined;
     const onCenterChange = jest.fn();
     const onMapPress = jest.fn();
@@ -43,6 +45,7 @@ describe('web MapCanvas', () => {
       }
       addListener(event: string, listener: () => void) {
         if (event === 'idle') idleListener = listener;
+        if (event === 'dragstart') dragStartListener = listener;
         if (event === 'click') mapPressListener = listener;
         return { remove: jest.fn() };
       }
@@ -66,6 +69,9 @@ describe('web MapCanvas', () => {
       }
     }
     class FakeMarker {
+      constructor(options: Record<string, unknown>) {
+        markerOptions.push(options);
+      }
       addListener() {
         return { remove: jest.fn() };
       }
@@ -86,6 +92,7 @@ describe('web MapCanvas', () => {
       onMapPress,
       onPlacePress: jest.fn(),
       showsUserLocation: true,
+      userCoordinates: gpsCenter,
     };
     const view = render(<MapCanvas {...props} />);
 
@@ -115,24 +122,45 @@ describe('web MapCanvas', () => {
     );
 
     currentCenter = { lat: () => 3.06, lng: () => 101.46 };
+    act(() => dragStartListener?.());
     act(() => idleListener?.());
-    expect(onCenterChange).toHaveBeenCalledWith({
-      center: {
-        latitude: 3.06,
-        longitude: 101.46,
-      },
-      radiusMeters: expect.any(Number),
-      bounds: {
-        northEast: {
-          latitude: 3.0975,
-          longitude: 101.4975,
+    expect(onCenterChange).toHaveBeenCalledWith(
+      {
+        center: {
+          latitude: 3.06,
+          longitude: 101.46,
         },
-        southWest: {
-          latitude: 3.0225,
-          longitude: 101.4225,
+        radiusMeters: expect.any(Number),
+        bounds: {
+          northEast: {
+            latitude: 3.0975,
+            longitude: 101.4975,
+          },
+          southWest: {
+            latitude: 3.0225,
+            longitude: 101.4225,
+          },
         },
       },
-    });
+      'gesture',
+    );
+    expect(markerOptions).toContainEqual(
+      expect.objectContaining({
+        position: { lat: gpsCenter.latitude, lng: gpsCenter.longitude },
+        title: 'Your current location',
+      }),
+    );
+
+    act(() => dragStartListener?.());
+    act(() => idleListener?.());
+    currentCenter = { lat: () => 3.07, lng: () => 101.47 };
+    act(() => idleListener?.());
+    expect(onCenterChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        center: { latitude: 3.07, longitude: 101.47 },
+      }),
+      'programmatic',
+    );
 
     act(() => mapPressListener?.());
     expect(onMapPress).toHaveBeenCalledTimes(1);

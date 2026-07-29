@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react';
 
-import type { PlaceSummary } from '@/contracts/place';
+import type { Coordinates, PlaceSummary } from '@/contracts/place';
 import type {
   AreaSuggestion,
   SearchCriteria,
@@ -42,6 +42,7 @@ type SearchContextValue = {
   locationStatus: 'idle' | 'requesting' | 'granted' | 'manual';
   locationMessage: string | null;
   locationCanAskAgain: boolean | null;
+  userCoordinates: Coordinates | null;
   surprise: PlaceSummary | undefined;
   setCriteria: (criteria: SearchCriteria) => void;
   setResults: (places: PlaceSummary[]) => void;
@@ -78,6 +79,8 @@ export function SearchProvider({
   const [locationCanAskAgain, setLocationCanAskAgain] = useState<
     boolean | null
   >(null);
+  const [userCoordinates, setUserCoordinates] =
+    useState<Coordinates | null>(null);
   const [surprise, setSurprise] = useState<PlaceSummary>();
   const criteriaRef = useRef(criteria);
   const requestIdRef = useRef(0);
@@ -187,6 +190,7 @@ export function SearchProvider({
     if (location.kind === 'manual') {
       setLocationStatus('manual');
       setLocationCanAskAgain(location.canAskAgain ?? true);
+      setUserCoordinates(null);
       setLocationMessage(
         location.reason === 'denied'
           ? 'Location permission was denied. Search by area instead.'
@@ -197,6 +201,7 @@ export function SearchProvider({
 
     setLocationStatus('granted');
     setLocationCanAskAgain(true);
+    setUserCoordinates(location.coordinates);
     return search({
       ...criteriaRef.current,
       center: location.coordinates,
@@ -225,6 +230,7 @@ export function SearchProvider({
       locationStatus,
       locationMessage,
       locationCanAskAgain,
+      userCoordinates,
       surprise,
       setCriteria: setSynchronizedCriteria,
       setResults: setSynchronizedResults,
@@ -242,6 +248,7 @@ export function SearchProvider({
       locationMessage,
       locationCanAskAgain,
       locationStatus,
+      userCoordinates,
       results,
       search,
       searchCurrentLocation,

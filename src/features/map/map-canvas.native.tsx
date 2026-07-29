@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
   PROVIDER_GOOGLE,
+  type Details,
   type MapStyleElement,
   type Region,
 } from 'react-native-maps';
@@ -84,6 +85,7 @@ export function MapCanvas({
   onMapPress,
   onPlacePress,
   showsUserLocation,
+  userCoordinates,
 }: MapCanvasProps) {
   const { colors, resolvedMode } = useAppTheme();
   const mapRef = useRef<MapView>(null);
@@ -115,7 +117,7 @@ export function MapCanvas({
     );
   }, [center]);
 
-  const handleRegionChange = (region: Region) => {
+  const handleRegionChange = (region: Region, details: Details) => {
     const nextCenter = {
       latitude: region.latitude,
       longitude: region.longitude,
@@ -137,7 +139,7 @@ export function MapCanvas({
       center: nextCenter,
       radiusMeters: radiusForMapRegion(region),
       bounds: boundsForMapRegion(region),
-    });
+    }, details.isGesture ? 'gesture' : 'programmatic');
   };
 
   return (
@@ -156,7 +158,7 @@ export function MapCanvas({
         provider={PROVIDER_GOOGLE}
         showsCompass
         showsMyLocationButton={false}
-        showsUserLocation={showsUserLocation}
+        showsUserLocation={showsUserLocation && Boolean(userCoordinates)}
         style={StyleSheet.absoluteFill}>
         {places.map((place) => (
           <Marker

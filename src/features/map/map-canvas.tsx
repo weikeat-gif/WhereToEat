@@ -16,10 +16,14 @@ import { fontFamily, radius, spacing } from '@/theme/tokens';
 export type MapCanvasProps = {
   center: Coordinates;
   places: PlaceSummary[];
-  onViewportChange: (viewport: MapViewport) => void;
+  onViewportChange: (
+    viewport: MapViewport,
+    source: 'gesture' | 'programmatic',
+  ) => void;
   onMapPress: () => void;
   onPlacePress: (placeId: string) => void;
   showsUserLocation: boolean;
+  userCoordinates?: Coordinates | null;
 };
 
 type MapsListener = { remove(): void };
@@ -61,6 +65,12 @@ export const FOOD_PIN_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURICo
     <path d="M21 52C18.2 45.7 5 34.3 5 21C5 11.6 12.2 4 21 4s16 7.6 16 17c0 13.3-13.2 24.7-16 31z" fill="#E64B3C" stroke="#171C1B" stroke-width="2.5"/>
     <circle cx="21" cy="21" r="11.5" fill="#C6FF00" stroke="#FFFFFF" stroke-width="2"/>
     <path d="M16.5 14v6.5M19 14v6.5M16.5 17h2.5M17.75 20.5V28M25 14v14M25 14c3.2 2.4 3.2 7 0 8.8" fill="none" stroke="#171C1B" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
+  </svg>
+`)}`;
+export const USER_LOCATION_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">
+    <circle cx="17" cy="17" r="15" fill="#4285F4" fill-opacity=".2"/>
+    <circle cx="17" cy="17" r="9" fill="#4285F4" stroke="#FFFFFF" stroke-width="3"/>
   </svg>
 `)}`;
 const PREVIEW_MARKER_POSITIONS = [
@@ -167,13 +177,16 @@ export function MapCanvas({
   onViewportChange,
   onMapPress,
   onPlacePress,
-  showsUserLocation: _showsUserLocation,
+  showsUserLocation,
+  userCoordinates,
 }: MapCanvasProps) {
   const { colors, resolvedMode } = useAppTheme();
   const hostRef = useRef<View>(null);
   const mapRef = useRef<WebMap | null>(null);
   const mapListenerRef = useRef<MapsListener | null>(null);
+  const mapDragListenerRef = useRef<MapsListener | null>(null);
   const mapPressListenerRef = useRef<MapsListener | null>(null);
+  const mapWasDraggedRef = useRef(false);
   const markerRefs = useRef<WebMarker[]>([]);
   const lastViewportRef = useRef<MapViewport>({
     center,
@@ -225,6 +238,9 @@ export function MapCanvas({
           zoom: 14,
         });
         mapRef.current = map;
+        mapDragListenerRef.current = map.addListener('dragstart', () => {
+          mapWasDraggedRef.current = true;
+        });
         mapListenerRef.current = map.addListener('idle', () => {
           const next = map.getCenter();
           if (!next) return;
@@ -265,9 +281,13 @@ export function MapCanvas({
                   }
                 : undefined,
           };
+          const source = mapWasDraggedRef.current
+            ? 'gesture'
+            : 'programmatic';
+          mapWasDraggedRef.current = false;
           if (!viewportChanged(lastViewportRef.current, nextViewport)) return;
           lastViewportRef.current = nextViewport;
-          onViewportChangeRef.current(nextViewport);
+          onViewportChangeRef.current(nextViewport, source);
         });
         mapPressListenerRef.current = map.addListener('click', () => {
           onMapPressRef.current();
@@ -282,6 +302,8 @@ export function MapCanvas({
       active = false;
       mapListenerRef.current?.remove();
       mapListenerRef.current = null;
+      mapDragListenerRef.current?.remove();
+      mapDragListenerRef.current = null;
       mapPressListenerRef.current?.remove();
       mapPressListenerRef.current = null;
       mapRef.current = null;
@@ -325,7 +347,7 @@ export function MapCanvas({
     if (!mapReady || !mapRef.current || !window.google?.maps) return;
 
     const maps = window.google.maps;
-    markerRefs.current = places.map((place) => {
+    const nextMarkers = places.map((place) => {
       const marker = new maps.Marker({
         map: mapRef.current,
         position: {
@@ -338,6 +360,21 @@ export function MapCanvas({
       marker.addListener('click', () => onPlacePress(place.id));
       return marker;
     });
+    if (showsUserLocation && userCoordinates) {
+      nextMarkers.push(
+        new maps.Marker({
+          icon: USER_LOCATION_ICON_URL,
+          map: mapRef.current,
+          position: {
+            lat: userCoordinates.latitude,
+            lng: userCoordinates.longitude,
+          },
+          title: i18n.t('mapCurrentLocation'),
+          zIndex: 1000,
+        }),
+      );
+    }
+    markerRefs.current = nextMarkers;
 
     return () => {
       markerRefs.current.forEach((marker) => marker.setMap(null));
@@ -349,6 +386,8 @@ export function MapCanvas({
     mapReady,
     onPlacePress,
     places,
+    showsUserLocation,
+    userCoordinates,
   ]);
 
   return (
