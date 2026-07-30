@@ -49,6 +49,36 @@ function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message);
 }
 
+export function parseOAuthCallback(
+  url: string,
+  expectedRedirect = 'makanmana://auth',
+): string {
+  const callback = new URL(url);
+  const expected = new URL(expectedRedirect);
+  const normalizedPath = (value: string) => value.replace(/\/+$/, '');
+  if (
+    callback.protocol !== expected.protocol ||
+    callback.host !== expected.host ||
+    normalizedPath(callback.pathname) !== normalizedPath(expected.pathname)
+  ) {
+    throw new Error('Google sign-in returned to an unexpected app address.');
+  }
+  const oauthError =
+    callback.searchParams.get('error_description') ??
+    callback.searchParams.get('error');
+  if (oauthError) {
+    const errorCode = callback.searchParams.get('error');
+    throw new Error(
+      errorCode === 'access_denied'
+        ? 'Google sign-in was cancelled.'
+        : 'Google sign-in could not be completed. Please try again.',
+    );
+  }
+  const code = callback.searchParams.get('code');
+  if (!code) throw new Error('Google sign-in response was missing its code.');
+  return code;
+}
+
 export class SupabaseAuthGateway implements AuthGateway {
   async restoreSession(): Promise<AuthSession | null> {
     if (!supabase) return null;
@@ -75,6 +105,8 @@ export class SupabaseAuthGateway implements AuthGateway {
       options: {
         redirectTo,
         skipBrowserRedirect: true,
+        scopes: 'openid email profile',
+        queryParams: { prompt: 'select_account' },
       },
     });
     throwIfError(error);
@@ -88,8 +120,7 @@ export class SupabaseAuthGateway implements AuthGateway {
       throw new Error('Google sign-in could not be completed.');
     }
 
-    const code = new URL(result.url).searchParams.get('code');
-    if (!code) throw new Error('Google sign-in response was missing its code.');
+    const code = parseOAuthCallback(result.url, redirectTo);
     const { error: exchangeError } =
       await client.auth.exchangeCodeForSession(code);
     throwIfError(exchangeError);

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Platform,
@@ -24,15 +25,19 @@ export function AuthScreen() {
     isBusy,
     error,
     emailCodeSent,
+    emailCodeAddress,
     backendMode,
     signInWithGoogle,
     signInWithApple,
     requestEmailCode,
     verifyEmailCode,
+    resetEmailCode,
     signOut,
   } = useAuth();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [showEmailSignIn, setShowEmailSignIn] = useState(false);
+  const verificationEmail = emailCodeAddress;
 
   function run(operation: () => Promise<void>) {
     void operation().catch(() => undefined);
@@ -75,10 +80,15 @@ export function AuthScreen() {
           </Text>
         ) : null}
         <AuthButton
-          label="Continue with Google"
+          icon="logo-google"
+          label="Sign in securely with Google"
           disabled={isBusy || backendMode === 'mock'}
           onPress={() => run(signInWithGoogle)}
         />
+        <Text style={[styles.providerHint, { color: colors.textMuted }]}>
+          Google opens in a secure browser. MakanMana will not email you a code
+          for this option.
+        </Text>
         {Platform.OS === 'ios' ? (
           <AppleSignInButton
             disabled={isBusy || backendMode === 'mock'}
@@ -86,35 +96,31 @@ export function AuthScreen() {
             theme={resolvedMode}
           />
         ) : null}
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <TextInput
-          accessibilityLabel="Email address"
-          autoCapitalize="none"
-          autoComplete="email"
-          editable={!isBusy}
-          keyboardType="email-address"
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          placeholderTextColor={colors.textMuted}
-          style={[
-            styles.input,
-            {
-              borderColor: colors.border,
-              color: colors.text,
-              backgroundColor: colors.surfaceElevated,
-            },
-          ]}
-          value={email}
-        />
-        {emailCodeSent ? (
-          <>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showEmailSignIn }}
+          onPress={() => setShowEmailSignIn((current) => !current)}
+          style={styles.emailToggle}>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Text style={[styles.emailToggleText, { color: colors.textMuted }]}>
+            {showEmailSignIn ? 'Hide email sign-in' : 'Use email instead'}
+          </Text>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        </Pressable>
+        {showEmailSignIn ? (
+          <View style={styles.emailStack}>
+            <Text style={[styles.emailExplanation, { color: colors.textMuted }]}>
+              Email sign-in is separate from Google. We will send the code to
+              the email address entered below.
+            </Text>
             <TextInput
-              accessibilityLabel="One-time code"
-              editable={!isBusy}
-              keyboardType="number-pad"
-              maxLength={8}
-              onChangeText={setCode}
-              placeholder="One-time code"
+              accessibilityLabel="Email address"
+              autoCapitalize="none"
+              autoComplete="email"
+              editable={!isBusy && !emailCodeSent}
+              keyboardType="email-address"
+              onChangeText={setEmail}
+              placeholder="you@example.com"
               placeholderTextColor={colors.textMuted}
               style={[
                 styles.input,
@@ -124,23 +130,83 @@ export function AuthScreen() {
                   backgroundColor: colors.surfaceElevated,
                 },
               ]}
-              value={code}
+              value={emailCodeSent ? emailCodeAddress : email}
             />
-            <AuthButton
-              label="Verify code"
-              disabled={isBusy || code.trim().length < 6}
-              onPress={() => run(() => verifyEmailCode(email, code))}
-            />
-          </>
-        ) : (
-          <AuthButton
-            label="Email me a code"
-            disabled={
-              isBusy || backendMode === 'mock' || !email.trim().includes('@')
-            }
-            onPress={() => run(() => requestEmailCode(email))}
-          />
-        )}
+            {emailCodeSent ? (
+              <>
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[styles.codeSent, { color: colors.text }]}>
+                  Code sent to {verificationEmail}. Check that email inbox and spam
+                  folder.
+                </Text>
+                <TextInput
+                  accessibilityLabel="Email sign-in code"
+                  autoComplete="one-time-code"
+                  editable={!isBusy}
+                  keyboardType="number-pad"
+                  maxLength={8}
+                  onChangeText={setCode}
+                  placeholder="6-digit email code"
+                  placeholderTextColor={colors.textMuted}
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: colors.border,
+                      color: colors.text,
+                      backgroundColor: colors.surfaceElevated,
+                    },
+                  ]}
+                  value={code}
+                />
+                <AuthButton
+                  label="Verify email code"
+                  disabled={isBusy || code.trim().length < 6}
+                  onPress={() =>
+                    run(() => verifyEmailCode(verificationEmail, code))
+                  }
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isBusy}
+                  onPress={() =>
+                    run(() => requestEmailCode(verificationEmail))
+                  }>
+                  <Text
+                    style={[
+                      styles.resendCode,
+                      { color: colors.accentForeground },
+                    ]}>
+                    Resend email code
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isBusy}
+                  onPress={() => {
+                    resetEmailCode();
+                    setCode('');
+                  }}>
+                  <Text
+                    style={[
+                      styles.resendCode,
+                      { color: colors.textMuted },
+                    ]}>
+                    Change email address
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <AuthButton
+                label="Send code to this email"
+                disabled={
+                  isBusy || backendMode === 'mock' || !email.trim().includes('@')
+                }
+                onPress={() => run(() => requestEmailCode(email))}
+              />
+            )}
+          </View>
+        ) : null}
         {isBusy ? (
           <ActivityIndicator color={colors.accentForeground} />
         ) : null}
@@ -154,10 +220,12 @@ function AuthButton({
   label,
   disabled,
   onPress,
+  icon,
 }: {
   label: string;
   disabled: boolean;
   onPress: () => void;
+  icon?: keyof typeof Ionicons.glyphMap;
 }) {
   const { colors } = useAppTheme();
   return (
@@ -172,6 +240,13 @@ function AuthButton({
           borderColor: colors.border,
         },
       ]}>
+      {icon ? (
+        <Ionicons
+          color={disabled ? colors.textMuted : colors.accentText}
+          name={icon}
+          size={20}
+        />
+      ) : null}
       <Text
         style={{
           color: disabled ? colors.textMuted : colors.accentText,
@@ -198,6 +273,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 15,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
     minHeight: 54,
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -210,6 +288,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  divider: { height: 1, marginVertical: 4 },
+  divider: { flex: 1, height: 1 },
+  emailToggle: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 44,
+  },
+  emailToggleText: { fontFamily: fontFamily.medium, fontSize: 13 },
+  emailStack: { gap: 12 },
+  emailExplanation: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  providerHint: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: -6,
+    textAlign: 'center',
+  },
+  codeSent: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 19 },
+  resendCode: {
+    fontFamily: fontFamily.semibold,
+    paddingVertical: 8,
+    textAlign: 'center',
+  },
   notice: { fontFamily: fontFamily.regular, lineHeight: 20 },
 });

@@ -279,6 +279,7 @@ describe('MapScreen states', () => {
     const query = screen.getByLabelText(
       'Search restaurants, cuisines, or locations',
     );
+    fireEvent(query, 'focus');
     fireEvent.changeText(query, 'Klang');
     await act(async () => {
       jest.advanceTimersByTime(MAP_QUERY_SUGGESTION_DELAY_MS);
@@ -302,28 +303,7 @@ describe('MapScreen states', () => {
     expect(screen.queryByTestId('results-pane')).toBeNull();
   });
 
-  it('keeps recent areas out of the restaurant and cuisine query field', () => {
-    const recentArea = {
-      id: 'taman-sentosa',
-      label: 'Taman Sentosa, Klang, Selangor',
-      coordinates: { latitude: 2.999458, longitude: 101.4745 },
-    };
-    mockUseSearch.mockReturnValue(
-      searchState({
-        recentAreas: [recentArea],
-      }),
-    );
-
-    render(<MapScreen />);
-    const query = screen.getByLabelText(
-      'Search restaurants, cuisines, or locations',
-    );
-    fireEvent(query, 'focus');
-
-    expect(screen.queryByText('Recent areas')).toBeNull();
-  });
-
-  it('shows recent selected areas in the dedicated area finder', () => {
+  it('shows recent areas in the unified search field and selects one', () => {
     const recentArea = {
       id: 'taman-sentosa',
       label: 'Taman Sentosa, Klang, Selangor',
@@ -338,15 +318,18 @@ describe('MapScreen states', () => {
     );
 
     render(<MapScreen />);
-    fireEvent(screen.getByLabelText('Search area manually'), 'focus');
+    fireEvent(
+      screen.getByLabelText('Search restaurants, cuisines, or locations'),
+      'focus',
+    );
 
-    expect(screen.getAllByText('Recent areas').length).toBeGreaterThan(0);
+    expect(screen.getByText('Recent areas')).toBeTruthy();
     fireEvent.press(
       screen.getByRole('button', {
         name: 'Go to Taman Sentosa, Klang, Selangor',
       }),
     );
-    expect(selectArea).toHaveBeenCalledWith(recentArea);
+    expect(selectArea).toHaveBeenCalledWith(recentArea, { query: undefined });
   });
 
   it('limits selected-area restaurants to the irregular area boundary', () => {
@@ -417,9 +400,23 @@ describe('MapScreen states', () => {
     mockUseSearch.mockReturnValue(searchState({ updateCriteriaAndSearch }));
 
     render(<MapScreen />);
-    fireEvent.press(screen.getByRole('button', { name: 'Filter RM RM' }));
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Open search filters' }),
+    );
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Filter Moderate' }),
+    );
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Apply search filters' }),
+    );
 
-    expect(updateCriteriaAndSearch).toHaveBeenCalledWith({ priceLevels: [1] });
+    expect(updateCriteriaAndSearch).toHaveBeenCalledWith({
+      categories: [],
+      openNow: true,
+      priceLevels: [1],
+      radiusMeters: 3000,
+      verifiedHalalOnly: false,
+    });
     expect(screen.queryByText(/\$/)).toBeNull();
   });
 

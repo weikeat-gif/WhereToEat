@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type {
   HalalVerification,
   PlaceDetails,
+  PlacePriceRange,
   PlaceSummary,
   PriceLevel,
 } from '@/contracts/place';
@@ -60,6 +61,19 @@ const halalVerificationSchema = z.object({
   expiresAt: z.string().datetime(),
 });
 
+const moneySchema = z.object({
+  currencyCode: z.string().min(3).max(3),
+  units: z.union([z.string(), z.number()]).optional(),
+  nanos: z.number().int().min(-999_999_999).max(999_999_999).optional(),
+});
+
+const priceRangeSchema = z
+  .object({
+    startPrice: moneySchema.optional(),
+    endPrice: moneySchema.optional(),
+  })
+  .optional();
+
 const rawPlaceSchema = z.object({
   id: z.string().min(1),
   displayName: z.object({ text: z.string().min(1) }),
@@ -74,6 +88,7 @@ const rawPlaceSchema = z.object({
   rating: z.number().min(0).max(5).optional(),
   userRatingCount: z.number().int().nonnegative().optional(),
   priceLevel: z.string().optional(),
+  priceRange: priceRangeSchema,
   currentOpeningHours: z
     .object({
       openNow: z.boolean().optional(),
@@ -227,6 +242,25 @@ function trustedHalal(
   return hasTrustedHalalVerification(verification) ? verification : undefined;
 }
 
+function toPriceRange(place: RawPlace): PlacePriceRange | undefined {
+  const start = place.priceRange?.startPrice;
+  const end = place.priceRange?.endPrice;
+  const currencyCode = start?.currencyCode ?? end?.currencyCode;
+  if (!currencyCode) return undefined;
+  const amount = (money: typeof start) => {
+    if (!money) return undefined;
+    const units = Number(money.units ?? 0);
+    const nanos = money.nanos ?? 0;
+    const value = units + nanos / 1_000_000_000;
+    return Number.isFinite(value) ? value : undefined;
+  };
+  return {
+    currencyCode,
+    start: amount(start),
+    endExclusive: amount(end),
+  };
+}
+
 function toSummary(place: RawPlace, criteria: SearchCriteria): PlaceSummary {
   const categories = (place.types ?? []).map(toCategory);
   return {
@@ -240,6 +274,7 @@ function toSummary(place: RawPlace, criteria: SearchCriteria): PlaceSummary {
     priceLevel: place.priceLevel
       ? PRICE_LEVELS[place.priceLevel]
       : undefined,
+    priceRange: toPriceRange(place),
     isOpen: place.currentOpeningHours?.openNow,
     categories,
     halalVerification: trustedHalal(place.halalVerification),

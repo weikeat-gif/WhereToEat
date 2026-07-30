@@ -4,11 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ListsScreen } from './lists-screen';
 
 const mockPush = jest.fn();
-const mockUpdateCriteriaAndSearch = jest.fn();
-let mockDataMode: 'mock' | 'live' = 'mock';
 const mockSearchState = {
-  error: null as string | null,
-  status: 'success' as 'idle' | 'loading' | 'success' | 'empty' | 'error',
   results: [
     {
       id: 'late-place',
@@ -21,6 +17,18 @@ const mockSearchState = {
       priceLevel: 1 as const,
       isOpen: true,
       categories: ['Supper'],
+    },
+    {
+      id: 'kopitiam-place',
+      name: 'Klang Kopitiam',
+      subtitle: 'Toast and coffee',
+      coordinates: { latitude: 3.14, longitude: 101.69 },
+      distanceMeters: 900,
+      rating: 4.3,
+      reviewCount: 180,
+      priceLevel: 2 as const,
+      isOpen: true,
+      categories: ['Cafe'],
     },
   ],
 };
@@ -35,27 +43,7 @@ jest.mock('expo-image', () => {
 });
 
 jest.mock('@/features/search/search-provider', () => ({
-  useSearch: () => ({
-    criteria: {
-      center: { latitude: 3.139, longitude: 101.6869 },
-      areaLabel: 'Klang Valley',
-      radiusMeters: 3000,
-      openNow: true,
-      priceLevels: [1, 2],
-      categories: [],
-      verifiedHalalOnly: false,
-    },
-    ...mockSearchState,
-    updateCriteriaAndSearch: mockUpdateCriteriaAndSearch,
-  }),
-}));
-
-jest.mock('@/config/env', () => ({
-  env: {
-    get EXPO_PUBLIC_DATA_MODE() {
-      return mockDataMode;
-    },
-  },
+  useSearch: () => mockSearchState,
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
@@ -76,12 +64,9 @@ function renderScreen() {
   );
 }
 
-describe('ListsScreen', () => {
+describe('ListsScreen meal plan', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockDataMode = 'mock';
-    mockSearchState.error = null;
-    mockSearchState.status = 'success';
     mockSearchState.results = [
       {
         id: 'late-place',
@@ -95,68 +80,70 @@ describe('ListsScreen', () => {
         isOpen: true,
         categories: ['Supper'],
       },
+      {
+        id: 'kopitiam-place',
+        name: 'Klang Kopitiam',
+        subtitle: 'Toast and coffee',
+        coordinates: { latitude: 3.14, longitude: 101.69 },
+        distanceMeters: 900,
+        rating: 4.3,
+        reviewCount: 180,
+        priceLevel: 2,
+        isOpen: true,
+        categories: ['Cafe'],
+      },
     ];
-    mockUpdateCriteriaAndSearch.mockResolvedValue(undefined);
   });
 
-  it('turns a curated list into a real shared restaurant search', () => {
+  it('turns current nearby results into a concrete meal plan', () => {
     const screen = renderScreen();
 
-    fireEvent.press(screen.getByRole('button', { name: 'Open Open late list' }));
-
-    expect(mockUpdateCriteriaAndSearch).toHaveBeenCalledWith({
-      categories: ['Supper'],
-      openNow: true,
-      priceLevels: [],
-      query: undefined,
-      verifiedHalalOnly: false,
-    });
+    expect(screen.getByText('Make a food plan')).toBeTruthy();
+    expect(screen.getByText('YOUR PICK')).toBeTruthy();
+    expect(screen.getAllByText('Late Night Noodles').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/400 m/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Budget-friendly/)).toBeTruthy();
   });
 
-  it('opens a result from the active collection', () => {
+  it('starts in-app directions for the selected place', () => {
     const screen = renderScreen();
 
-    fireEvent.press(screen.getByText('Late Night Noodles'));
+    fireEvent.press(screen.getByRole('button', { name: 'Directions' }));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/place/[id]',
+      pathname: '/directions/[id]',
       params: { id: 'late-place' },
     });
   });
 
-  it('shows a genuine empty state instead of demo restaurants', () => {
-    mockSearchState.status = 'empty';
-    mockSearchState.results = [];
-    const screen = renderScreen();
-
-    fireEvent.press(screen.getByRole('button', { name: 'Open Cafes list' }));
-
-    expect(screen.getByText('No matches nearby yet')).toBeTruthy();
-    expect(screen.queryByText('Restoran Nasi Kandar Line Clear')).toBeNull();
-  });
-
-  it('shows the service error instead of stale restaurant results', () => {
-    mockSearchState.status = 'error';
-    mockSearchState.error = 'Search is temporarily unavailable.';
-    mockSearchState.results = [];
+  it('cycles to another nearby choice', () => {
     const screen = renderScreen();
 
     fireEvent.press(
-      screen.getByRole('button', { name: 'Open Verified Halal list' }),
+      screen.getByRole('button', {
+        name: 'Pick another nearby restaurant',
+      }),
     );
 
-    expect(screen.getByText('Couldn’t load this list')).toBeTruthy();
-    expect(screen.getByText('Search is temporarily unavailable.')).toBeTruthy();
-    expect(screen.queryByText('Late Night Noodles')).toBeNull();
+    expect(screen.getAllByText('Klang Kopitiam').length).toBeGreaterThan(0);
   });
 
-  it('does not show curated demo shops while live discovery is idle', () => {
-    mockDataMode = 'live';
-    mockSearchState.status = 'idle';
+  it('lets the user choose tonight', () => {
+    const screen = renderScreen();
+
+    const tonight = screen.getByRole('button', { name: 'Tonight' });
+    fireEvent.press(tonight);
+
+    expect(tonight).toHaveProp('accessibilityState', { selected: true });
+  });
+
+  it('sends an empty plan to restaurant search', () => {
     mockSearchState.results = [];
     const screen = renderScreen();
 
-    expect(screen.queryByText('Jalan 21 Burger')).toBeNull();
-    expect(screen.queryByText('Nasi Lemak Antarabangsa')).toBeNull();
+    expect(screen.getByText('Find nearby food first')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Open search' }));
+
+    expect(mockPush).toHaveBeenCalledWith('/map');
   });
 });

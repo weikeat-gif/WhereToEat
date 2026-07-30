@@ -102,7 +102,9 @@ export function CompactPlaceRow({
                 styles.labelText,
                 { color: isSupper ? colors.supper : colors.price },
               ]}>
-              {isSupper ? 'SUPPER' : formatPrice(place.priceLevel)}
+              {isSupper
+                ? 'SUPPER'
+                : formatPrice(place.priceLevel, place.priceRange)}
             </Text>
           </View>
           <View style={styles.label}>

@@ -77,7 +77,7 @@ export function PlaceCard({ place, image, onPress }: PlaceCardProps) {
             </Text>
           </View>
           <Text style={[styles.price, { color: colors.price }]}>
-            {formatPrice(place.priceLevel)}
+            {formatPrice(place.priceLevel, place.priceRange)}
           </Text>
         </View>
       </View>

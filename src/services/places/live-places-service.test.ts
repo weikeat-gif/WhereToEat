@@ -221,6 +221,10 @@ describe('LivePlacesService', () => {
             rating: 4.7,
             userRatingCount: 321,
             priceLevel: 'PRICE_LEVEL_MODERATE',
+            priceRange: {
+              startPrice: { currencyCode: 'MYR', units: '20' },
+              endPrice: { currencyCode: 'MYR', units: '40' },
+            },
             currentOpeningHours: {
               openNow: true,
               weekdayDescriptions: ['Monday: 6:00 PM – 1:00 AM'],
@@ -267,6 +271,11 @@ describe('LivePlacesService', () => {
           id: 'google-place-1',
           name: 'Klang Supper Club',
           priceLevel: 2,
+          priceRange: {
+            currencyCode: 'MYR',
+            start: 20,
+            endExclusive: 40,
+          },
           isOpen: true,
           categories: ['Malaysian Restaurant', 'Restaurant'],
         },

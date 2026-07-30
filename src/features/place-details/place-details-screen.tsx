@@ -249,7 +249,9 @@ export function PlaceDetailsScreen() {
                 </Text>
               </View>
               <Text style={styles.heroMuted}>•</Text>
-              <Text style={styles.heroPrice}>{formatPrice(place.priceLevel)}</Text>
+              <Text style={styles.heroPrice}>
+                {formatPrice(place.priceLevel, place.priceRange)}
+              </Text>
             </View>
           </View>
         </View>

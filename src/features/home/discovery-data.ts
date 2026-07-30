@@ -1,6 +1,6 @@
 import type { ImageSource } from 'expo-image';
 
-import type { PlaceSummary } from '@/contracts/place';
+import type { PlacePriceRange, PlaceSummary } from '@/contracts/place';
 
 export type DiscoveryPlace = PlaceSummary & {
   image?: ImageSource;
@@ -148,6 +148,38 @@ export function formatReviews(reviewCount: number) {
   return `${reviewCount}`;
 }
 
-export function formatPrice(priceLevel?: number) {
-  return priceLevel ? 'RM'.repeat(priceLevel) : 'Price unavailable';
+function formatMoney(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+export function formatPrice(
+  priceLevel?: number,
+  priceRange?: PlacePriceRange,
+) {
+  if (priceRange && (priceRange.start !== undefined || priceRange.endExclusive !== undefined)) {
+    const currency = priceRange.currencyCode === 'MYR'
+      ? 'RM'
+      : `${priceRange.currencyCode} `;
+    if (
+      priceRange.start !== undefined &&
+      priceRange.endExclusive !== undefined
+    ) {
+      return `${currency}${formatMoney(priceRange.start)}–${formatMoney(
+        priceRange.endExclusive,
+      )}`;
+    }
+    if (priceRange.start !== undefined) {
+      return `From ${currency}${formatMoney(priceRange.start)}`;
+    }
+    return `Under ${currency}${formatMoney(priceRange.endExclusive!)}`;
+  }
+  const levels: Record<number, string> = {
+    1: 'Budget-friendly',
+    2: 'Moderate price',
+    3: 'Pricey',
+    4: 'Premium price',
+  };
+  return priceLevel
+    ? levels[priceLevel] ?? 'Price unavailable'
+    : 'Price unavailable';
 }

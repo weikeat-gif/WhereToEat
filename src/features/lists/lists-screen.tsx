@@ -1,99 +1,65 @@
-import type { ComponentProps } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { CompactPlaceRow } from '@/components/ui/compact-place-row';
-import { env } from '@/config/env';
-import type { SearchCriteria } from '@/contracts/search';
+import type { PlaceSummary } from '@/contracts/place';
+import { DISCOVERY_PLACES, formatDistance, formatPrice } from '@/features/home/discovery-data';
 import { useSearch } from '@/features/search/search-provider';
 import { useAppTheme } from '@/theme/theme-provider';
-import { fontFamily } from '@/theme/tokens';
+import { fontFamily, radius, spacing } from '@/theme/tokens';
 
-import { DISCOVERY_PLACES } from '@/features/home/discovery-data';
-
-type Collection = {
-  title: string;
-  description: string;
-  icon: ComponentProps<typeof Ionicons>['name'];
-  color: 'supper' | 'price' | 'cafe' | 'halal';
-  criteria: Partial<SearchCriteria>;
-};
-
-const COLLECTIONS: Collection[] = [
-  {
-    title: 'Open late',
-    description: 'Supper spots serving now',
-    icon: 'time-outline',
-    color: 'supper',
-    criteria: {
-      categories: ['Supper'],
-      openNow: true,
-      priceLevels: [],
-      query: undefined,
-      verifiedHalalOnly: false,
-    },
-  },
-  {
-    title: 'Budget favourites',
-    description: 'Strong picks under RM20',
-    icon: 'pricetag-outline',
-    color: 'price',
-    criteria: {
-      categories: [],
-      openNow: false,
-      priceLevels: [1],
-      query: undefined,
-      verifiedHalalOnly: false,
-    },
-  },
-  {
-    title: 'Cafes',
-    description: 'Coffee, toast and easy catch-ups',
-    icon: 'cafe-outline',
-    color: 'cafe',
-    criteria: {
-      categories: ['Cafe'],
-      openNow: false,
-      priceLevels: [],
-      query: undefined,
-      verifiedHalalOnly: false,
-    },
-  },
-  {
-    title: 'Verified Halal',
-    description: 'Only trusted, current verification',
-    icon: 'shield-checkmark-outline',
-    color: 'halal',
-    criteria: {
-      categories: [],
-      openNow: false,
-      priceLevels: [],
-      query: undefined,
-      verifiedHalalOnly: true,
-    },
-  },
-];
+type MealTime = 'now' | 'tonight';
 
 export function ListsScreen() {
   const { colors } = useAppTheme();
-  const { error, results, status, updateCriteriaAndSearch } = useSearch();
-  const [activeCollection, setActiveCollection] = useState<string | null>(null);
-  const isLiveDiscovery = env.EXPO_PUBLIC_DATA_MODE === 'live';
-  const places = activeCollection
-    ? results
-    : results.length > 0
-      ? results
-      : isLiveDiscovery
-        ? []
-        : DISCOVERY_PLACES;
-  const isCollectionLoading =
-    activeCollection !== null && status === 'loading';
-  const collectionIsEmpty = activeCollection !== null && status === 'empty';
-  const collectionHasError = activeCollection !== null && status === 'error';
+  const { results } = useSearch();
+  const places = results;
+  const [mealTime, setMealTime] = useState<MealTime>('now');
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | undefined>(
+    places[0]?.id,
+  );
+  const selectedPlace = useMemo(
+    () => places.find((place) => place.id === selectedId) ?? places[0],
+    [places, selectedId],
+  );
+
+  useEffect(() => {
+    if (selectedId && places.some((place) => place.id === selectedId)) return;
+    setSelectedId(places[0]?.id);
+  }, [places, selectedId]);
+
+  const pickForMe = () => {
+    if (places.length === 0) {
+      router.push('/map');
+      return;
+    }
+    const currentIndex = Math.max(
+      0,
+      places.findIndex((place) => place.id === selectedPlace?.id),
+    );
+    setSelectedId(places[(currentIndex + 1) % places.length].id);
+  };
+
+  const sharePlan = async (place: PlaceSummary) => {
+    setShareError(null);
+    try {
+      const timing = mealTime === 'now' ? 'now' : 'tonight';
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        `${place.coordinates.latitude},${place.coordinates.longitude}`,
+      )}&query_place_id=${encodeURIComponent(place.id)}`;
+      await Share.share({
+        message: `Makan at ${place.name} ${timing}? ${mapsUrl}`,
+        title: `MakanMana plan: ${place.name}`,
+      });
+    } catch {
+      setShareError('Unable to open sharing right now. Please try again.');
+    }
+  };
 
   return (
     <SafeAreaView
@@ -104,145 +70,211 @@ export function ListsScreen() {
         showsVerticalScrollIndicator={false}>
         <View>
           <Text style={[styles.eyebrow, { color: colors.accentForeground }]}>
-            CHOOSE YOUR MOOD
+            NEXT MAKAN
           </Text>
-          <Text style={[styles.title, { color: colors.text }]}>Food lists</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Make a food plan
+          </Text>
           <Text style={[styles.description, { color: colors.textMuted }]}>
-            Tap a list to search it live around {places.length > 0 ? 'your area' : 'Klang Valley'}.
+            Pick one nearby place, decide when, then share or start directions.
           </Text>
         </View>
 
-        <View style={styles.collections}>
-          {COLLECTIONS.map((collection) => {
-            const tone = colors[collection.color];
+        <View
+          style={[
+            styles.timePicker,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}>
+          {(['now', 'tonight'] as const).map((value) => {
+            const selected = mealTime === value;
             return (
               <Pressable
-                accessibilityLabel={`Open ${collection.title} list`}
                 accessibilityRole="button"
-                accessibilityState={{
-                  selected: activeCollection === collection.title,
-                }}
-                key={collection.title}
-                onPress={() => {
-                  setActiveCollection(collection.title);
-                  void updateCriteriaAndSearch(collection.criteria);
-                }}
-                style={({ pressed }) => [
-                  styles.collection,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor:
-                      activeCollection === collection.title
-                        ? tone
-                        : colors.border,
-                    opacity: pressed ? 0.76 : 1,
-                  },
+                accessibilityState={{ selected }}
+                key={value}
+                onPress={() => setMealTime(value)}
+                style={[
+                  styles.timeOption,
+                  selected && { backgroundColor: colors.accent },
                 ]}>
-                <View
-                  style={[
-                    styles.collectionIcon,
-                    { backgroundColor: `${tone}20` },
-                  ]}>
-                  <Ionicons color={tone} name={collection.icon} size={22} />
-                </View>
-                <View style={styles.collectionCopy}>
-                  <Text style={[styles.collectionTitle, { color: colors.text }]}>
-                    {collection.title}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.collectionDescription,
-                      { color: colors.textMuted },
-                    ]}>
-                    {collection.description}
-                  </Text>
-                </View>
                 <Ionicons
-                  color={colors.textMuted}
-                  name="chevron-forward"
-                  size={19}
+                  color={selected ? colors.accentText : colors.textMuted}
+                  name={value === 'now' ? 'flash-outline' : 'moon-outline'}
+                  size={18}
                 />
+                <Text
+                  style={[
+                    styles.timeOptionText,
+                    { color: selected ? colors.accentText : colors.text },
+                  ]}>
+                  {value === 'now' ? 'Eat now' : 'Tonight'}
+                </Text>
               </Pressable>
             );
           })}
         </View>
 
-        <View style={styles.resultHeading}>
-          <Text style={[styles.resultTitle, { color: colors.text }]}>
-            {activeCollection ?? 'Ready to explore'}
-          </Text>
-          <Pressable
-            accessibilityLabel="Open all map results"
-            accessibilityRole="button"
-            onPress={() => router.push('/map')}>
-            <Text style={[styles.seeAll, { color: colors.accentForeground }]}>
-              View map
-            </Text>
-          </Pressable>
-        </View>
-
-        {isCollectionLoading ? (
+        {selectedPlace ? (
           <View
-            accessibilityLiveRegion="polite"
-            style={[styles.stateCard, { borderColor: colors.border }]}>
-            <Ionicons color={colors.accentForeground} name="search" size={22} />
-            <Text style={[styles.stateTitle, { color: colors.text }]}>
-              Finding the best matches nearby…
-            </Text>
-          </View>
-        ) : collectionHasError ? (
-          <View
-            accessibilityLiveRegion="polite"
-            style={[styles.stateCard, { borderColor: colors.border }]}>
-            <Ionicons
-              color={colors.supper}
-              name="cloud-offline-outline"
-              size={22}
-            />
-            <Text style={[styles.stateTitle, { color: colors.text }]}>
-              Couldn’t load this list
-            </Text>
-            <Text style={[styles.stateBody, { color: colors.textMuted }]}>
-              {error ?? 'Please try this collection again in a moment.'}
-            </Text>
-          </View>
-        ) : collectionIsEmpty ? (
-          <View
-            accessibilityLiveRegion="polite"
-            style={[styles.stateCard, { borderColor: colors.border }]}>
-            <Ionicons
-              color={colors.textMuted}
-              name="restaurant-outline"
-              size={22}
-            />
-            <Text style={[styles.stateTitle, { color: colors.text }]}>
-              No matches nearby yet
-            </Text>
-            <Text style={[styles.stateBody, { color: colors.textMuted }]}>
-              Try another list or widen the search area on the map.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.rows}>
-            {places.slice(0, 4).map((place) => (
-              <CompactPlaceRow
-                image={
-                  DISCOVERY_PLACES.find((candidate) => candidate.id === place.id)
-                    ?.image
-                }
-                key={place.id}
+            style={[
+              styles.planCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+            <View style={styles.planHeading}>
+              <View style={styles.planCopy}>
+                <Text style={[styles.planLabel, { color: colors.textMuted }]}>
+                  YOUR PICK
+                </Text>
+                <Text style={[styles.planName, { color: colors.text }]}>
+                  {selectedPlace.name}
+                </Text>
+                <Text style={[styles.planMeta, { color: colors.textMuted }]}>
+                  {formatDistance(selectedPlace.distanceMeters)} ·{' '}
+                  {formatPrice(
+                    selectedPlace.priceLevel,
+                    selectedPlace.priceRange,
+                  )}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.planIcon,
+                  { backgroundColor: `${colors.accent}24` },
+                ]}>
+                <Ionicons
+                  color={colors.accentForeground}
+                  name="restaurant"
+                  size={26}
+                />
+              </View>
+            </View>
+            <View style={styles.actions}>
+              <Pressable
+                accessibilityRole="button"
                 onPress={() =>
                   router.push({
-                    pathname: '/place/[id]',
-                    params: { id: place.id },
+                    pathname: '/directions/[id]',
+                    params: { id: selectedPlace.id },
                   })
                 }
-                place={place}
-              />
-            ))}
+                style={[styles.primaryAction, { backgroundColor: colors.accent }]}>
+                <Ionicons
+                  color={colors.accentText}
+                  name="navigate-outline"
+                  size={18}
+                />
+                <Text
+                  style={[styles.actionText, { color: colors.accentText }]}>
+                  Directions
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void sharePlan(selectedPlace)}
+                style={[
+                  styles.secondaryAction,
+                  { backgroundColor: colors.surfaceElevated },
+                ]}>
+                <Ionicons color={colors.text} name="share-outline" size={18} />
+                <Text style={[styles.actionText, { color: colors.text }]}>
+                  Share
+                </Text>
+              </Pressable>
+            </View>
+            {shareError ? (
+              <Text accessibilityRole="alert" style={{ color: colors.warning }}>
+                {shareError}
+              </Text>
+            ) : null}
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.emptyCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}>
+            <Ionicons
+              color={colors.accentForeground}
+              name="map-outline"
+              size={28}
+            />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              Find nearby food first
+            </Text>
+            <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
+              Your current search results will appear here so you can make a plan.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/map')}
+              style={[styles.primaryAction, { backgroundColor: colors.accent }]}>
+              <Text style={[styles.actionText, { color: colors.accentText }]}>
+                Open search
+              </Text>
+            </Pressable>
           </View>
         )}
+
+        <Pressable
+          accessibilityLabel="Pick another nearby restaurant"
+          accessibilityRole="button"
+          onPress={pickForMe}
+          style={[
+            styles.pickButton,
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+          ]}>
+          <Ionicons color={colors.accentForeground} name="dice-outline" size={21} />
+          <View style={styles.pickCopy}>
+            <Text style={[styles.pickTitle, { color: colors.text }]}>
+              Pick for me
+            </Text>
+            <Text style={[styles.pickHint, { color: colors.textMuted }]}>
+              Cycle through the food already found nearby
+            </Text>
+          </View>
+          <Ionicons color={colors.textMuted} name="refresh" size={20} />
+        </Pressable>
+
+        {places.length > 0 ? (
+          <View style={styles.nearbySection}>
+            <View style={styles.sectionHeading}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Nearby choices
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/map')}>
+                <Text style={[styles.seeMap, { color: colors.accentForeground }]}>
+                  See map
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.rows}>
+              {places.slice(0, 5).map((place) => (
+                <View
+                  key={place.id}
+                  style={
+                    selectedPlace?.id === place.id
+                      ? [
+                          styles.selectedRow,
+                          { borderColor: colors.accentForeground },
+                        ]
+                      : undefined
+                  }>
+                  <CompactPlaceRow
+                    image={
+                      DISCOVERY_PLACES.find(
+                        (candidate) => candidate.id === place.id,
+                      )?.image
+                    }
+                    onPress={() => setSelectedId(place.id)}
+                    place={place}
+                  />
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
         <GoogleMapsAttribution />
       </ScrollView>
     </SafeAreaView>
@@ -251,7 +283,7 @@ export function ListsScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { gap: 24, padding: 18, paddingBottom: 32 },
+  content: { gap: spacing.lg, padding: spacing.lg, paddingBottom: spacing.xxl },
   eyebrow: {
     fontFamily: fontFamily.bold,
     fontSize: 10,
@@ -259,7 +291,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fontFamily.bold,
-    fontSize: 32,
+    fontSize: 30,
     letterSpacing: -0.8,
     marginTop: 4,
   },
@@ -269,55 +301,89 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginTop: 6,
   },
-  collections: { gap: 9 },
-  collection: {
-    minHeight: 76,
-    alignItems: 'center',
-    borderRadius: 16,
+  timePicker: {
+    borderRadius: radius.pill,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    padding: 12,
+    padding: 4,
   },
-  collectionIcon: {
-    width: 46,
-    height: 46,
+  timeOption: {
     alignItems: 'center',
-    borderRadius: 13,
+    borderRadius: radius.pill,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
     justifyContent: 'center',
+    minHeight: 44,
   },
-  collectionCopy: { flex: 1, minWidth: 0 },
-  collectionTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
-  collectionDescription: {
+  timeOptionText: { fontFamily: fontFamily.semibold, fontSize: 14 },
+  planCard: { borderRadius: 20, borderWidth: 1, gap: spacing.lg, padding: spacing.lg },
+  planHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md },
+  planCopy: { flex: 1 },
+  planLabel: { fontFamily: fontFamily.bold, fontSize: 10, letterSpacing: 1.1 },
+  planName: { fontFamily: fontFamily.bold, fontSize: 23, marginTop: 5 },
+  planMeta: { fontFamily: fontFamily.medium, fontSize: 13, marginTop: 6 },
+  planIcon: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  actions: { flexDirection: 'row', gap: spacing.sm },
+  primaryAction: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: spacing.lg,
+  },
+  actionText: { fontFamily: fontFamily.semibold, fontSize: 14 },
+  emptyCard: {
+    alignItems: 'center',
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.xl,
+  },
+  emptyTitle: { fontFamily: fontFamily.semibold, fontSize: 18 },
+  emptyBody: {
     fontFamily: fontFamily.regular,
-    fontSize: 12,
-    marginTop: 3,
+    lineHeight: 20,
+    textAlign: 'center',
   },
-  resultHeading: {
+  pickButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 70,
+    padding: spacing.md,
+  },
+  pickCopy: { flex: 1 },
+  pickTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  pickHint: { fontFamily: fontFamily.regular, fontSize: 12, marginTop: 3 },
+  nearbySection: { gap: spacing.md },
+  sectionHeading: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  resultTitle: { fontFamily: fontFamily.semibold, fontSize: 18 },
-  seeAll: { fontFamily: fontFamily.semibold, fontSize: 13 },
-  rows: { gap: 9 },
-  stateCard: {
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 7,
-    paddingHorizontal: 18,
-    paddingVertical: 28,
-  },
-  stateTitle: {
-    fontFamily: fontFamily.semibold,
-    fontSize: 15,
-    textAlign: 'center',
-  },
-  stateBody: {
-    fontFamily: fontFamily.regular,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
+  sectionTitle: { fontFamily: fontFamily.semibold, fontSize: 19 },
+  seeMap: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  rows: { gap: spacing.sm },
+  selectedRow: { borderRadius: 17, borderWidth: 2, padding: 2 },
 });

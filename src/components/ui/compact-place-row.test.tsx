@@ -29,7 +29,7 @@ const place: PlaceSummary = {
 };
 
 describe('CompactPlaceRow', () => {
-  it('shows distance as visible metadata beside the RM price', () => {
+  it('shows distance beside the semantic Google price level', () => {
     render(
       <CompactPlaceRow
         onPress={jest.fn()}
@@ -38,7 +38,26 @@ describe('CompactPlaceRow', () => {
     );
 
     expect(screen.getByText(place.subtitle)).toBeTruthy();
-    expect(screen.getByText('RMRM')).toBeTruthy();
+    expect(screen.getByText('Moderate price')).toBeTruthy();
     expect(screen.getByText('5.6 km')).toBeTruthy();
+  });
+
+  it('prefers an actual Google price range when one is returned', () => {
+    render(
+      <CompactPlaceRow
+        onPress={jest.fn()}
+        place={{
+          ...place,
+          priceRange: {
+            currencyCode: 'MYR',
+            start: 18,
+            endExclusive: 36,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('RM18–36')).toBeTruthy();
+    expect(screen.queryByText('Moderate price')).toBeNull();
   });
 });

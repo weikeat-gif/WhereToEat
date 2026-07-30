@@ -70,11 +70,11 @@ export class UpstreamError extends Error {
 
 const FIELD_MASKS = {
   nearby:
-    'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.types',
+    'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.priceRange,places.currentOpeningHours,places.types',
   autocomplete:
     'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
   details:
-    'id,displayName,formattedAddress,location,viewport,rating,userRatingCount,priceLevel,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
+    'id,displayName,formattedAddress,location,viewport,rating,userRatingCount,priceLevel,priceRange,currentOpeningHours,internationalPhoneNumber,websiteUri,types',
   route:
     'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
 } as const;

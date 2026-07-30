@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
@@ -42,6 +42,7 @@ const CATEGORIES = [
 ] as const;
 const PRICES: PriceLevel[] = [1, 2, 3, 4];
 const RADII = [1000, 3000, 5000, 10_000];
+const DEFAULT_RADIUS_METERS = 3000;
 type MapViewMode = 'split' | 'map' | 'list';
 export const MAP_AUTO_SEARCH_DELAY_MS = 650;
 export const MAP_QUERY_SUGGESTION_DELAY_MS = 280;
@@ -83,18 +84,42 @@ export function MapScreen() {
     radiusMeters: criteria.radiusMeters,
   });
   const [queryInput, setQueryInput] = useState(criteria.query ?? '');
-  const [areaInput, setAreaInput] = useState(criteria.areaLabel);
-  const [suggestions, setSuggestions] = useState<AreaSuggestion[]>([]);
-  const [areaFocused, setAreaFocused] = useState(false);
+  const [queryFocused, setQueryFocused] = useState(false);
+  const queryBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [queryAreaSuggestions, setQueryAreaSuggestions] = useState<
     AreaSuggestion[]
   >([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState(() => ({
+    openNow: criteria.openNow,
+    verifiedHalalOnly: criteria.verifiedHalalOnly,
+    priceLevels: [...criteria.priceLevels],
+    categories: [...criteria.categories],
+    radiusMeters: criteria.radiusMeters,
+  }));
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<MapViewMode>('split');
   const [pendingMapSearch, setPendingMapSearch] =
     useState<MapViewport | null>(null);
   const mapFocused = viewMode === 'map';
   const listFocused = viewMode === 'list';
+  const activeFilterCount =
+    Number(criteria.openNow) +
+    Number(criteria.verifiedHalalOnly) +
+    Number(criteria.priceLevels.length > 0) +
+    Number(criteria.categories.length > 0) +
+    Number(criteria.radiusMeters !== DEFAULT_RADIUS_METERS);
+  const keepQueryOpen = () => {
+    if (queryBlurTimer.current) clearTimeout(queryBlurTimer.current);
+    queryBlurTimer.current = null;
+  };
+  const closeQueryAfterInteraction = () => {
+    keepQueryOpen();
+    queryBlurTimer.current = setTimeout(() => {
+      setQueryFocused(false);
+      queryBlurTimer.current = null;
+    }, 150);
+  };
   const visibleResults = useMemo(
     () => {
       const areaBoundary = criteria.areaBoundary;
@@ -141,8 +166,11 @@ export function MapScreen() {
 
   const handleCurrentLocation = async () => {
     setSettingsError(null);
+    setQueryFocused(false);
+    setFiltersOpen(false);
     if (locationCanAskAgain !== false) {
       await searchCurrentLocation();
+      setViewMode('map');
       return;
     }
     try {
@@ -161,7 +189,6 @@ export function MapScreen() {
       radiusMeters: criteria.radiusMeters,
       bounds: criteria.areaBounds,
     });
-    setAreaInput(criteria.areaLabel);
   }, [
     criteria.areaBounds,
     criteria.areaLabel,
@@ -173,26 +200,12 @@ export function MapScreen() {
     setQueryInput(criteria.query ?? '');
   }, [criteria.query]);
 
-  useEffect(() => {
-    let active = true;
-    if (areaInput.trim().length < 2 || areaInput === criteria.areaLabel) {
-      setSuggestions([]);
-      return;
-    }
-    const timeout = setTimeout(() => {
-      void autocompleteArea(areaInput)
-        .then((areas) => {
-          if (active) setSuggestions(areas);
-        })
-        .catch(() => {
-          if (active) setSuggestions([]);
-        });
-    }, 220);
-    return () => {
-      active = false;
-      clearTimeout(timeout);
-    };
-  }, [areaInput, autocompleteArea, criteria.areaLabel]);
+  useEffect(
+    () => () => {
+      if (queryBlurTimer.current) clearTimeout(queryBlurTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -217,46 +230,71 @@ export function MapScreen() {
   }, [autocompleteArea, criteria.query, queryInput]);
 
   const submitQuery = () => {
-    setQueryAreaSuggestions([]);
-    void updateCriteriaAndSearch({ query: queryInput.trim() });
-  };
-
-  const togglePrice = (price: PriceLevel) => {
-    const priceLevels = criteria.priceLevels.includes(price)
-      ? criteria.priceLevels.filter((item) => item !== price)
-      : [...criteria.priceLevels, price];
-    void updateCriteriaAndSearch({ priceLevels });
-  };
-
-  const toggleCategory = (category: string) => {
-    const categories = criteria.categories.includes(category) ? [] : [category];
-    void updateCriteriaAndSearch({ categories });
-  };
-
-  const cycleRadius = () => {
-    const currentIndex = RADII.indexOf(criteria.radiusMeters);
-    const radiusMeters = RADII[(currentIndex + 1) % RADII.length];
-    void updateCriteriaAndSearch({ radiusMeters });
-  };
-
-  const chooseArea = (area: AreaSuggestion) => {
-    const selectedArea = { ...area, label: areaDisplayLabel(area) };
     Keyboard.dismiss();
-    setAreaFocused(false);
-    setSuggestions([]);
-    setAreaInput(selectedArea.label);
-    setViewMode('map');
-    void selectArea(selectedArea);
+    setQueryFocused(false);
+    setQueryAreaSuggestions([]);
+    setFiltersOpen(false);
+    setViewMode('split');
+    void updateCriteriaAndSearch({
+      query: queryInput.trim() || undefined,
+    });
   };
 
   const chooseQueryArea = (area: AreaSuggestion) => {
     const selectedArea = { ...area, label: areaDisplayLabel(area) };
     Keyboard.dismiss();
+    setQueryFocused(false);
+    setFiltersOpen(false);
     setQueryAreaSuggestions([]);
     setQueryInput('');
-    setAreaInput(selectedArea.label);
     setViewMode('map');
     void selectArea(selectedArea, { query: undefined });
+  };
+
+  const openFilters = () => {
+    setQueryFocused(false);
+    setDraftFilters({
+      openNow: criteria.openNow,
+      verifiedHalalOnly: criteria.verifiedHalalOnly,
+      priceLevels: [...criteria.priceLevels],
+      categories: [...criteria.categories],
+      radiusMeters: criteria.radiusMeters,
+    });
+    setFiltersOpen((current) => !current);
+  };
+
+  const applyFilters = () => {
+    setFiltersOpen(false);
+    setViewMode('split');
+    void updateCriteriaAndSearch(draftFilters);
+  };
+
+  const resetDraftFilters = () => {
+    setDraftFilters({
+      openNow: false,
+      verifiedHalalOnly: false,
+      priceLevels: [],
+      categories: [],
+      radiusMeters: DEFAULT_RADIUS_METERS,
+    });
+  };
+
+  const toggleDraftPrice = (price: PriceLevel) => {
+    setDraftFilters((current) => ({
+      ...current,
+      priceLevels: current.priceLevels.includes(price)
+        ? current.priceLevels.filter((candidate) => candidate !== price)
+        : [...current.priceLevels, price],
+    }));
+  };
+
+  const toggleDraftCategory = (category: string) => {
+    setDraftFilters((current) => ({
+      ...current,
+      categories: current.categories.includes(category)
+        ? current.categories.filter((candidate) => candidate !== category)
+        : [...current.categories, category],
+    }));
   };
 
   const runMapAreaSearch = useCallback(
@@ -301,123 +339,6 @@ export function MapScreen() {
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <View
-        style={[
-          styles.areaControl,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}>
-        <View style={styles.areaRow}>
-          <Ionicons
-            color={colors.accentForeground}
-            name="location-outline"
-            size={19}
-          />
-          <TextInput
-            accessibilityLabel={i18n.t('mapAreaAccessibility')}
-            onChangeText={setAreaInput}
-            onFocus={() => setAreaFocused(true)}
-            placeholder={i18n.t('mapAreaPlaceholder')}
-            placeholderTextColor={colors.textMuted}
-            style={[styles.areaInput, { color: colors.text }]}
-            value={areaInput}
-          />
-          <TouchableOpacity
-            accessibilityLabel={
-              locationCanAskAgain === false
-                ? i18n.t('mapOpenLocationSettings')
-                : i18n.t('mapUseCurrentLocation')
-            }
-            accessibilityRole="button"
-            disabled={locationStatus === 'requesting'}
-            onPress={() => void handleCurrentLocation()}
-            style={[
-              styles.locationButton,
-              { backgroundColor: colors.surfaceElevated },
-            ]}>
-            <Ionicons
-              color={colors.text}
-              name={
-                locationStatus === 'requesting'
-                  ? 'hourglass-outline'
-                  : 'locate-outline'
-              }
-              size={20}
-            />
-          </TouchableOpacity>
-        </View>
-        {suggestions.length > 0 ||
-        (areaFocused &&
-          recentAreas.length > 0 &&
-          (areaInput.trim().length === 0 ||
-            areaInput === criteria.areaLabel)) ? (
-          <View style={styles.suggestions}>
-            {suggestions.length === 0 ? (
-              <View style={styles.querySuggestionHeader}>
-                <Text
-                  accessibilityRole="header"
-                  style={[
-                    styles.querySuggestionHeading,
-                    { color: colors.textMuted },
-                  ]}>
-                  {i18n.t('mapRecentAreas')}
-                </Text>
-                <TouchableOpacity
-                  accessibilityLabel={i18n.t('mapClearRecentAreas')}
-                  accessibilityRole="button"
-                  onPress={clearRecentAreas}>
-                  <Text
-                    style={[
-                      styles.clearRecentAreas,
-                      { color: colors.accentForeground },
-                    ]}>
-                    {i18n.t('mapClear')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-            {(suggestions.length > 0 ? suggestions : recentAreas)
-              .slice(0, 5)
-              .map((area) => (
-              <TouchableOpacity
-                key={area.id}
-                accessibilityLabel={
-                  suggestions.length > 0
-                    ? i18n.t('mapChooseArea', { area: area.label })
-                    : i18n.t('mapGoToArea', {
-                        area: areaDisplayLabel(area),
-                      })
-                }
-                accessibilityRole="button"
-                onPress={() => chooseArea(area)}
-                style={[styles.suggestion, { borderColor: colors.border }]}>
-                <View style={styles.areaSuggestionCopy}>
-                  <Text numberOfLines={1} style={{ color: colors.text }}>
-                    {area.label}
-                  </Text>
-                  {area.secondaryLabel ? (
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.suggestionSecondary,
-                        { color: colors.textMuted },
-                      ]}>
-                      {area.secondaryLabel}
-                    </Text>
-                  ) : null}
-                </View>
-                {suggestions.length === 0 ? (
-                  <Ionicons
-                    color={colors.accentForeground}
-                    name="time-outline"
-                    size={18}
-                  />
-                ) : null}
-              </TouchableOpacity>
-              ))}
-          </View>
-        ) : null}
-      </View>
-
       <View style={styles.resultHeader}>
         <View style={styles.resultCopy}>
           <Text style={[styles.resultTitle, { color: colors.text }]}>
@@ -446,52 +367,6 @@ export function MapScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-
-      <ScrollView
-        horizontal
-        contentContainerStyle={styles.filters}
-        keyboardShouldPersistTaps="handled"
-        showsHorizontalScrollIndicator={false}>
-        <FilterChip
-          active={criteria.openNow}
-          label={i18n.t('mapFilterOpenNow')}
-          onPress={() =>
-            void updateCriteriaAndSearch({ openNow: !criteria.openNow })
-          }
-        />
-        <FilterChip
-          active={criteria.verifiedHalalOnly}
-          label={i18n.t('mapFilterVerifiedHalal')}
-          onPress={() =>
-            void updateCriteriaAndSearch({
-              verifiedHalalOnly: !criteria.verifiedHalalOnly,
-            })
-          }
-        />
-        <FilterChip
-          active
-          label={i18n.t('mapRadius', {
-            distance: Number((criteria.radiusMeters / 1000).toFixed(1)),
-          })}
-          onPress={cycleRadius}
-        />
-        {PRICES.map((price) => (
-          <FilterChip
-            key={price}
-            active={criteria.priceLevels.includes(price)}
-            label={Array.from({ length: price }, () => 'RM').join(' ')}
-            onPress={() => togglePrice(price)}
-          />
-        ))}
-        {CATEGORIES.map((category) => (
-          <FilterChip
-            key={category.value}
-            active={criteria.categories.includes(category.value)}
-            label={i18n.t(category.labelKey)}
-            onPress={() => toggleCategory(category.value)}
-          />
-        ))}
-      </ScrollView>
 
       {locationStatus === 'granted' ? (
         <Text accessibilityLiveRegion="polite" style={{ color: colors.halal }}>
@@ -560,12 +435,16 @@ export function MapScreen() {
       style={[styles.safeArea, { backgroundColor: colors.background }]}>
       {!listFocused ? (
         <View testID="map-pane" style={styles.mapPane}>
-          <MapCanvas
+           <MapCanvas
             center={mapViewport.center}
             focusedAreaBoundary={criteria.areaBoundary}
             focusedAreaBounds={criteria.areaBounds}
             onViewportChange={handleViewportChange}
-            onMapPress={() => setViewMode('map')}
+            onMapPress={() => {
+              setQueryFocused(false);
+              setFiltersOpen(false);
+              setViewMode('map');
+            }}
             onPlacePress={openPlace}
             places={visibleResults}
             showsUserLocation={locationStatus === 'granted'}
@@ -633,6 +512,12 @@ export function MapScreen() {
               accessibilityLabel={i18n.t('mapQueryAccessibility')}
               maxLength={120}
               onChangeText={setQueryInput}
+              onFocus={() => {
+                keepQueryOpen();
+                setQueryFocused(true);
+                setFiltersOpen(false);
+              }}
+              onBlur={closeQueryAfterInteraction}
               onSubmitEditing={submitQuery}
               placeholder={i18n.t('mapQueryPlaceholder')}
               placeholderTextColor={colors.textMuted}
@@ -641,19 +526,218 @@ export function MapScreen() {
               value={queryInput}
             />
             <TouchableOpacity
-              accessibilityLabel="Show search filters and nearby results"
+              accessibilityLabel={i18n.t('mapOpenFilters')}
               accessibilityRole="button"
-              onPress={() => {
-                setViewMode('split');
-              }}
+              onPress={openFilters}
               style={[
                 styles.submitButton,
                 { backgroundColor: colors.surfaceElevated },
               ]}>
               <Ionicons color={colors.text} name="options-outline" size={20} />
+              {activeFilterCount > 0 ? (
+                <View
+                  style={[
+                    styles.filterBadge,
+                    { backgroundColor: colors.accentForeground },
+                  ]}>
+                  <Text style={[styles.filterBadgeText, { color: colors.background }]}>
+                    {activeFilterCount}
+                  </Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel={
+                locationCanAskAgain === false
+                  ? i18n.t('mapOpenLocationSettings')
+                  : i18n.t('mapUseCurrentLocation')
+              }
+              accessibilityRole="button"
+              disabled={locationStatus === 'requesting'}
+              onPress={() => void handleCurrentLocation()}
+              style={[
+                styles.submitButton,
+                {
+                  backgroundColor:
+                    locationStatus === 'granted'
+                      ? `${colors.accent}32`
+                      : colors.surfaceElevated,
+                },
+              ]}>
+              <Ionicons
+                color={
+                  locationStatus === 'granted'
+                    ? colors.accentForeground
+                    : colors.text
+                }
+                name={
+                  locationStatus === 'requesting'
+                    ? 'hourglass-outline'
+                    : 'navigate'
+                }
+                size={20}
+              />
             </TouchableOpacity>
           </View>
-          {queryAreaSuggestions.length > 0 ? (
+          {filtersOpen ? (
+            <View style={[styles.filterPanel, { borderColor: colors.border }]}>
+              <View style={styles.filterPanelHeader}>
+                <View>
+                  <Text style={[styles.filterTitle, { color: colors.text }]}>
+                    {i18n.t('mapFiltersTitle')}
+                  </Text>
+                  <Text style={[styles.filterHint, { color: colors.textMuted }]}>
+                    {i18n.t('mapFiltersHint')}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityLabel={i18n.t('mapResetFilters')}
+                  accessibilityRole="button"
+                  onPress={resetDraftFilters}>
+                  <Text style={[styles.resetFilters, { color: colors.accentForeground }]}>
+                    {i18n.t('mapReset')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                contentContainerStyle={styles.filterPanelContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                <Text style={[styles.filterSectionTitle, { color: colors.textMuted }]}>
+                  {i18n.t('mapAvailability')}
+                </Text>
+                <View style={styles.filterWrap}>
+                  <FilterChip
+                    active={draftFilters.openNow}
+                    label={i18n.t('mapFilterOpenNow')}
+                    onPress={() =>
+                      setDraftFilters((current) => ({
+                        ...current,
+                        openNow: !current.openNow,
+                      }))
+                    }
+                  />
+                  <FilterChip
+                    active={draftFilters.verifiedHalalOnly}
+                    label={i18n.t('mapFilterVerifiedHalal')}
+                    onPress={() =>
+                      setDraftFilters((current) => ({
+                        ...current,
+                        verifiedHalalOnly: !current.verifiedHalalOnly,
+                      }))
+                    }
+                  />
+                </View>
+                <Text style={[styles.filterSectionTitle, { color: colors.textMuted }]}>
+                  {i18n.t('mapAverageSpend')}
+                </Text>
+                <View style={styles.filterWrap}>
+                  {PRICES.map((price) => (
+                    <FilterChip
+                      key={price}
+                      active={draftFilters.priceLevels.includes(price)}
+                      label={
+                        [
+                          'Budget-friendly',
+                          'Moderate',
+                          'Pricey',
+                          'Premium',
+                        ][price - 1]
+                      }
+                      onPress={() => toggleDraftPrice(price)}
+                    />
+                  ))}
+                </View>
+                <Text style={[styles.filterSectionTitle, { color: colors.textMuted }]}>
+                  {i18n.t('mapCuisine')}
+                </Text>
+                <View style={styles.filterWrap}>
+                  {CATEGORIES.map((category) => (
+                    <FilterChip
+                      key={category.value}
+                      active={draftFilters.categories.includes(category.value)}
+                      label={i18n.t(category.labelKey)}
+                      onPress={() => toggleDraftCategory(category.value)}
+                    />
+                  ))}
+                </View>
+                <Text style={[styles.filterSectionTitle, { color: colors.textMuted }]}>
+                  {i18n.t('mapDistance')}
+                </Text>
+                <View style={styles.filterWrap}>
+                  {RADII.map((radiusMeters) => (
+                    <FilterChip
+                      key={radiusMeters}
+                      active={draftFilters.radiusMeters === radiusMeters}
+                      label={i18n.t('mapRadius', {
+                        distance: Number((radiusMeters / 1000).toFixed(1)),
+                      })}
+                      onPress={() =>
+                        setDraftFilters((current) => ({
+                          ...current,
+                          radiusMeters,
+                        }))
+                      }
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+              <TouchableOpacity
+                accessibilityLabel={i18n.t('mapApplyFilters')}
+                accessibilityRole="button"
+                onPress={applyFilters}
+                style={[styles.applyFilters, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.applyFiltersText, { color: colors.accentText }]}>
+                  {i18n.t('mapShowResults')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {queryFocused &&
+          queryInput.trim().length === 0 &&
+          recentAreas.length > 0 ? (
+            <View
+              style={[
+                styles.querySuggestions,
+                { borderColor: colors.border },
+              ]}>
+              <View style={styles.querySuggestionHeader}>
+                <Text
+                  accessibilityRole="header"
+                  style={[
+                    styles.querySuggestionHeading,
+                    { color: colors.textMuted },
+                  ]}>
+                  {i18n.t('mapRecentAreas')}
+                </Text>
+                <TouchableOpacity
+                  accessibilityLabel={i18n.t('mapClearRecentAreas')}
+                  accessibilityRole="button"
+                  onPress={clearRecentAreas}>
+                  <Text
+                    style={[
+                      styles.clearRecentAreas,
+                      { color: colors.accentForeground },
+                    ]}>
+                    {i18n.t('mapClear')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {recentAreas.slice(0, 5).map((area) => {
+                const label = areaDisplayLabel(area);
+                return (
+                  <AreaSuggestionRow
+                    key={area.id}
+                    area={area}
+                    label={label}
+                    onPressIn={keepQueryOpen}
+                    onPress={() => chooseQueryArea(area)}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
+          {queryFocused && queryAreaSuggestions.length > 0 ? (
             <View
               style={[
                 styles.querySuggestions,
@@ -669,40 +753,42 @@ export function MapScreen() {
                   {i18n.t('mapLocationSuggestions')}
                 </Text>
               </View>
+              {queryInput.trim() ? (
+                <TouchableOpacity
+                  accessibilityLabel={i18n.t('mapQuerySubmitAccessibility')}
+                  accessibilityRole="button"
+                  onPress={submitQuery}
+                  onPressIn={keepQueryOpen}
+                  style={styles.querySuggestion}>
+                  <View
+                    style={[
+                      styles.querySuggestionIcon,
+                      { backgroundColor: colors.surfaceElevated },
+                    ]}>
+                    <Ionicons
+                      color={colors.accentForeground}
+                      name="restaurant-outline"
+                      size={18}
+                    />
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.querySuggestionLabel, { color: colors.text }]}>
+                    {i18n.t('mapSearchFoodFor', { query: queryInput.trim() })}
+                  </Text>
+                  <Ionicons color={colors.textMuted} name="arrow-forward" size={17} />
+                </TouchableOpacity>
+              ) : null}
               {queryAreaSuggestions.slice(0, 5).map((area) => {
                 const label = areaDisplayLabel(area);
                 return (
-                  <TouchableOpacity
+                  <AreaSuggestionRow
                     key={area.id}
-                    accessibilityLabel={i18n.t('mapGoToArea', { area: label })}
-                    accessibilityRole="button"
+                    area={area}
+                    label={label}
+                    onPressIn={keepQueryOpen}
                     onPress={() => chooseQueryArea(area)}
-                    style={styles.querySuggestion}>
-                    <View
-                      style={[
-                        styles.querySuggestionIcon,
-                        { backgroundColor: colors.surfaceElevated },
-                      ]}>
-                      <Ionicons
-                        color={colors.accentForeground}
-                        name="location-outline"
-                        size={18}
-                      />
-                    </View>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.querySuggestionLabel,
-                        { color: colors.text },
-                      ]}>
-                      {label}
-                    </Text>
-                    <Ionicons
-                      color={colors.textMuted}
-                      name="chevron-forward"
-                      size={17}
-                    />
-                  </TouchableOpacity>
+                  />
                 );
               })}
             </View>
@@ -851,6 +937,46 @@ function FilterChip({
   );
 }
 
+function AreaSuggestionRow({
+  area,
+  label,
+  onPressIn,
+  onPress,
+}: {
+  area: AreaSuggestion;
+  label: string;
+  onPressIn?: () => void;
+  onPress: () => void;
+}) {
+  const { colors } = useAppTheme();
+  return (
+    <TouchableOpacity
+      accessibilityLabel={i18n.t('mapGoToArea', { area: label })}
+      accessibilityRole="button"
+      onPress={onPress}
+      onPressIn={onPressIn}
+      style={styles.querySuggestion}>
+      <View
+        style={[
+          styles.querySuggestionIcon,
+          { backgroundColor: colors.surfaceElevated },
+        ]}>
+        <Ionicons
+          color={colors.accentForeground}
+          name={area.id.startsWith('recent:') ? 'time-outline' : 'location-outline'}
+          size={18}
+        />
+      </View>
+      <Text
+        numberOfLines={1}
+        style={[styles.querySuggestionLabel, { color: colors.text }]}>
+        {label}
+      </Text>
+      <Ionicons color={colors.textMuted} name="chevron-forward" size={17} />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   mapPane: {
@@ -977,40 +1103,74 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
-  areaControl: {
-    borderRadius: 15,
-    borderWidth: 1,
-    padding: 8,
-  },
-  areaRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  areaInput: {
-    flex: 1,
-    fontFamily: fontFamily.regular,
-    minHeight: 44,
-    paddingHorizontal: 2,
-    paddingVertical: spacing.xs,
-  },
-  locationButton: {
+  filterBadge: {
     alignItems: 'center',
-    borderRadius: 14,
-    height: 44,
+    borderRadius: radius.pill,
+    height: 17,
     justifyContent: 'center',
-    width: 44,
+    minWidth: 17,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    right: -3,
+    top: -3,
   },
-  suggestions: {
-    overflow: 'hidden',
+  filterBadgeText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
   },
-  suggestion: {
+  filterPanel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    maxHeight: 480,
+    paddingBottom: spacing.xs,
+    paddingTop: spacing.md,
+  },
+  filterPanelHeader: {
     alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: spacing.sm,
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
   },
-  areaSuggestionCopy: { flex: 1 },
-  suggestionSecondary: { fontSize: 12, marginTop: 2 },
+  filterTitle: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 18,
+  },
+  filterHint: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  resetFilters: {
+    fontFamily: fontFamily.semibold,
+    padding: spacing.sm,
+  },
+  filterPanelContent: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  filterSectionTitle: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 0.7,
+    marginTop: spacing.xs,
+    textTransform: 'uppercase',
+  },
+  filterWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  applyFilters: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    justifyContent: 'center',
+    marginHorizontal: spacing.sm,
+    minHeight: 46,
+  },
+  applyFiltersText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 15,
+  },
   resultsContent: {
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.lg,
@@ -1053,7 +1213,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  filters: { gap: spacing.sm, paddingRight: spacing.lg },
   chip: {
     borderRadius: radius.pill,
     borderWidth: 1,

@@ -102,6 +102,11 @@ describe('places Edge Function core', () => {
         'X-Goog-FieldMask': expect.stringContaining('viewport'),
       }),
     });
+    expect(request.init).toMatchObject({
+      headers: expect.objectContaining({
+        'X-Goog-FieldMask': expect.stringContaining('priceRange'),
+      }),
+    });
   });
 
   it('validates a boundary request inside the Klang Valley service area', () => {

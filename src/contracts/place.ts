@@ -1,5 +1,11 @@
 export type PriceLevel = 1 | 2 | 3 | 4;
 
+export type PlacePriceRange = {
+  currencyCode: string;
+  start?: number;
+  endExclusive?: number;
+};
+
 export type Coordinates = {
   latitude: number;
   longitude: number;
@@ -30,6 +36,7 @@ export type PlaceSummary = {
   rating: number;
   reviewCount: number;
   priceLevel?: PriceLevel;
+  priceRange?: PlacePriceRange;
   isOpen?: boolean;
   photoUrl?: string;
   categories: string[];

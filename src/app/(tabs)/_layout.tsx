@@ -11,7 +11,7 @@ const ICONS = {
   index: ['home-outline', 'home'],
   map: ['search-outline', 'search'],
   saved: ['bookmark-outline', 'bookmark'],
-  lists: ['list-outline', 'list'],
+  lists: ['calendar-outline', 'calendar'],
   profile: ['person-outline', 'person'],
 } as const;
 
@@ -62,7 +62,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="map" options={{ title: 'Search' }} />
       <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
-      <Tabs.Screen name="lists" options={{ title: 'Lists' }} />
+      <Tabs.Screen name="lists" options={{ title: 'Plan' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );

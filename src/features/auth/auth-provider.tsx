@@ -21,11 +21,13 @@ type AuthContextValue = {
   isBusy: boolean;
   error: string | null;
   emailCodeSent: boolean;
+  emailCodeAddress: string;
   backendMode: 'live' | 'mock';
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   requestEmailCode: (email: string) => Promise<void>;
   verifyEmailCode: (email: string, code: string) => Promise<void>;
+  resetEmailCode: () => void;
   signOut: () => Promise<void>;
   clearError: () => void;
   setMockUser: (user: AppUser | null) => void;
@@ -46,6 +48,7 @@ export function AuthProvider({
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [emailCodeAddress, setEmailCodeAddress] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -99,7 +102,9 @@ export function AuthProvider({
   );
   const requestEmailCode = useCallback(
     async (email: string) => {
-      await perform(() => gateway.requestEmailCode(email));
+      const normalizedEmail = email.trim().toLowerCase();
+      await perform(() => gateway.requestEmailCode(normalizedEmail));
+      setEmailCodeAddress(normalizedEmail);
       setEmailCodeSent(true);
     },
     [gateway, perform],
@@ -112,7 +117,13 @@ export function AuthProvider({
   const signOut = useCallback(async () => {
     await perform(() => gateway.signOut());
     setEmailCodeSent(false);
+    setEmailCodeAddress('');
   }, [gateway, perform]);
+  const resetEmailCode = useCallback(() => {
+    setEmailCodeSent(false);
+    setEmailCodeAddress('');
+    setError(null);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -121,21 +132,25 @@ export function AuthProvider({
       isBusy,
       error,
       emailCodeSent,
+      emailCodeAddress,
       backendMode: isSupabaseConfigured ? ('live' as const) : ('mock' as const),
       signInWithGoogle,
       signInWithApple,
       requestEmailCode,
       verifyEmailCode,
+      resetEmailCode,
       signOut,
       clearError: () => setError(null),
       setMockUser,
     }),
     [
       emailCodeSent,
+      emailCodeAddress,
       error,
       isBusy,
       isLoading,
       requestEmailCode,
+      resetEmailCode,
       signInWithApple,
       signInWithGoogle,
       signOut,
