@@ -128,6 +128,48 @@ describe('PlaceDetailsScreen', () => {
     expect(mockToggle).toHaveBeenCalledWith('jalan-21-burger');
   });
 
+  it('shares a restaurant location through either Waze or Google Maps', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({
+      action: Share.sharedAction,
+    });
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Share place'));
+    expect(screen.getByText('Choose a location link')).toBeTruthy();
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Share Waze location' }),
+    );
+    await waitFor(() =>
+      expect(share).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('https://waze.com/ul?'),
+        }),
+      ),
+    );
+
+    fireEvent.press(screen.getByLabelText('Share place'));
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Share Google Maps location' }),
+    );
+    await waitFor(() =>
+      expect(share).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /https:\/\/www\.google\.com\/maps\/search\/\?api=1.*query_place_id=jalan-21-burger/,
+          ),
+        }),
+      ),
+    );
+  });
+
   it('announces Share failures and offers external navigation apps', async () => {
     jest.spyOn(Share, 'share').mockRejectedValue(new Error('share unavailable'));
     const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
@@ -142,6 +184,9 @@ describe('PlaceDetailsScreen', () => {
     );
 
     fireEvent.press(screen.getByLabelText('Share place'));
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Share Google Maps location' }),
+    );
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
         'Unable to share this restaurant.',

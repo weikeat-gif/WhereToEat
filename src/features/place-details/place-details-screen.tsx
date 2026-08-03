@@ -52,6 +52,8 @@ const HIDDEN_GENERIC_CATEGORIES = new Set([
   'Point Of Interest',
   'Establishment',
 ]);
+type ProviderAction = 'navigate' | 'share';
+type LocationProvider = 'waze' | 'google';
 
 export function PlaceDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,7 +74,9 @@ export function PlaceDetailsScreen() {
   const [loadedPlace, setLoadedPlace] = useState(initialPlace);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [providerAction, setProviderAction] = useState<ProviderAction | null>(
+    null,
+  );
   const summary = results.find((candidate) => candidate.id === loadedPlace?.id);
   const place = loadedPlace && summary
     ? { ...loadedPlace, ...summary }
@@ -127,37 +131,44 @@ export function PlaceDetailsScreen() {
     void toggle(place.id).catch(() => undefined);
   }
 
-  async function sharePlace() {
+  function sharePlace() {
     if (!place) return;
     setActionError(null);
-    try {
-      await Share.share({
-        message: `${place.name} — ${place.subtitle}. ${place.address}`,
-        title: place.name,
-      });
-    } catch {
-      setActionError('Unable to share this restaurant.');
-    }
+    setProviderAction('share');
   }
 
   function openDirections() {
     if (!place) return;
     setActionError(null);
-    setNavigationOpen(true);
+    setProviderAction('navigate');
   }
 
-  async function openNavigationApp(provider: 'waze' | 'google') {
-    if (!place) return;
+  async function handleLocationProvider(provider: LocationProvider) {
+    if (!place || !providerAction) return;
+    const action = providerAction;
     const url =
       provider === 'waze'
         ? buildWazeNavigationUrl(place.coordinates)
-        : buildGoogleMapsNavigationUrl(place.coordinates, place.id);
-    setNavigationOpen(false);
+        : action === 'share'
+          ? buildGoogleMapsPlaceUrl(place.name, place.id)
+          : buildGoogleMapsNavigationUrl(place.coordinates, place.id);
+    setProviderAction(null);
     setActionError(null);
     try {
-      await Linking.openURL(url);
+      if (action === 'share') {
+        await Share.share({
+          message: `${place.name} — ${place.subtitle}. ${place.address}\n${url}`,
+          title: place.name,
+        });
+      } else {
+        await Linking.openURL(url);
+      }
     } catch {
-      setActionError('Unable to open that navigation app.');
+      setActionError(
+        action === 'share'
+          ? 'Unable to share this restaurant.'
+          : 'Unable to open that navigation app.',
+      );
     }
   }
 
@@ -599,7 +610,7 @@ export function PlaceDetailsScreen() {
             backgroundColor="rgba(8,10,9,0.82)"
             color="#FFFFFF"
             icon="share-outline"
-            onPress={() => void sharePlace()}
+            onPress={sharePlace}
           />
         </View>
       </View>
@@ -627,14 +638,14 @@ export function PlaceDetailsScreen() {
 
       <Modal
         animationType="slide"
-        onRequestClose={() => setNavigationOpen(false)}
+        onRequestClose={() => setProviderAction(null)}
         transparent
-        visible={navigationOpen}>
+        visible={providerAction !== null}>
         <View style={styles.navigationModal}>
           <Pressable
-            accessibilityLabel="Close navigation options"
+            accessibilityLabel={`Close ${providerAction ?? 'location'} options`}
             accessibilityRole="button"
-            onPress={() => setNavigationOpen(false)}
+            onPress={() => setProviderAction(null)}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -648,17 +659,24 @@ export function PlaceDetailsScreen() {
             ]}>
             <View style={styles.navigationHandle} />
             <Text style={[styles.navigationTitle, { color: colors.text }]}>
-              Choose your navigation app
+              {providerAction === 'share'
+                ? 'Choose a location link'
+                : 'Choose your navigation app'}
             </Text>
             <Text
               style={[styles.navigationSubtitle, { color: colors.textMuted }]}>
-              MakanMana will open this restaurant in an external navigation
-              app.
+              {providerAction === 'share'
+                ? 'Pick the map link to include in your share message.'
+                : 'MakanMana will open this restaurant in an external navigation app.'}
             </Text>
             <Pressable
-              accessibilityLabel="Navigate with Waze"
+              accessibilityLabel={
+                providerAction === 'share'
+                  ? 'Share Waze location'
+                  : 'Navigate with Waze'
+              }
               accessibilityRole="button"
-              onPress={() => void openNavigationApp('waze')}
+              onPress={() => void handleLocationProvider('waze')}
               style={({ pressed }) => [
                 styles.navigationOption,
                 {
@@ -681,9 +699,13 @@ export function PlaceDetailsScreen() {
               />
             </Pressable>
             <Pressable
-              accessibilityLabel="Navigate with Google Maps"
+              accessibilityLabel={
+                providerAction === 'share'
+                  ? 'Share Google Maps location'
+                  : 'Navigate with Google Maps'
+              }
               accessibilityRole="button"
-              onPress={() => void openNavigationApp('google')}
+              onPress={() => void handleLocationProvider('google')}
               style={({ pressed }) => [
                 styles.navigationOption,
                 {
@@ -701,9 +723,9 @@ export function PlaceDetailsScreen() {
               <Ionicons color={colors.text} name="open-outline" size={18} />
             </Pressable>
             <Pressable
-              accessibilityLabel="Cancel navigation"
+              accessibilityLabel={`Cancel ${providerAction ?? 'location'}`}
               accessibilityRole="button"
-              onPress={() => setNavigationOpen(false)}
+              onPress={() => setProviderAction(null)}
               style={styles.navigationCancel}>
               <Text
                 style={[
