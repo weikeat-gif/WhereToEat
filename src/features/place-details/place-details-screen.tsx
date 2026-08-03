@@ -24,6 +24,7 @@ import { useAuth } from '@/features/auth/auth-provider';
 import {
   buildGoogleMapsNavigationUrl,
   buildGoogleMapsPlaceUrl,
+  buildWazeLocationUrl,
   buildWazeNavigationUrl,
 } from '@/features/directions/external-navigation';
 import {
@@ -148,7 +149,9 @@ export function PlaceDetailsScreen() {
     const action = providerAction;
     const url =
       provider === 'waze'
-        ? buildWazeNavigationUrl(place.coordinates)
+        ? action === 'share'
+          ? buildWazeLocationUrl(place.coordinates)
+          : buildWazeNavigationUrl(place.coordinates)
         : action === 'share'
           ? buildGoogleMapsPlaceUrl(place.name, place.id)
           : buildGoogleMapsNavigationUrl(place.coordinates, place.id);
@@ -349,12 +352,6 @@ export function PlaceDetailsScreen() {
               {saveError}
             </Text>
           ) : null}
-          {actionError ? (
-            <Text accessibilityRole="alert" style={{ color: colors.warning }}>
-              {actionError}
-            </Text>
-          ) : null}
-
           {place.popularPicks.length > 0 ? (
             <>
               <View style={styles.sectionTitleRow}>
@@ -614,6 +611,22 @@ export function PlaceDetailsScreen() {
           />
         </View>
       </View>
+
+      {actionError ? (
+        <Text
+          accessibilityRole="alert"
+          style={[
+            styles.actionAlert,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.warning,
+              bottom: 100 + Math.max(insets.bottom, 12),
+              color: colors.warning,
+            },
+          ]}>
+          {actionError}
+        </Text>
+      ) : null}
 
       <View
         style={[
@@ -920,6 +933,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topActionsRight: { flexDirection: 'row', gap: 8 },
+  actionAlert: {
+    borderRadius: 14,
+    borderWidth: 1,
+    fontFamily: fontFamily.semibold,
+    fontSize: 13,
+    left: 18,
+    lineHeight: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    position: 'absolute',
+    right: 18,
+    zIndex: 6,
+  },
   footer: {
     left: 10,
     right: 10,

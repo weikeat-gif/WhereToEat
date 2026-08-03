@@ -1,13 +1,18 @@
 import type { Coordinates } from '@/contracts/place';
 
-export function buildWazeNavigationUrl(destination: Coordinates) {
+export function buildWazeLocationUrl(destination: Coordinates) {
   const url = new URL('https://waze.com/ul');
   url.searchParams.set(
     'll',
     `${destination.latitude},${destination.longitude}`,
   );
-  url.searchParams.set('navigate', 'yes');
   url.searchParams.set('utm_source', 'makanmana');
+  return url.toString();
+}
+
+export function buildWazeNavigationUrl(destination: Coordinates) {
+  const url = new URL(buildWazeLocationUrl(destination));
+  url.searchParams.set('navigate', 'yes');
   return url.toString();
 }
 

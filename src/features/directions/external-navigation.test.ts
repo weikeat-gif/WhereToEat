@@ -1,12 +1,22 @@
 import {
   buildGoogleMapsNavigationUrl,
   buildGoogleMapsPlaceUrl,
+  buildWazeLocationUrl,
   buildWazeNavigationUrl,
 } from '@/features/directions/external-navigation';
 
 const destination = { latitude: 3.0449, longitude: 101.4456 };
 
 describe('external navigation URLs', () => {
+  it('shares a Waze location without starting navigation', () => {
+    const url = new URL(buildWazeLocationUrl(destination));
+
+    expect(`${url.origin}${url.pathname}`).toBe('https://waze.com/ul');
+    expect(url.searchParams.get('ll')).toBe('3.0449,101.4456');
+    expect(url.searchParams.has('navigate')).toBe(false);
+    expect(url.searchParams.get('utm_source')).toBe('makanmana');
+  });
+
   it('starts Waze navigation at the restaurant coordinates', () => {
     const url = new URL(buildWazeNavigationUrl(destination));
 

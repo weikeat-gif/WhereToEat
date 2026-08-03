@@ -147,13 +147,11 @@ describe('PlaceDetailsScreen', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Share Waze location' }),
     );
-    await waitFor(() =>
-      expect(share).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('https://waze.com/ul?'),
-        }),
-      ),
-    );
+    await waitFor(() => {
+      const sharedMessage = share.mock.calls.at(-1)?.[0].message;
+      expect(sharedMessage).toContain('https://waze.com/ul?');
+      expect(sharedMessage).not.toContain('navigate=yes');
+    });
 
     fireEvent.press(screen.getByLabelText('Share place'));
     fireEvent.press(
@@ -192,6 +190,7 @@ describe('PlaceDetailsScreen', () => {
         'Unable to share this restaurant.',
       ),
     );
+    expect(screen.getByRole('alert')).toHaveStyle({ position: 'absolute' });
 
     fireEvent.press(screen.getByTestId('directions-button'));
     expect(screen.getByText('Choose your navigation app')).toBeTruthy();
