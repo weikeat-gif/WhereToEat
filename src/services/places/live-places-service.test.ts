@@ -108,6 +108,11 @@ describe('LivePlacesService', () => {
         types: ['restaurant'],
         reviews: [
           {
+            name: 'places/reviewed-place/reviews/rating-only',
+            rating: 4,
+            authorAttribution: { displayName: 'Rating only reviewer' },
+          },
+          {
             name: 'places/reviewed-place/reviews/review-1',
             rating: 5,
             text: { text: 'Excellent kopi and quick service.' },

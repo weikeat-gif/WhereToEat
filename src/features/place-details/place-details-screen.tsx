@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     flexDirection: 'row',
     gap: 5,
-    minHeight: 32,
+    minHeight: 44,
   },
   reviewLinkText: { fontFamily: fontFamily.semibold, fontSize: 12 },
   reviewsEmpty: {
