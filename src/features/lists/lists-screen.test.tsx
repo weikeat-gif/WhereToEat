@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Share } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ListsScreen } from './lists-screen';
@@ -65,6 +66,10 @@ function renderScreen() {
 }
 
 describe('ListsScreen meal plan', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchState.results = [
@@ -126,6 +131,38 @@ describe('ListsScreen meal plan', () => {
     );
 
     expect(screen.getAllByText('Klang Kopitiam').length).toBeGreaterThan(0);
+  });
+
+  it('shares only a Waze or Google Maps location link', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({
+      action: Share.sharedAction,
+    });
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Share' }));
+    expect(screen.getByText('Choose a location link')).toBeTruthy();
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Share Waze location' }),
+    );
+    await waitFor(() => {
+      const message = share.mock.calls.at(-1)?.[0].message;
+      expect(message).toContain('https://waze.com/ul?');
+      expect(message).not.toContain('navigate=yes');
+    });
+
+    fireEvent.press(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Share Google Maps location' }),
+    );
+    await waitFor(() =>
+      expect(share).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /https:\/\/www\.google\.com\/maps\/search\/\?api=1.*query_place_id=late-place/,
+          ),
+        }),
+      ),
+    );
   });
 
   it('lets the user choose tonight', () => {

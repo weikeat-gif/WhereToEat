@@ -231,6 +231,8 @@ describe('web MapCanvas', () => {
     const markerListeners = new Map<string, () => void>();
     const openInfoWindow = jest.fn();
     const closeInfoWindow = jest.fn();
+    const onPlacePress = jest.fn();
+    let infoWindowOptions: Record<string, unknown> | undefined;
     let infoContent: HTMLElement | undefined;
 
     class FakeMap {
@@ -261,6 +263,9 @@ describe('web MapCanvas', () => {
       setMap() {}
     }
     class FakeInfoWindow {
+      constructor(options?: Record<string, unknown>) {
+        infoWindowOptions = options;
+      }
       setContent(content: HTMLElement) {
         infoContent = content;
       }
@@ -273,7 +278,7 @@ describe('web MapCanvas', () => {
       <MapCanvas
         center={coordinates}
         onMapPress={jest.fn()}
-        onPlacePress={jest.fn()}
+        onPlacePress={onPlacePress}
         onViewportChange={jest.fn()}
         places={[
           {
@@ -307,6 +312,7 @@ describe('web MapCanvas', () => {
     });
 
     await waitFor(() => expect(markerListeners.has('mouseover')).toBe(true));
+    expect(infoWindowOptions).toEqual({ disableAutoPan: true });
     act(() => markerListeners.get('mouseover')?.());
 
     expect(infoContent?.textContent).toContain('Hover Kopitiam');
@@ -314,9 +320,13 @@ describe('web MapCanvas', () => {
     expect(infoContent?.textContent).toContain('Open now');
     expect(infoContent?.textContent).toContain('Closes');
     expect(openInfoWindow).toHaveBeenCalledTimes(1);
+    expect(onPlacePress).not.toHaveBeenCalled();
 
     act(() => markerListeners.get('mouseout')?.());
     expect(closeInfoWindow).toHaveBeenCalledTimes(1);
+
+    act(() => markerListeners.get('click')?.());
+    expect(onPlacePress).toHaveBeenCalledWith('hover-place');
   });
 
 });

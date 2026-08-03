@@ -61,6 +61,9 @@ type WebInfoWindow = {
   }): void;
   setContent(content: HTMLElement): void;
 };
+type WebInfoWindowOptions = {
+  disableAutoPan?: boolean;
+};
 type WebPolygon = {
   setMap(map: WebMap | null): void;
 };
@@ -70,7 +73,7 @@ type GoogleMapsApi = {
     options: Record<string, unknown>,
   ) => WebMap;
   Marker: new (options: Record<string, unknown>) => WebMarker;
-  InfoWindow: new () => WebInfoWindow;
+  InfoWindow: new (options?: WebInfoWindowOptions) => WebInfoWindow;
   Polygon?: new (options: Record<string, unknown>) => WebPolygon;
 };
 
@@ -509,7 +512,10 @@ export function MapCanvas({
     if (!mapReady || !mapRef.current || !window.google?.maps) return;
 
     const maps = window.google.maps;
-    const infoWindow = places.length > 0 ? new maps.InfoWindow() : undefined;
+    const infoWindow =
+      places.length > 0
+        ? new maps.InfoWindow({ disableAutoPan: true })
+        : undefined;
     const nextMarkers = places.map((place) => {
       const marker = new maps.Marker({
         map: mapRef.current,

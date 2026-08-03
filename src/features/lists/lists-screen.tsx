@@ -7,12 +7,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { CompactPlaceRow } from '@/components/ui/compact-place-row';
 import type { PlaceSummary } from '@/contracts/place';
+import {
+  buildGoogleMapsPlaceUrl,
+  buildWazeLocationUrl,
+} from '@/features/directions/external-navigation';
 import { DISCOVERY_PLACES, formatDistance, formatPrice } from '@/features/home/discovery-data';
 import { useSearch } from '@/features/search/search-provider';
 import { useAppTheme } from '@/theme/theme-provider';
 import { fontFamily, radius, spacing } from '@/theme/tokens';
 
 type MealTime = 'now' | 'tonight';
+type ShareProvider = 'google' | 'waze';
 
 export function ListsScreen() {
   const { colors } = useAppTheme();
@@ -20,6 +25,7 @@ export function ListsScreen() {
   const places = results;
   const [mealTime, setMealTime] = useState<MealTime>('now');
   const [shareError, setShareError] = useState<string | null>(null);
+  const [shareProviderOpen, setShareProviderOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(
     places[0]?.id,
   );
@@ -45,13 +51,15 @@ export function ListsScreen() {
     setSelectedId(places[(currentIndex + 1) % places.length].id);
   };
 
-  const sharePlan = async (place: PlaceSummary) => {
+  const sharePlan = async (place: PlaceSummary, provider: ShareProvider) => {
     setShareError(null);
+    setShareProviderOpen(false);
     try {
       const timing = mealTime === 'now' ? 'now' : 'tonight';
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        `${place.coordinates.latitude},${place.coordinates.longitude}`,
-      )}&query_place_id=${encodeURIComponent(place.id)}`;
+      const mapsUrl =
+        provider === 'waze'
+          ? buildWazeLocationUrl(place.coordinates)
+          : buildGoogleMapsPlaceUrl(place.name, place.id);
       await Share.share({
         message: `Makan at ${place.name} ${timing}? ${mapsUrl}`,
         title: `MakanMana plan: ${place.name}`,
@@ -170,7 +178,10 @@ export function ListsScreen() {
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => void sharePlan(selectedPlace)}
+                onPress={() => {
+                  setShareError(null);
+                  setShareProviderOpen(true);
+                }}
                 style={[
                   styles.secondaryAction,
                   { backgroundColor: colors.surfaceElevated },
@@ -181,6 +192,78 @@ export function ListsScreen() {
                 </Text>
               </Pressable>
             </View>
+            {shareProviderOpen ? (
+              <View
+                style={[
+                  styles.shareProvider,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <View style={styles.shareProviderHeading}>
+                  <View style={styles.shareProviderCopy}>
+                    <Text
+                      style={[styles.shareProviderTitle, { color: colors.text }]}>
+                      Choose a location link
+                    </Text>
+                    <Text
+                      style={[
+                        styles.shareProviderHint,
+                        { color: colors.textMuted },
+                      ]}>
+                      Share the restaurant through Waze or Google Maps.
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityLabel="Close share options"
+                    accessibilityRole="button"
+                    onPress={() => setShareProviderOpen(false)}
+                    style={styles.closeShareProvider}>
+                    <Ionicons color={colors.textMuted} name="close" size={20} />
+                  </Pressable>
+                </View>
+                <View style={styles.shareProviderActions}>
+                  <Pressable
+                    accessibilityLabel="Share Waze location"
+                    accessibilityRole="button"
+                    onPress={() => void sharePlan(selectedPlace, 'waze')}
+                    style={[
+                      styles.shareProviderButton,
+                      { backgroundColor: colors.accent },
+                    ]}>
+                    <Ionicons color={colors.accentText} name="navigate" size={18} />
+                    <Text
+                      style={[
+                        styles.shareProviderButtonText,
+                        { color: colors.accentText },
+                      ]}>
+                      Waze
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Share Google Maps location"
+                    accessibilityRole="button"
+                    onPress={() => void sharePlan(selectedPlace, 'google')}
+                    style={[
+                      styles.shareProviderButton,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                    ]}>
+                    <Ionicons color={colors.text} name="map-outline" size={18} />
+                    <Text
+                      style={[
+                        styles.shareProviderButtonText,
+                        { color: colors.text },
+                      ]}>
+                      Google Maps
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
             {shareError ? (
               <Text accessibilityRole="alert" style={{ color: colors.warning }}>
                 {shareError}
@@ -351,6 +434,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   actionText: { fontFamily: fontFamily.semibold, fontSize: 14 },
+  shareProvider: {
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  shareProviderHeading: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  shareProviderCopy: { flex: 1 },
+  shareProviderTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  shareProviderHint: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  closeShareProvider: {
+    alignItems: 'center',
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  shareProviderActions: { flexDirection: 'row', gap: spacing.sm },
+  shareProviderButton: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+  },
+  shareProviderButtonText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   emptyCard: {
     alignItems: 'center',
     borderRadius: 20,
