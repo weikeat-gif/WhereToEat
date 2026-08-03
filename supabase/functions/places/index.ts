@@ -24,6 +24,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const RATE_LIMIT_HMAC_SECRET = Deno.env.get('RATE_LIMIT_HMAC_SECRET');
+const GOOGLE_PLACES_REVIEWS_ENABLED =
+  Deno.env.get('GOOGLE_PLACES_REVIEWS_ENABLED') === 'true';
 
 const rate = new Map<string, { count: number; resetAt: number }>();
 const MAX_RATE_ENTRIES = 5_000;
@@ -94,7 +96,10 @@ async function consumeDurableRateLimit(
 
 async function googleRequest(input: GooglePlacesAction): Promise<unknown> {
   if (!GOOGLE_API_KEY) throw new Error('Google Places is not configured.');
-  const { url, init } = buildGoogleRequest(GOOGLE_API_KEY, input);
+  const { url, init } = buildGoogleRequest(GOOGLE_API_KEY, input, {
+    includeReviews:
+      input.action === 'details' && GOOGLE_PLACES_REVIEWS_ENABLED,
+  });
 
   return fetchWithTimeout(fetch, url, init, async (response) => {
     if (!response.ok) {

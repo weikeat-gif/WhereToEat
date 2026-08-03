@@ -52,6 +52,15 @@ type WebMarker = {
   addListener(event: string, listener: () => void): MapsListener;
   setMap(map: WebMap | null): void;
 };
+type WebInfoWindow = {
+  close(): void;
+  open(options: {
+    anchor: WebMarker;
+    map: WebMap;
+    shouldFocus: boolean;
+  }): void;
+  setContent(content: HTMLElement): void;
+};
 type WebPolygon = {
   setMap(map: WebMap | null): void;
 };
@@ -61,6 +70,7 @@ type GoogleMapsApi = {
     options: Record<string, unknown>,
   ) => WebMap;
   Marker: new (options: Record<string, unknown>) => WebMarker;
+  InfoWindow: new () => WebInfoWindow;
   Polygon?: new (options: Record<string, unknown>) => WebPolygon;
 };
 
@@ -191,6 +201,81 @@ function webBounds(bounds: MapBounds) {
     south: bounds.southWest.latitude,
     west: bounds.southWest.longitude,
   };
+}
+
+function distanceBetween(left: Coordinates, right: Coordinates) {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusMeters = 6_371_000;
+  const latitudeDelta = radians(right.latitude - left.latitude);
+  const longitudeDelta = radians(right.longitude - left.longitude);
+  const startLatitude = radians(left.latitude);
+  const endLatitude = radians(right.latitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(startLatitude) *
+      Math.cos(endLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+  return Math.round(2 * earthRadiusMeters * Math.asin(Math.sqrt(haversine)));
+}
+
+function formatMarkerDistance(distanceMeters: number) {
+  if (distanceMeters < 1000) return `${distanceMeters} m`;
+  return `${(distanceMeters / 1000).toFixed(1)} km`;
+}
+
+function formatMarkerTime(value: string | undefined) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return undefined;
+  return new Intl.DateTimeFormat('en-MY', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Asia/Kuala_Lumpur',
+  }).format(date);
+}
+
+function markerPreviewContent(
+  place: PlaceSummary,
+  userCoordinates: Coordinates | null | undefined,
+  mode: 'light' | 'dark',
+) {
+  const container = document.createElement('div');
+  container.style.cssText = [
+    `background:${mode === 'dark' ? '#171C1B' : '#FFFDF7'}`,
+    `color:${mode === 'dark' ? '#FFFFFF' : '#171C1B'}`,
+    'font-family:Manrope,system-ui,sans-serif',
+    'max-width:220px',
+    'padding:4px 2px',
+  ].join(';');
+
+  const title = document.createElement('strong');
+  title.style.cssText = 'display:block;font-size:14px;line-height:19px';
+  title.textContent = place.name;
+  container.appendChild(title);
+
+  const distanceMeters = userCoordinates
+    ? distanceBetween(userCoordinates, place.coordinates)
+    : Math.round(place.distanceMeters);
+  const meta = document.createElement('span');
+  meta.style.cssText = [
+    'display:block',
+    'font-size:12px',
+    'line-height:18px',
+    'margin-top:3px',
+    `color:${mode === 'dark' ? '#D7DAD5' : '#5F6763'}`,
+  ].join(';');
+  const distanceLabel = userCoordinates ? 'from you' : 'away';
+  const nextClose = formatMarkerTime(place.nextCloseTime);
+  const nextOpen = formatMarkerTime(place.nextOpenTime);
+  const openingLabel =
+    place.isOpen === true
+      ? `Open now${nextClose ? ` · Closes ${nextClose}` : ''}`
+      : place.isOpen === false
+        ? `Closed now${nextOpen ? ` · Opens ${nextOpen}` : ''}`
+        : 'Hours unavailable';
+  meta.textContent = `${formatMarkerDistance(distanceMeters)} ${distanceLabel} · ${openingLabel}`;
+  container.appendChild(meta);
+  return container;
 }
 
 export function MapCanvas({
@@ -424,6 +509,7 @@ export function MapCanvas({
     if (!mapReady || !mapRef.current || !window.google?.maps) return;
 
     const maps = window.google.maps;
+    const infoWindow = places.length > 0 ? new maps.InfoWindow() : undefined;
     const nextMarkers = places.map((place) => {
       const marker = new maps.Marker({
         map: mapRef.current,
@@ -434,7 +520,21 @@ export function MapCanvas({
         icon: FOOD_PIN_ICON_URL,
         title: place.name,
       });
-      marker.addListener('click', () => onPlacePress(place.id));
+      marker.addListener('mouseover', () => {
+        infoWindow?.setContent(
+          markerPreviewContent(place, userCoordinates, resolvedMode),
+        );
+        infoWindow?.open({
+          anchor: marker,
+          map: mapRef.current!,
+          shouldFocus: false,
+        });
+      });
+      marker.addListener('mouseout', () => infoWindow?.close());
+      marker.addListener('click', () => {
+        infoWindow?.close();
+        onPlacePress(place.id);
+      });
       return marker;
     });
     if (showsUserLocation && userCoordinates) {
@@ -454,6 +554,7 @@ export function MapCanvas({
     markerRefs.current = nextMarkers;
 
     return () => {
+      infoWindow?.close();
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
     };
@@ -463,6 +564,7 @@ export function MapCanvas({
     mapReady,
     onPlacePress,
     places,
+    resolvedMode,
     showsUserLocation,
     userCoordinates,
   ]);

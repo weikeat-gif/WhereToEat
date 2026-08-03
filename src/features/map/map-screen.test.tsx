@@ -184,6 +184,23 @@ describe('MapScreen states', () => {
     expect(screen.getByTestId('results-pane')).toBeTruthy();
   });
 
+  it('keeps the filter sheet unobstructed while filters are open', () => {
+    render(<MapScreen />);
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Open search filters' }),
+    );
+
+    expect(screen.getByTestId('filter-panel')).toHaveStyle({
+      overflow: 'hidden',
+    });
+    expect(screen.queryByTestId('results-pane')).toBeNull();
+    expect(screen.queryByTestId('search-area-button')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Apply search filters' }),
+    ).toBeTruthy();
+  });
+
   it('keeps Privacy and Terms navigation in Profile only', () => {
     render(<MapScreen />);
 

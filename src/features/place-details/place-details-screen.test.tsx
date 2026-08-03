@@ -251,6 +251,85 @@ describe('PlaceDetailsScreen', () => {
     expect(screen.queryByText('See all hours')).toBeNull();
   });
 
+  it('shows attributed Google review excerpts and opens the original review', async () => {
+    mockDataMode = 'live';
+    mockLoadDisplayPlace.mockResolvedValue({
+      ...DISCOVERY_PLACES[0],
+      reviews: [
+        {
+          id: 'places/jalan-21-burger/reviews/review-1',
+          authorName: 'Aisha R.',
+          authorUrl: 'https://www.google.com/maps/contrib/aisha',
+          authorPhotoUrl: 'https://example.test/aisha.jpg',
+          rating: 5,
+          text: 'The burger was juicy and the service was quick.',
+          relativePublishTime: '2 weeks ago',
+          googleMapsUrl: 'https://www.google.com/maps/reviews/review-1',
+        },
+      ],
+    });
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    expect(await screen.findByText('Google reviews')).toBeTruthy();
+    expect(
+      screen.getByText('Up to 3 reviews, ordered by Google relevance.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Aisha R.')).toBeTruthy();
+    expect(
+      screen.getByLabelText("Aisha R.'s Google Maps profile photo"),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', {
+        name: "Open Aisha R.'s Google Maps profile",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('The burger was juicy and the service was quick.'),
+    ).toBeTruthy();
+    fireEvent.press(
+      screen.getByRole('link', {
+        name: "View Aisha R.'s review on Google Maps",
+      }),
+    );
+    await waitFor(() =>
+      expect(openUrl).toHaveBeenCalledWith(
+        'https://www.google.com/maps/reviews/review-1',
+      ),
+    );
+  });
+
+  it('links to the exact Google Maps place when excerpts are unavailable', async () => {
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    fireEvent.press(
+      screen.getByRole('link', { name: 'Read reviews on Google Maps' }),
+    );
+
+    await waitFor(() => {
+      const url = new URL(openUrl.mock.calls[0][0]);
+      expect(url.searchParams.get('query')).toBe('Jalan 21 Burger');
+      expect(url.searchParams.get('query_place_id')).toBe('jalan-21-burger');
+    });
+  });
+
   it('discloses a sponsored restaurant and records its unique profile view', async () => {
     mockResults = [
       {

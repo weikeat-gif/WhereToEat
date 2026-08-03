@@ -123,14 +123,19 @@ function textSearchRectangle(
 export function buildGoogleRequest(
   apiKey: string,
   input: PlacesAction,
+  options: { includeReviews?: boolean } = {},
 ): { url: string; init: RequestInit } {
   if (input.action === 'boundary') {
     throw new Error('Boundary requests do not use Google Places.');
   }
+  const fieldMask =
+    input.action === 'details' && options.includeReviews
+      ? `${FIELD_MASKS.details},reviews`
+      : FIELD_MASKS[input.action];
   const headers = {
     'Content-Type': 'application/json',
     'X-Goog-Api-Key': apiKey,
-    'X-Goog-FieldMask': FIELD_MASKS[input.action],
+    'X-Goog-FieldMask': fieldMask,
   };
 
   if (input.action === 'nearby') {

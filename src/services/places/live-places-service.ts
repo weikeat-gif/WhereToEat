@@ -74,6 +74,20 @@ const priceRangeSchema = z
   })
   .optional();
 
+const reviewSchema = z.object({
+  name: z.string().min(1),
+  relativePublishTimeDescription: z.string().min(1).optional(),
+  text: z.object({ text: z.string().min(1) }),
+  rating: z.number().min(1).max(5),
+  authorAttribution: z.object({
+    displayName: z.string().min(1),
+    uri: z.string().url().optional(),
+    photoUri: z.string().url().optional(),
+  }),
+  publishTime: z.string().datetime().optional(),
+  googleMapsUri: z.string().url(),
+});
+
 const rawPlaceSchema = z.object({
   id: z.string().min(1),
   displayName: z.object({ text: z.string().min(1) }),
@@ -92,9 +106,12 @@ const rawPlaceSchema = z.object({
   currentOpeningHours: z
     .object({
       openNow: z.boolean().optional(),
+      nextOpenTime: z.string().datetime().optional(),
+      nextCloseTime: z.string().datetime().optional(),
       weekdayDescriptions: z.array(z.string()).optional(),
     })
     .optional(),
+  reviews: z.array(reviewSchema).max(5).optional(),
   types: z.array(z.string()).optional(),
   halalVerification: halalVerificationSchema.optional(),
   promotion: z.object({ id: z.string().uuid() }).optional(),
@@ -276,6 +293,8 @@ function toSummary(place: RawPlace, criteria: SearchCriteria): PlaceSummary {
       : undefined,
     priceRange: toPriceRange(place),
     isOpen: place.currentOpeningHours?.openNow,
+    nextOpenTime: place.currentOpeningHours?.nextOpenTime,
+    nextCloseTime: place.currentOpeningHours?.nextCloseTime,
     categories,
     halalVerification: trustedHalal(place.halalVerification),
     promotion: place.promotion,
@@ -321,6 +340,17 @@ function toDetails(place: RawPlace): PlaceDetails {
     address: place.formattedAddress ?? '',
     openingHours: place.currentOpeningHours?.weekdayDescriptions ?? [],
     photoUrls: [],
+    reviews: (place.reviews ?? []).map((review) => ({
+      id: review.name,
+      authorName: review.authorAttribution.displayName,
+      authorUrl: review.authorAttribution.uri,
+      authorPhotoUrl: review.authorAttribution.photoUri,
+      rating: review.rating,
+      text: review.text.text,
+      relativePublishTime: review.relativePublishTimeDescription,
+      publishTime: review.publishTime,
+      googleMapsUrl: review.googleMapsUri,
+    })),
     viewport: place.viewport
       ? {
           northEast: place.viewport.high,

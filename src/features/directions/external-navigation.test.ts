@@ -1,5 +1,6 @@
 import {
   buildGoogleMapsNavigationUrl,
+  buildGoogleMapsPlaceUrl,
   buildWazeNavigationUrl,
 } from '@/features/directions/external-navigation';
 
@@ -29,6 +30,20 @@ describe('external navigation URLs', () => {
       'ChIJ-food-place',
     );
     expect(url.searchParams.get('travelmode')).toBe('driving');
+    expect(url.searchParams.has('key')).toBe(false);
+  });
+
+  it('opens the exact restaurant page in Google Maps without an API key', () => {
+    const url = new URL(
+      buildGoogleMapsPlaceUrl('Klang Kopitiam', 'ChIJ-food-place'),
+    );
+
+    expect(`${url.origin}${url.pathname}`).toBe(
+      'https://www.google.com/maps/search/',
+    );
+    expect(url.searchParams.get('api')).toBe('1');
+    expect(url.searchParams.get('query')).toBe('Klang Kopitiam');
+    expect(url.searchParams.get('query_place_id')).toBe('ChIJ-food-place');
     expect(url.searchParams.has('key')).toBe(false);
   });
 });

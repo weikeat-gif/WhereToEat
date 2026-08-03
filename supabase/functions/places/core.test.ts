@@ -109,6 +109,25 @@ describe('places Edge Function core', () => {
     });
   });
 
+  it('keeps paid Google review fields off unless explicitly enabled', () => {
+    const input = { action: 'details' as const, placeId: 'ChIJReviewedPlace' };
+    const standardRequest = buildGoogleRequest('server-key', input);
+    const reviewsRequest = buildGoogleRequest('server-key', input, {
+      includeReviews: true,
+    });
+
+    expect(
+      (standardRequest.init.headers as Record<string, string>)[
+        'X-Goog-FieldMask'
+      ],
+    ).not.toContain('reviews');
+    expect(
+      (reviewsRequest.init.headers as Record<string, string>)[
+        'X-Goog-FieldMask'
+      ],
+    ).toContain('reviews');
+  });
+
   it('validates a boundary request inside the Klang Valley service area', () => {
     expect(
       validatePlacesRequest({

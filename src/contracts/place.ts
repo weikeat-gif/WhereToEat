@@ -27,6 +27,18 @@ export type Promotion = {
   id: string;
 };
 
+export type PlaceReview = {
+  id: string;
+  authorName: string;
+  authorUrl?: string;
+  authorPhotoUrl?: string;
+  rating: number;
+  text: string;
+  relativePublishTime?: string;
+  publishTime?: string;
+  googleMapsUrl: string;
+};
+
 export type PlaceSummary = {
   id: string;
   name: string;
@@ -38,6 +50,8 @@ export type PlaceSummary = {
   priceLevel?: PriceLevel;
   priceRange?: PlacePriceRange;
   isOpen?: boolean;
+  nextOpenTime?: string;
+  nextCloseTime?: string;
   photoUrl?: string;
   categories: string[];
   halalVerification?: HalalVerification;
@@ -51,6 +65,7 @@ export type PlaceDetails = PlaceSummary & {
   openingHours: string[];
   description?: string;
   photoUrls: string[];
+  reviews?: PlaceReview[];
   viewport?: CoordinateBounds;
 };
 

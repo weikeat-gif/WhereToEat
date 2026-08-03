@@ -1,6 +1,10 @@
 import type { ImageSource } from 'expo-image';
 
-import type { PlacePriceRange, PlaceSummary } from '@/contracts/place';
+import type {
+  PlacePriceRange,
+  PlaceReview,
+  PlaceSummary,
+} from '@/contracts/place';
 
 export type DiscoveryPlace = PlaceSummary & {
   image?: ImageSource;
@@ -8,6 +12,7 @@ export type DiscoveryPlace = PlaceSummary & {
   description: string;
   openingNote: string;
   popularPicks: { name: string; image: ImageSource }[];
+  reviews?: PlaceReview[];
 };
 
 const burgerImage = require('../../../assets/images/makanmana/ramly-burger.png');

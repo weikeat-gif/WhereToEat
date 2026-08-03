@@ -15,6 +15,19 @@ supabase secrets set GOOGLE_MAPS_SERVER_API_KEY=...
 supabase secrets set RATE_LIMIT_HMAC_SECRET=...
 ```
 
+Google review excerpts are disabled by default because requesting the
+`reviews` field moves Place Details to the **Enterprise + Atmosphere** billing
+tier. The free Google Maps Demo Key does not provide user-generated reviews.
+Only after enabling billing, setting a hard quota, and accepting that higher
+tier should the review field be enabled and the function redeployed:
+
+```powershell
+supabase secrets set GOOGLE_PLACES_REVIEWS_ENABLED=true
+```
+
+Leave this secret unset (or set it to `false`) for the RM0 preview. The app
+still links users to Google Maps when review excerpts are unavailable.
+
 In the Supabase Auth dashboard:
 
 - enable anonymous sign-ins so guest discovery receives a short-lived user JWT;

@@ -471,32 +471,34 @@ export function MapScreen() {
           </TouchableOpacity>
         ) : null}
 
-        <TouchableOpacity
-          accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
-          accessibilityRole="button"
-          disabled={status === 'loading'}
-          onPress={() => void searchMapArea()}
-          style={[
-            styles.searchAreaButton,
-            mapFocused
-              ? styles.searchAreaButtonFocused
-              : styles.searchAreaButtonExpanded,
-            {
-              backgroundColor: colors.accent,
-              opacity: status === 'loading' ? 0.64 : 1,
-            },
-          ]}
-          testID="search-area-button">
-          <Text
-            style={{
-              color: colors.accentText,
-              fontFamily: fontFamily.semibold,
-            }}>
-            {status === 'loading'
-              ? i18n.t('mapSearching')
-              : i18n.t('mapSearchArea')}
-          </Text>
-        </TouchableOpacity>
+        {!filtersOpen ? (
+          <TouchableOpacity
+            accessibilityLabel={i18n.t('mapSearchAreaAccessibility')}
+            accessibilityRole="button"
+            disabled={status === 'loading'}
+            onPress={() => void searchMapArea()}
+            style={[
+              styles.searchAreaButton,
+              mapFocused
+                ? styles.searchAreaButtonFocused
+                : styles.searchAreaButtonExpanded,
+              {
+                backgroundColor: colors.accent,
+                opacity: status === 'loading' ? 0.64 : 1,
+              },
+            ]}
+            testID="search-area-button">
+            <Text
+              style={{
+                color: colors.accentText,
+                fontFamily: fontFamily.semibold,
+              }}>
+              {status === 'loading'
+                ? i18n.t('mapSearching')
+                : i18n.t('mapSearchArea')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         <View
           style={[
@@ -580,7 +582,9 @@ export function MapScreen() {
             </TouchableOpacity>
           </View>
           {filtersOpen ? (
-            <View style={[styles.filterPanel, { borderColor: colors.border }]}>
+            <View
+              testID="filter-panel"
+              style={[styles.filterPanel, { borderColor: colors.border }]}>
               <View style={styles.filterPanelHeader}>
                 <View>
                   <Text style={[styles.filterTitle, { color: colors.text }]}>
@@ -602,7 +606,8 @@ export function MapScreen() {
               <ScrollView
                 contentContainerStyle={styles.filterPanelContent}
                 keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}>
+                showsVerticalScrollIndicator={false}
+                style={styles.filterPanelScroll}>
                 <Text style={[styles.filterSectionTitle, { color: colors.textMuted }]}>
                   {i18n.t('mapAvailability')}
                 </Text>
@@ -797,7 +802,7 @@ export function MapScreen() {
         </View>
       ) : null}
 
-      {!mapFocused ? (
+      {filtersOpen ? null : !mapFocused ? (
         <View
           testID="results-pane"
           style={[
@@ -1013,7 +1018,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.lg,
     top: spacing.md,
-    zIndex: 2,
+    zIndex: 4,
   },
   searchAreaButton: {
     alignItems: 'center',
@@ -1121,6 +1126,7 @@ const styles = StyleSheet.create({
   filterPanel: {
     borderTopWidth: StyleSheet.hairlineWidth,
     maxHeight: 480,
+    overflow: 'hidden',
     paddingBottom: spacing.xs,
     paddingTop: spacing.md,
   },
@@ -1147,6 +1153,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
+  },
+  filterPanelScroll: {
+    flexShrink: 1,
+    minHeight: 0,
   },
   filterSectionTitle: {
     fontFamily: fontFamily.semibold,

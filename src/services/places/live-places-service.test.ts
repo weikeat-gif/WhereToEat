@@ -99,6 +99,46 @@ describe('LivePlacesService', () => {
     );
   });
 
+  it('maps attributed Google review excerpts on place details', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        id: 'reviewed-place',
+        displayName: { text: 'Reviewed Kopitiam' },
+        location: { latitude: 3.139, longitude: 101.6869 },
+        types: ['restaurant'],
+        reviews: [
+          {
+            name: 'places/reviewed-place/reviews/review-1',
+            rating: 5,
+            text: { text: 'Excellent kopi and quick service.' },
+            relativePublishTimeDescription: '2 weeks ago',
+            publishTime: '2026-07-15T08:00:00Z',
+            googleMapsUri: 'https://www.google.com/maps/reviews/review-1',
+            authorAttribution: {
+              displayName: 'Aisha R.',
+              uri: 'https://www.google.com/maps/contrib/aisha',
+              photoUri: 'https://example.test/aisha.jpg',
+            },
+          },
+        ],
+      }),
+    );
+    const service = new LivePlacesService('https://places.example.test/api');
+
+    await expect(service.getPlaceDetails('reviewed-place')).resolves.toMatchObject({
+      reviews: [
+        {
+          id: 'places/reviewed-place/reviews/review-1',
+          authorName: 'Aisha R.',
+          rating: 5,
+          text: 'Excellent kopi and quick service.',
+          relativePublishTime: '2 weeks ago',
+          googleMapsUrl: 'https://www.google.com/maps/reviews/review-1',
+        },
+      ],
+    });
+  });
+
   it('maps network failures without exposing provider details', async () => {
     jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('offline'));
     const service = new LivePlacesService('https://places.example.test/api');
@@ -227,6 +267,7 @@ describe('LivePlacesService', () => {
             },
             currentOpeningHours: {
               openNow: true,
+              nextCloseTime: '2026-08-03T14:00:00Z',
               weekdayDescriptions: ['Monday: 6:00 PM – 1:00 AM'],
             },
             types: ['malaysian_restaurant', 'restaurant'],
@@ -277,6 +318,7 @@ describe('LivePlacesService', () => {
             endExclusive: 40,
           },
           isOpen: true,
+          nextCloseTime: '2026-08-03T14:00:00Z',
           categories: ['Malaysian Restaurant', 'Restaurant'],
         },
       ],

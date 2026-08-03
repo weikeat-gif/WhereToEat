@@ -135,6 +135,11 @@ describe('web MapCanvas', () => {
         maps: {
           Map: FakeMap,
           Marker: FakeMarker,
+          InfoWindow: class FakeInfoWindow {
+            close() {}
+            open() {}
+            setContent() {}
+          },
           Polygon: FakePolygon,
         },
       };
@@ -220,6 +225,98 @@ describe('web MapCanvas', () => {
 
     act(() => mapPressListener?.());
     expect(onMapPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows restaurant, user distance, and opening status while hovering a web marker', async () => {
+    const markerListeners = new Map<string, () => void>();
+    const openInfoWindow = jest.fn();
+    const closeInfoWindow = jest.fn();
+    let infoContent: HTMLElement | undefined;
+
+    class FakeMap {
+      constructor(element: HTMLElement, options: Record<string, unknown>) {
+        void element;
+        void options;
+      }
+      addListener() {
+        return { remove: jest.fn() };
+      }
+      getCenter() {
+        return { lat: () => 3.139, lng: () => 101.6869 };
+      }
+      getBounds() {
+        return undefined;
+      }
+      fitBounds() {}
+      setCenter() {}
+    }
+    class FakeMarker {
+      constructor(options: Record<string, unknown>) {
+        if (options.title === 'Your current location') return;
+      }
+      addListener(event: string, listener: () => void) {
+        markerListeners.set(event, listener);
+        return { remove: jest.fn() };
+      }
+      setMap() {}
+    }
+    class FakeInfoWindow {
+      setContent(content: HTMLElement) {
+        infoContent = content;
+      }
+      open = openInfoWindow;
+      close = closeInfoWindow;
+    }
+
+    const coordinates = { latitude: 3.139, longitude: 101.6869 };
+    render(
+      <MapCanvas
+        center={coordinates}
+        onMapPress={jest.fn()}
+        onPlacePress={jest.fn()}
+        onViewportChange={jest.fn()}
+        places={[
+          {
+            id: 'hover-place',
+            name: 'Hover Kopitiam',
+            subtitle: 'Breakfast and coffee',
+            coordinates,
+            distanceMeters: 9_999,
+            rating: 4.6,
+            reviewCount: 80,
+            isOpen: true,
+            nextCloseTime: '2026-08-03T14:00:00Z',
+            categories: ['Cafe'],
+          },
+        ]}
+        showsUserLocation
+        userCoordinates={coordinates}
+      />,
+    );
+
+    await act(async () => {
+      window.google = {
+        maps: {
+          Map: FakeMap,
+          Marker: FakeMarker,
+          InfoWindow: FakeInfoWindow,
+        },
+      };
+      window.__makanManaGoogleMapsReady?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(markerListeners.has('mouseover')).toBe(true));
+    act(() => markerListeners.get('mouseover')?.());
+
+    expect(infoContent?.textContent).toContain('Hover Kopitiam');
+    expect(infoContent?.textContent).toContain('0 m from you');
+    expect(infoContent?.textContent).toContain('Open now');
+    expect(infoContent?.textContent).toContain('Closes');
+    expect(openInfoWindow).toHaveBeenCalledTimes(1);
+
+    act(() => markerListeners.get('mouseout')?.());
+    expect(closeInfoWindow).toHaveBeenCalledTimes(1);
   });
 
 });

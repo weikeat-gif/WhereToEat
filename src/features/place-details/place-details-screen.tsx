@@ -23,6 +23,7 @@ import { env } from '@/config/env';
 import { useAuth } from '@/features/auth/auth-provider';
 import {
   buildGoogleMapsNavigationUrl,
+  buildGoogleMapsPlaceUrl,
   buildWazeNavigationUrl,
 } from '@/features/directions/external-navigation';
 import {
@@ -157,6 +158,15 @@ export function PlaceDetailsScreen() {
       await Linking.openURL(url);
     } catch {
       setActionError('Unable to open that navigation app.');
+    }
+  }
+
+  async function openGoogleReview(url: string) {
+    setActionError(null);
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setActionError('Unable to open Google Maps reviews right now.');
     }
   }
 
@@ -399,6 +409,168 @@ export function PlaceDetailsScreen() {
                 {place.address}
               </Text>
             </View>
+          </View>
+
+          <View style={styles.reviewsSection}>
+            <View style={styles.reviewsHeadingRow}>
+              <View>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Google reviews
+                </Text>
+                <Text style={[styles.sectionNote, { color: colors.textMuted }]}>
+                  Up to 3 reviews, ordered by Google relevance.
+                </Text>
+              </View>
+              <Ionicons color={colors.accentForeground} name="star" size={22} />
+            </View>
+
+            {(place.reviews ?? []).length > 0 ? (
+              (place.reviews ?? []).slice(0, 3).map((review) => (
+                <View
+                  key={review.id}
+                  style={[
+                    styles.reviewCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewAuthorRow}>
+                      {review.authorPhotoUrl ? (
+                        <Image
+                          accessibilityLabel={`${review.authorName}'s Google Maps profile photo`}
+                          contentFit="cover"
+                          source={{ uri: review.authorPhotoUrl }}
+                          style={styles.reviewAvatar}
+                        />
+                      ) : (
+                        <View
+                          accessibilityLabel={`${review.authorName}'s Google Maps profile photo`}
+                          style={[
+                            styles.reviewAvatarFallback,
+                            { backgroundColor: colors.surfaceElevated },
+                          ]}>
+                          <Ionicons
+                            color={colors.textMuted}
+                            name="person"
+                            size={18}
+                          />
+                        </View>
+                      )}
+                      <View style={styles.reviewAuthorCopy}>
+                        {review.authorUrl ? (
+                          <Pressable
+                            accessibilityLabel={`Open ${review.authorName}'s Google Maps profile`}
+                            accessibilityRole="link"
+                            onPress={() =>
+                              void openGoogleReview(review.authorUrl!)
+                            }>
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.reviewAuthor,
+                                { color: colors.text },
+                              ]}>
+                              {review.authorName}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.reviewAuthor,
+                              { color: colors.text },
+                            ]}>
+                            {review.authorName}
+                          </Text>
+                        )}
+                        {review.relativePublishTime ? (
+                          <Text
+                            style={[
+                              styles.reviewTime,
+                              { color: colors.textMuted },
+                            ]}>
+                            {review.relativePublishTime}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    <View style={styles.reviewRating}>
+                      <Ionicons color="#F5B301" name="star" size={15} />
+                      <Text
+                        style={[styles.reviewRatingText, { color: colors.text }]}>
+                        {review.rating.toFixed(1)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    numberOfLines={5}
+                    style={[styles.reviewText, { color: colors.text }]}>
+                    {review.text}
+                  </Text>
+                  <Pressable
+                    accessibilityLabel={`View ${review.authorName}'s review on Google Maps`}
+                    accessibilityRole="link"
+                    onPress={() => void openGoogleReview(review.googleMapsUrl)}
+                    style={({ pressed }) => [
+                      styles.reviewLink,
+                      { opacity: pressed ? 0.68 : 1 },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.reviewLinkText,
+                        { color: colors.accentForeground },
+                      ]}>
+                      View on Google Maps
+                    </Text>
+                    <Ionicons
+                      color={colors.accentForeground}
+                      name="open-outline"
+                      size={15}
+                    />
+                  </Pressable>
+                </View>
+              ))
+            ) : (
+              <View
+                style={[
+                  styles.reviewsEmpty,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Text style={[styles.reviewText, { color: colors.textMuted }]}>
+                  Review excerpts are unavailable in this preview.
+                </Text>
+                <Pressable
+                  accessibilityLabel="Read reviews on Google Maps"
+                  accessibilityRole="link"
+                  onPress={() =>
+                    void openGoogleReview(
+                      buildGoogleMapsPlaceUrl(place.name, place.id),
+                    )
+                  }
+                  style={({ pressed }) => [
+                    styles.reviewLink,
+                    { opacity: pressed ? 0.68 : 1 },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.reviewLinkText,
+                      { color: colors.accentForeground },
+                    ]}>
+                    Read reviews on Google Maps
+                  </Text>
+                  <Ionicons
+                    color={colors.accentForeground}
+                    name="open-outline"
+                    size={15}
+                  />
+                </Pressable>
+              </View>
+            )}
           </View>
           <GoogleMapsAttribution />
         </View>
@@ -661,6 +833,62 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     marginTop: 3,
+  },
+  reviewsSection: { gap: 10 },
+  reviewsHeadingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  reviewCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  reviewHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  reviewAuthorRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  reviewAvatar: { borderRadius: 18, height: 36, width: 36 },
+  reviewAvatarFallback: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  reviewAuthorCopy: { flex: 1 },
+  reviewAuthor: { fontFamily: fontFamily.semibold, fontSize: 14 },
+  reviewTime: { fontFamily: fontFamily.regular, fontSize: 12, marginTop: 2 },
+  reviewRating: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  reviewRatingText: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  reviewText: {
+    fontFamily: fontFamily.regular,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  reviewLink: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 5,
+    minHeight: 32,
+  },
+  reviewLinkText: { fontFamily: fontFamily.semibold, fontSize: 12 },
+  reviewsEmpty: {
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 8,
+    padding: 14,
   },
   topActions: {
     left: 16,
