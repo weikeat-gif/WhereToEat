@@ -1,17 +1,31 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import type { AppUser } from '@/contracts/auth';
 
 import { ProfileScreen } from './profile-screen';
 
 const mockSetMode = jest.fn();
 const mockPush = jest.fn();
+const mockUpdateDisplayName = jest.fn();
+const mockSignOut = jest.fn();
+const mockAuthState = {
+  user: {
+    id: 'user-1',
+    email: 'weikeatpeng@gmail.com',
+  } as AppUser | null,
+  isBusy: false,
+  error: null as string | null,
+  updateDisplayName: mockUpdateDisplayName,
+  signOut: mockSignOut,
+};
 
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockPush(...args) },
 }));
 
 jest.mock('@/features/auth/auth-provider', () => ({
-  useAuth: () => ({ user: { id: 'user-1', email: 'test@example.com' } }),
+  useAuth: () => mockAuthState,
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
@@ -26,6 +40,14 @@ jest.mock('@/theme/theme-provider', () => ({
 describe('ProfileScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuthState.user = {
+      id: 'user-1',
+      email: 'weikeatpeng@gmail.com',
+    };
+    mockAuthState.error = null;
+    mockAuthState.isBusy = false;
+    mockUpdateDisplayName.mockResolvedValue(undefined);
+    mockSignOut.mockResolvedValue(undefined);
   });
 
   it('offers accessible theme options and selects dark mode', () => {
@@ -47,7 +69,7 @@ describe('ProfileScreen', () => {
     });
   });
 
-  it('provides a reachable account and sign-out route', () => {
+  it('shows the email username and lets the user save a custom name', async () => {
     const screen = render(
       <SafeAreaProvider
         initialMetrics={{
@@ -58,10 +80,19 @@ describe('ProfileScreen', () => {
       </SafeAreaProvider>,
     );
 
-    fireEvent.press(screen.getByRole('button', { name: 'Manage account' }));
+    expect(screen.getByText('weikeatpeng')).toBeTruthy();
+    expect(screen.getByText('weikeatpeng@gmail.com')).toBeTruthy();
 
-    expect(screen.getByText('test@example.com')).toBeTruthy();
-    expect(mockPush).toHaveBeenCalledWith('/auth');
+    fireEvent.press(screen.getByRole('button', { name: 'Edit display name' }));
+    fireEvent.changeText(screen.getByLabelText('Display name'), 'Klang Foodie');
+    fireEvent.press(screen.getByRole('button', { name: 'Save display name' }));
+
+    await waitFor(() =>
+      expect(mockUpdateDisplayName).toHaveBeenCalledWith('Klang Foodie'),
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
   it('keeps Privacy and Terms available from Profile', () => {

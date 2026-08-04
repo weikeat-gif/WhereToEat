@@ -27,6 +27,7 @@ type AuthContextValue = {
   signInWithApple: () => Promise<void>;
   requestEmailCode: (email: string) => Promise<void>;
   verifyEmailCode: (email: string, code: string) => Promise<void>;
+  updateDisplayName: (displayName: string) => Promise<void>;
   resetEmailCode: () => void;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -78,11 +79,13 @@ export function AuthProvider({
     };
   }, [gateway]);
 
-  const perform = useCallback(async (operation: () => Promise<void>) => {
+  const perform = useCallback(async <Result,>(
+    operation: () => Promise<Result>,
+  ): Promise<Result> => {
     setError(null);
     setIsBusy(true);
     try {
-      await operation();
+      return await operation();
     } catch (operationError) {
       const message = toUserMessage(operationError);
       setError(message);
@@ -114,6 +117,15 @@ export function AuthProvider({
       perform(() => gateway.verifyEmailCode(email, code)),
     [gateway, perform],
   );
+  const updateDisplayName = useCallback(
+    async (displayName: string) => {
+      const updatedUser = await perform(() =>
+        gateway.updateDisplayName(displayName),
+      );
+      setMockUser(updatedUser);
+    },
+    [gateway, perform],
+  );
   const signOut = useCallback(async () => {
     await perform(() => gateway.signOut());
     setEmailCodeSent(false);
@@ -138,6 +150,7 @@ export function AuthProvider({
       signInWithApple,
       requestEmailCode,
       verifyEmailCode,
+      updateDisplayName,
       resetEmailCode,
       signOut,
       clearError: () => setError(null),
@@ -155,6 +168,7 @@ export function AuthProvider({
       signInWithGoogle,
       signOut,
       user,
+      updateDisplayName,
       verifyEmailCode,
     ],
   );

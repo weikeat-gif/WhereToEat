@@ -1,5 +1,11 @@
-import { act, render, screen, waitFor } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
+import { Pressable, Text } from 'react-native';
 
 import type { AuthGateway } from './auth-gateway';
 import { AuthProvider, useAuth } from './auth-provider';
@@ -17,6 +23,23 @@ function Consumer() {
   return <Text>{isLoading ? 'loading' : (user?.email ?? 'guest')}</Text>;
 }
 
+function AccountConsumer() {
+  const { error, updateDisplayName, user } = useAuth();
+  return (
+    <>
+      <Text>{user?.displayName ?? 'no-name'}</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() =>
+          void updateDisplayName('Klang Foodie').catch(() => undefined)
+        }>
+        <Text>Update display name</Text>
+      </Pressable>
+      {error ? <Text>{error}</Text> : null}
+    </>
+  );
+}
+
 function fakeGateway(): AuthGateway {
   return {
     restoreSession: jest.fn().mockResolvedValue({
@@ -28,6 +51,7 @@ function fakeGateway(): AuthGateway {
     signInWithApple: jest.fn(),
     requestEmailCode: jest.fn(),
     verifyEmailCode: jest.fn(),
+    updateDisplayName: jest.fn(),
     signOut: jest.fn(),
   };
 }
@@ -82,5 +106,60 @@ describe('AuthProvider', () => {
       expect(screen.getByText('new@example.com')).toBeTruthy(),
     );
     expect(screen.queryByText('old@example.com')).toBeNull();
+  });
+
+  it('publishes an updated display name without waiting for another auth event', async () => {
+    const gateway = fakeGateway();
+    gateway.restoreSession = jest.fn().mockResolvedValue({
+      accessToken: 'token',
+      user: {
+        id: 'user-1',
+        email: 'weikeatpeng@gmail.com',
+        displayName: 'weikeatpeng',
+      },
+    });
+    gateway.updateDisplayName = jest.fn().mockResolvedValue({
+      id: 'user-1',
+      email: 'weikeatpeng@gmail.com',
+      displayName: 'Klang Foodie',
+    });
+    render(
+      <AuthProvider gateway={gateway}>
+        <AccountConsumer />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('weikeatpeng')).toBeTruthy());
+
+    fireEvent.press(screen.getByRole('button', { name: 'Update display name' }));
+
+    await waitFor(() => expect(screen.getByText('Klang Foodie')).toBeTruthy());
+  });
+
+  it('keeps the previous display name when the account update fails', async () => {
+    const gateway = fakeGateway();
+    gateway.restoreSession = jest.fn().mockResolvedValue({
+      accessToken: 'token',
+      user: {
+        id: 'user-1',
+        email: 'weikeatpeng@gmail.com',
+        displayName: 'weikeatpeng',
+      },
+    });
+    gateway.updateDisplayName = jest
+      .fn()
+      .mockRejectedValue(new Error('Unable to update your account name.'));
+    render(
+      <AuthProvider gateway={gateway}>
+        <AccountConsumer />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('weikeatpeng')).toBeTruthy());
+
+    fireEvent.press(screen.getByRole('button', { name: 'Update display name' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Unable to update your account name.')).toBeTruthy(),
+    );
+    expect(screen.getByText('weikeatpeng')).toBeTruthy();
   });
 });

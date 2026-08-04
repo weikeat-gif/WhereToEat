@@ -1,13 +1,18 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import type { AppUser } from '@/contracts/auth';
 
 import { AuthScreen } from './auth-screen';
 
 const mockSignInWithGoogle = jest.fn();
 const mockRequestEmailCode = jest.fn();
 const mockVerifyEmailCode = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn();
+const mockReplace = jest.fn();
 const mockAuthState = {
-  user: null,
+  user: null as AppUser | null,
   isLoading: false,
   isBusy: false,
   error: null,
@@ -21,6 +26,14 @@ const mockAuthState = {
   resetEmailCode: jest.fn(),
   signOut: jest.fn(),
 };
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    back: mockBack,
+    canGoBack: mockCanGoBack,
+    replace: mockReplace,
+  }),
+}));
 
 jest.mock('./auth-provider', () => ({
   useAuth: () => mockAuthState,
@@ -59,8 +72,10 @@ describe('AuthScreen', () => {
     mockSignInWithGoogle.mockResolvedValue(undefined);
     mockRequestEmailCode.mockResolvedValue(undefined);
     mockVerifyEmailCode.mockResolvedValue(undefined);
+    mockCanGoBack.mockReturnValue(true);
     mockAuthState.emailCodeSent = false;
     mockAuthState.emailCodeAddress = '';
+    mockAuthState.user = null;
   });
 
   it('keeps Google sign-in separate from email-code sign-in', () => {
@@ -87,6 +102,37 @@ describe('AuthScreen', () => {
     );
 
     expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns to the previous screen when sign-in completes', async () => {
+    const screen = renderScreen();
+
+    mockAuthState.user = {
+      id: 'user-1',
+      email: 'weikeatpeng@gmail.com',
+      displayName: 'weikeatpeng',
+    };
+    screen.rerender(screenTree());
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalledTimes(1));
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('opens Profile after direct-route sign-in completes', async () => {
+    mockCanGoBack.mockReturnValue(false);
+    const screen = renderScreen();
+
+    mockAuthState.user = {
+      id: 'user-1',
+      email: 'weikeatpeng@gmail.com',
+      displayName: 'weikeatpeng',
+    };
+    screen.rerender(screenTree());
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(tabs)/profile'),
+    );
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('explains where an email code was sent and locks that address', async () => {

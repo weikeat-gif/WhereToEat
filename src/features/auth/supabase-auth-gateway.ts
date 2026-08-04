@@ -17,10 +17,19 @@ import type {
 
 WebBrowser.maybeCompleteAuthSession();
 
+const DISALLOWED_DISPLAY_NAME_CHARACTERS =
+  /[\u0000-\u001F\u007F-\u009F\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/;
+
 function toAppUser(user: User): AppUser {
   const metadata = user.user_metadata;
+  const customDisplayName = metadata.display_name;
+  const emailUsername = user.email?.split('@')[0]?.trim();
+  const providerDisplayName = metadata.full_name ?? metadata.name;
   const displayName =
-    metadata.full_name ?? metadata.name ?? metadata.display_name ?? undefined;
+    (typeof customDisplayName === 'string' && customDisplayName.trim()) ||
+    emailUsername ||
+    (typeof providerDisplayName === 'string' && providerDisplayName.trim()) ||
+    undefined;
   const avatarUrl =
     metadata.avatar_url ?? metadata.picture ?? metadata.photo_url ?? undefined;
 
@@ -172,6 +181,29 @@ export class SupabaseAuthGateway implements AuthGateway {
       type: 'email',
     });
     throwIfError(error);
+  }
+
+  async updateDisplayName(displayName: string): Promise<AppUser> {
+    const normalizedDisplayName = displayName.replace(/\s+/g, ' ').trim();
+    if (
+      normalizedDisplayName.length < 2 ||
+      normalizedDisplayName.length > 40
+    ) {
+      throw new Error('Display name must be between 2 and 40 characters.');
+    }
+    if (DISALLOWED_DISPLAY_NAME_CHARACTERS.test(normalizedDisplayName)) {
+      throw new Error('Display name contains unsupported characters.');
+    }
+
+    const client = requireClient();
+    const { data, error } = await client.auth.updateUser({
+      data: { display_name: normalizedDisplayName },
+    });
+    throwIfError(error);
+    if (!data.user) {
+      throw new Error('Unable to update your account name. Please try again.');
+    }
+    return toAppUser(data.user);
   }
 
   async signOut(): Promise<void> {

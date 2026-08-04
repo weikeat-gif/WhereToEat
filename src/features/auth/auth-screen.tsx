@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Platform,
@@ -18,6 +19,7 @@ import { useAuth } from './auth-provider';
 import { AppleSignInButton } from './apple-sign-in-button';
 
 export function AuthScreen() {
+  const router = useRouter();
   const { colors, resolvedMode } = useAppTheme();
   const {
     user,
@@ -38,6 +40,15 @@ export function AuthScreen() {
   const [code, setCode] = useState('');
   const [showEmailSignIn, setShowEmailSignIn] = useState(false);
   const verificationEmail = emailCodeAddress;
+
+  useEffect(() => {
+    if (!user) return;
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(tabs)/profile');
+  }, [router, user]);
 
   function run(operation: () => Promise<void>) {
     void operation().catch(() => undefined);

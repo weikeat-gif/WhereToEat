@@ -1,7 +1,14 @@
-import type { ComponentProps } from 'react';
+import { type ComponentProps, useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/auth-provider';
@@ -38,7 +45,30 @@ const MODES: ModeOption[] = [
 
 export function ProfileScreen() {
   const { colors, mode, resolvedMode, setMode } = useAppTheme();
-  const { user } = useAuth();
+  const { error, isBusy, signOut, updateDisplayName, user } = useAuth();
+  const accountName =
+    user?.displayName?.trim() ||
+    user?.email?.split('@')[0]?.trim() ||
+    'MakanMana diner';
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(accountName);
+  const normalizedNameDraft = nameDraft.replace(/\s+/g, ' ').trim();
+  const validName =
+    normalizedNameDraft.length >= 2 && normalizedNameDraft.length <= 40;
+
+  useEffect(() => {
+    setNameDraft(accountName);
+    setEditingName(false);
+  }, [accountName, user?.id]);
+
+  async function saveDisplayName() {
+    try {
+      await updateDisplayName(normalizedNameDraft);
+      setEditingName(false);
+    } catch {
+      // AuthProvider exposes the user-facing error below the editor.
+    }
+  }
 
   return (
     <SafeAreaView
@@ -62,42 +92,148 @@ export function ProfileScreen() {
             styles.account,
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}>
-          <View
-            style={[
-              styles.accountIcon,
-              { backgroundColor: colors.surfaceElevated },
-            ]}>
-            <Ionicons
-              color={colors.accentForeground}
-              name="person-outline"
-              size={23}
-            />
+          <View style={styles.accountSummary}>
+            <View
+              style={[
+                styles.accountIcon,
+                { backgroundColor: colors.surfaceElevated },
+              ]}>
+              <Ionicons
+                color={colors.accentForeground}
+                name="person-outline"
+                size={23}
+              />
+            </View>
+            <View style={styles.accountCopy}>
+              <Text style={[styles.accountLabel, { color: colors.textMuted }]}>
+                ACCOUNT
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.accountValue, { color: colors.text }]}>
+                {user ? accountName : 'Browsing as guest'}
+              </Text>
+              {user?.email ? (
+                <Text
+                  numberOfLines={1}
+                  style={[styles.accountEmail, { color: colors.textMuted }]}>
+                  {user.email}
+                </Text>
+              ) : null}
+            </View>
+            <Pressable
+              accessibilityLabel={user ? 'Edit display name' : 'Sign in'}
+              accessibilityRole="button"
+              disabled={isBusy}
+              onPress={() => {
+                if (user) {
+                  setNameDraft(accountName);
+                  setEditingName(true);
+                } else {
+                  router.push('/auth');
+                }
+              }}
+              style={({ pressed }) => [
+                styles.accountButton,
+                {
+                  backgroundColor: colors.accent,
+                  opacity: isBusy ? 0.5 : pressed ? 0.78 : 1,
+                },
+              ]}>
+              <Text
+                style={[styles.accountButtonText, { color: colors.accentText }]}>
+                {user ? 'Edit' : 'Sign in'}
+              </Text>
+            </Pressable>
           </View>
-          <View style={styles.accountCopy}>
-            <Text style={[styles.accountLabel, { color: colors.textMuted }]}>
-              ACCOUNT
-            </Text>
+
+          {user && editingName ? (
+            <View style={styles.nameEditor}>
+              <TextInput
+                accessibilityLabel="Display name"
+                autoCapitalize="words"
+                editable={!isBusy}
+                maxLength={40}
+                onChangeText={setNameDraft}
+                placeholder="Your display name"
+                placeholderTextColor={colors.textMuted}
+                style={[
+                  styles.nameInput,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={nameDraft}
+              />
+              <Text style={[styles.nameHint, { color: colors.textMuted }]}>
+                Use 2–40 characters. This is how your account appears in
+                MakanMana.
+              </Text>
+              <View style={styles.nameActions}>
+                <Pressable
+                  accessibilityLabel="Cancel editing display name"
+                  accessibilityRole="button"
+                  disabled={isBusy}
+                  onPress={() => {
+                    setNameDraft(accountName);
+                    setEditingName(false);
+                  }}
+                  style={[styles.nameAction, { borderColor: colors.border }]}>
+                  <Text style={[styles.nameActionText, { color: colors.text }]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Save display name"
+                  accessibilityRole="button"
+                  disabled={isBusy || !validName}
+                  onPress={() => void saveDisplayName()}
+                  style={[
+                    styles.nameAction,
+                    {
+                      backgroundColor: colors.accent,
+                      borderColor: colors.accent,
+                      opacity: isBusy || !validName ? 0.5 : 1,
+                    },
+                  ]}>
+                  <Text
+                    style={[styles.nameActionText, { color: colors.accentText }]}>
+                    Save name
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+          {user && error ? (
             <Text
-              numberOfLines={1}
-              style={[styles.accountValue, { color: colors.text }]}>
-              {user?.email ?? user?.displayName ?? 'Browsing as guest'}
+              accessibilityRole="alert"
+              style={[styles.accountError, { color: colors.warning }]}>
+              {error}
             </Text>
-          </View>
-          <Pressable
-            accessibilityLabel={user ? 'Manage account' : 'Sign in'}
-            accessibilityRole="button"
-            onPress={() => router.push('/auth')}
-            style={({ pressed }) => [
-              styles.accountButton,
-              {
-                backgroundColor: colors.accent,
-                opacity: pressed ? 0.78 : 1,
-              },
-            ]}>
-            <Text style={[styles.accountButtonText, { color: colors.accentText }]}>
-              {user ? 'Manage' : 'Sign in'}
-            </Text>
-          </Pressable>
+          ) : null}
+
+          {user ? (
+            <Pressable
+              accessibilityLabel="Sign out"
+              accessibilityRole="button"
+              disabled={isBusy}
+              onPress={() => void signOut().catch(() => undefined)}
+              style={({ pressed }) => [
+                styles.signOutButton,
+                {
+                  borderColor: colors.border,
+                  opacity: isBusy ? 0.5 : pressed ? 0.72 : 1,
+                },
+              ]}>
+              <Ionicons color={colors.textMuted} name="log-out-outline" size={18} />
+              <Text style={[styles.signOutText, { color: colors.textMuted }]}>
+                Sign out
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View
@@ -278,12 +414,15 @@ const styles = StyleSheet.create({
   },
   account: {
     minHeight: 74,
-    alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,
-    flexDirection: 'row',
     gap: 12,
     padding: 13,
+  },
+  accountSummary: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
   },
   accountIcon: {
     width: 48,
@@ -303,6 +442,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
+  accountEmail: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    marginTop: 2,
+  },
   accountButton: {
     minHeight: 44,
     alignItems: 'center',
@@ -311,6 +455,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   accountButtonText: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  nameEditor: { gap: 8 },
+  nameInput: {
+    borderRadius: 13,
+    borderWidth: 1,
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    minHeight: 48,
+    paddingHorizontal: 14,
+  },
+  nameHint: { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 17 },
+  nameActions: { flexDirection: 'row', gap: 8 },
+  nameAction: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  nameActionText: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  accountError: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 18 },
+  signOutButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  signOutText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   preview: { borderRadius: 18, borderWidth: 1, gap: 18, padding: 16 },
   previewTop: {
     alignItems: 'center',

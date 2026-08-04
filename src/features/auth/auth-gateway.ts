@@ -14,5 +14,6 @@ export interface AuthGateway {
   signInWithApple(): Promise<void>;
   requestEmailCode(email: string): Promise<void>;
   verifyEmailCode(email: string, code: string): Promise<void>;
+  updateDisplayName(displayName: string): Promise<AppUser>;
   signOut(): Promise<void>;
 }
