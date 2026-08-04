@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import type { Coordinates, PlaceSummary } from '@/contracts/place';
+import type { FoodPreferenceKey } from '@/contracts/food-preference';
 import type {
   AreaSuggestion,
   SearchCriteria,
@@ -32,6 +33,10 @@ import {
   rememberRecentArea,
   saveRecentAreas,
 } from '@/features/search/recent-areas';
+import {
+  applyFoodPreferencePolicy,
+  criteriaWithHardFoodPreferences,
+} from '@/features/food-preferences/food-preference-policy';
 import { pickSurprise } from '@/features/search/surprise';
 import { placesService } from '@/services/places';
 import type { PlacesService } from '@/services/places/places-service';
@@ -80,13 +85,19 @@ type SearchProviderProps = PropsWithChildren<{
   service?: PlacesService;
   locationClient?: SearchLocationClient;
   historyScope?: string | null;
+  preferenceKeys?: ReadonlySet<FoodPreferenceKey>;
+  preferencesReady?: boolean;
 }>;
+
+const EMPTY_FOOD_PREFERENCES = new Set<FoodPreferenceKey>();
 
 export function SearchProvider({
   children,
   service = placesService,
   locationClient,
   historyScope = null,
+  preferenceKeys = EMPTY_FOOD_PREFERENCES,
+  preferencesReady = true,
 }: SearchProviderProps) {
   const [criteria, setCriteria] = useState(DEFAULT_SEARCH_CRITERIA);
   const [results, setResults] = useState<PlaceSummary[]>([]);
@@ -104,6 +115,10 @@ export function SearchProvider({
   const [surprise, setSurprise] = useState<PlaceSummary>();
   const [recentAreas, setRecentAreas] = useState<AreaSuggestion[]>([]);
   const criteriaRef = useRef(criteria);
+  const preferenceKeysRef = useRef(preferenceKeys);
+  preferenceKeysRef.current = preferenceKeys;
+  const preferencesReadyRef = useRef(preferencesReady);
+  preferencesReadyRef.current = preferencesReady;
   const requestIdRef = useRef(0);
   const recentAreasRef = useRef<AreaSuggestion[]>([]);
   const historyEpochRef = useRef(0);
@@ -122,26 +137,42 @@ export function SearchProvider({
   }, []);
 
   const setSynchronizedResults = useCallback((places: PlaceSummary[]) => {
-    setResults(places);
-    setStatus(places.length === 0 ? 'empty' : 'success');
+    if (!preferencesReadyRef.current) return;
+    const personalizedPlaces = applyFoodPreferencePolicy(
+      places,
+      preferenceKeysRef.current,
+      criteriaRef.current,
+    );
+    setResults(personalizedPlaces);
+    setStatus(personalizedPlaces.length === 0 ? 'empty' : 'success');
     setError(null);
     setSearchResults({
       criteria: criteriaRef.current,
-      places,
+      places: personalizedPlaces,
       fetchedAt: new Date().toISOString(),
     });
   }, []);
 
   const search = useCallback(
     async (nextCriteria = criteriaRef.current) => {
+      if (!preferencesReadyRef.current) return undefined;
       const requestId = ++requestIdRef.current;
+      const effectiveCriteria = criteriaWithHardFoodPreferences(
+        nextCriteria,
+        preferenceKeysRef.current,
+      );
       setSynchronizedCriteria(nextCriteria);
       setStatus('loading');
       setError(null);
 
       try {
-        const nextResults = await service.searchNearby(nextCriteria);
-        if (requestId !== requestIdRef.current) return undefined;
+        const nextResults = await service.searchNearby(effectiveCriteria);
+        if (
+          requestId !== requestIdRef.current ||
+          !preferencesReadyRef.current
+        ) {
+          return undefined;
+        }
         const { areaBoundary, areaBounds } = nextResults.criteria;
         const boundedPlaces = areaBoundary
           ? nextResults.places.filter((place) =>
@@ -154,7 +185,12 @@ export function SearchProvider({
             : nextResults.places;
         const boundedResults = {
           ...nextResults,
-          places: boundedPlaces,
+          places: applyFoodPreferencePolicy(
+            boundedPlaces,
+            preferenceKeysRef.current,
+            nextCriteria,
+          ),
+          criteria: nextCriteria,
         };
         setSynchronizedCriteria(boundedResults.criteria);
         setResults(boundedResults.places);
@@ -163,7 +199,12 @@ export function SearchProvider({
         setStatus(boundedResults.places.length === 0 ? 'empty' : 'success');
         return boundedResults;
       } catch (searchError) {
-        if (requestId !== requestIdRef.current) return undefined;
+        if (
+          requestId !== requestIdRef.current ||
+          !preferencesReadyRef.current
+        ) {
+          return undefined;
+        }
         setResults([]);
         setSearchResults(null);
         setStatus('error');
@@ -240,6 +281,7 @@ export function SearchProvider({
       area: AreaSuggestion,
       changes: Pick<SearchCriteria, 'query'> = {},
     ) => {
+      if (!preferencesReadyRef.current) return undefined;
       const operationId = ++requestIdRef.current;
       setStatus('loading');
       setError(null);
@@ -250,7 +292,12 @@ export function SearchProvider({
         const coordinates = area.coordinates ?? details?.coordinates;
         if (!coordinates) throw new Error('Unable to resolve that area.');
         const areaBounds = area.viewport ?? details?.viewport;
-        if (operationId !== requestIdRef.current) return undefined;
+        if (
+          operationId !== requestIdRef.current ||
+          !preferencesReadyRef.current
+        ) {
+          return undefined;
+        }
         const resolvedArea = {
           ...area,
           coordinates,
@@ -287,6 +334,7 @@ export function SearchProvider({
         ]);
         if (
           !boundary ||
+          !preferencesReadyRef.current ||
           requestIdRef.current !== boundarySearchRequestId ||
           criteriaRef.current.areaPlaceId !== area.id ||
           !nextResults
@@ -315,7 +363,12 @@ export function SearchProvider({
           places: boundaryPlaces,
         };
       } catch (areaError) {
-        if (operationId !== requestIdRef.current) return undefined;
+        if (
+          operationId !== requestIdRef.current ||
+          !preferencesReadyRef.current
+        ) {
+          return undefined;
+        }
         setResults([]);
         setSearchResults(null);
         setStatus('error');
@@ -331,12 +384,18 @@ export function SearchProvider({
   );
 
   const searchCurrentLocation = useCallback(async () => {
+    if (!preferencesReadyRef.current) return undefined;
     const operationId = ++requestIdRef.current;
     setLocationStatus('requesting');
     setLocationMessage(null);
     setLocationCanAskAgain(null);
     const location = await requestSearchLocation(locationClient);
-    if (operationId !== requestIdRef.current) return undefined;
+    if (
+      operationId !== requestIdRef.current ||
+      !preferencesReadyRef.current
+    ) {
+      return undefined;
+    }
     if (location.kind === 'manual') {
       setLocationStatus('manual');
       setLocationCanAskAgain(location.canAskAgain ?? true);
@@ -391,8 +450,17 @@ export function SearchProvider({
   }, [historyScope]);
 
   useEffect(() => {
-    void search(DEFAULT_SEARCH_CRITERIA);
-  }, [search]);
+    if (!preferencesReady) {
+      requestIdRef.current += 1;
+      setResults([]);
+      setSearchResults(null);
+      setSurprise(undefined);
+      setStatus('loading');
+      setError(null);
+      return;
+    }
+    void search(criteriaRef.current);
+  }, [preferenceKeys, preferencesReady, search]);
 
   const value = useMemo(
     () => ({

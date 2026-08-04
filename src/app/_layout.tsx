@@ -24,6 +24,7 @@ function RootNavigator() {
       <StatusBar style={resolvedMode === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="assistant" options={{ presentation: 'card' }} />
         <Stack.Screen name="place/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="directions/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="privacy" options={{ presentation: 'card' }} />

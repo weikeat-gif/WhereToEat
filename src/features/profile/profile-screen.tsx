@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/auth-provider';
+import { FOOD_PREFERENCE_CATALOGUE } from '@/features/food-preferences/food-preference-policy';
+import { useFoodPreferences } from '@/features/food-preferences/food-preferences-provider';
 import { useAppTheme } from '@/theme/theme-provider';
 import { fontFamily, type ThemeMode } from '@/theme/tokens';
 
@@ -46,6 +48,13 @@ const MODES: ModeOption[] = [
 export function ProfileScreen() {
   const { colors, mode, resolvedMode, setMode } = useAppTheme();
   const { error, isBusy, signOut, updateDisplayName, user } = useAuth();
+  const {
+    add: addFoodPreference,
+    error: foodPreferenceError,
+    isLoading: foodPreferencesLoading,
+    preferenceKeys,
+    remove: removeFoodPreference,
+  } = useFoodPreferences();
   const accountName =
     user?.displayName?.trim() ||
     user?.email?.split('@')[0]?.trim() ||
@@ -270,6 +279,120 @@ export function ProfileScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        <View
+          style={[
+            styles.preferenceSection,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}>
+          <View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Food preferences
+            </Text>
+            <Text
+              style={[styles.sectionDescription, { color: colors.textMuted }]}>
+              Dietary needs filter results. Food interests reorder suggestions
+              without hiding other choices.
+            </Text>
+          </View>
+
+          {user ? (
+            <>
+              {(['hard', 'soft'] as const).map((kind) => (
+                <View key={kind} style={styles.preferenceGroup}>
+                  <Text
+                    style={[
+                      styles.preferenceGroupLabel,
+                      { color: colors.textMuted },
+                    ]}>
+                    {kind === 'hard' ? 'DIETARY REQUIREMENTS' : 'FOOD INTERESTS'}
+                  </Text>
+                  <View style={styles.preferenceOptions}>
+                    {FOOD_PREFERENCE_CATALOGUE.filter(
+                      (preference) => preference.kind === kind,
+                    ).map((preference) => {
+                      const selected = preferenceKeys.has(preference.key);
+                      return (
+                        <Pressable
+                          accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${preference.label} preference`}
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            disabled: foodPreferencesLoading,
+                            selected,
+                          }}
+                          disabled={foodPreferencesLoading}
+                          key={preference.key}
+                          onPress={() =>
+                            void (selected
+                              ? removeFoodPreference(preference.key)
+                              : addFoodPreference(preference.key)
+                            ).catch(() => undefined)
+                          }
+                          style={({ pressed }) => [
+                            styles.preferenceOption,
+                            {
+                              backgroundColor: selected
+                                ? `${colors.accent}24`
+                                : colors.surfaceElevated,
+                              borderColor: selected
+                                ? colors.accentForeground
+                                : colors.border,
+                              opacity:
+                                foodPreferencesLoading || pressed ? 0.65 : 1,
+                            },
+                          ]}>
+                          {selected ? (
+                            <Ionicons
+                              color={colors.accentForeground}
+                              name="checkmark"
+                              size={15}
+                            />
+                          ) : null}
+                          <Text
+                            style={[
+                              styles.preferenceOptionText,
+                              {
+                                color: selected
+                                  ? colors.accentForeground
+                                  : colors.text,
+                              },
+                            ]}>
+                            {preference.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+              {foodPreferenceError ? (
+                <Text
+                  accessibilityRole="alert"
+                  style={[styles.preferenceError, { color: colors.warning }]}>
+                  {foodPreferenceError}
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <Pressable
+              accessibilityLabel="Sign in to save food preferences"
+              accessibilityRole="button"
+              onPress={() => router.push('/auth')}
+              style={[
+                styles.preferenceSignIn,
+                { backgroundColor: colors.accent },
+              ]}>
+              <Ionicons color={colors.accentText} name="log-in-outline" size={18} />
+              <Text
+                style={[
+                  styles.preferenceSignInText,
+                  { color: colors.accentText },
+                ]}>
+                Sign in to save preferences
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         <View>
@@ -515,6 +638,44 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   previewChipText: { fontFamily: fontFamily.semibold, fontSize: 12 },
+  preferenceSection: {
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 16,
+    padding: 16,
+  },
+  preferenceGroup: { gap: 8 },
+  preferenceGroupLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  preferenceOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  preferenceOption: {
+    minHeight: 42,
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  preferenceOptionText: { fontFamily: fontFamily.semibold, fontSize: 12 },
+  preferenceError: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  preferenceSignIn: {
+    minHeight: 48,
+    alignItems: 'center',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  preferenceSignInText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   sectionTitle: { fontFamily: fontFamily.semibold, fontSize: 18 },
   sectionDescription: {
     fontFamily: fontFamily.regular,

@@ -307,6 +307,45 @@ export function HomeScreen() {
           </Pressable>
         </View>
 
+        <Pressable
+          accessibilityHint="Opens a food-only assistant that matches nearby restaurants to your preferences"
+          accessibilityLabel="Ask MakanMana for food ideas"
+          accessibilityRole="button"
+          onPress={() => router.push('/assistant')}
+          style={({ pressed }) => [
+            styles.assistantCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.76 : 1,
+            },
+          ]}>
+          <View
+            style={[
+              styles.assistantIcon,
+              { backgroundColor: `${colors.accent}24` },
+            ]}>
+            <Ionicons
+              color={colors.accentForeground}
+              name="sparkles"
+              size={22}
+            />
+          </View>
+          <View style={styles.assistantCopy}>
+            <Text style={[styles.assistantTitle, { color: colors.text }]}>
+              Ask MakanMana
+            </Text>
+            <Text style={[styles.assistantSubtitle, { color: colors.textMuted }]}>
+              Tell me what you feel like eating
+            </Text>
+          </View>
+          <Ionicons
+            color={colors.accentForeground}
+            name="chevron-forward"
+            size={19}
+          />
+        </Pressable>
+
         <ScrollView
           contentContainerStyle={styles.filterRow}
           horizontal
@@ -509,6 +548,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  assistantCard: {
+    minHeight: 72,
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    marginHorizontal: 16,
+    padding: 12,
+  },
+  assistantIcon: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    borderRadius: 14,
+    justifyContent: 'center',
+  },
+  assistantCopy: { flex: 1 },
+  assistantTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  assistantSubtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
   },
   filterRow: { gap: 8, paddingHorizontal: 16 },
   notice: {

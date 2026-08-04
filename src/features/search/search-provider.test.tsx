@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import type { FoodPreferenceKey } from '@/contracts/food-preference';
 import type { PlaceDetails, PlaceSummary } from '@/contracts/place';
 import type {
   AreaBoundary,
@@ -57,6 +58,42 @@ class FakePlacesService implements PlacesService {
 
   async getPlaceDetails(_placeId: string): Promise<PlaceDetails> {
     throw new Error('Not needed');
+  }
+}
+
+const preferencePlaces: PlaceSummary[] = [
+  {
+    ...result,
+    id: 'near-malaysian',
+    name: 'Nearby Kitchen',
+    distanceMeters: 300,
+    categories: ['Malaysian'],
+  },
+  {
+    ...result,
+    id: 'far-chinese',
+    name: 'Noodle House',
+    distanceMeters: 1400,
+    categories: ['Chinese', 'Noodles'],
+    halalVerification: {
+      sourceName: 'JAKIM Halal Malaysia',
+      sourceUrl: 'https://www.halal.gov.my/v4/',
+      verifiedAt: '2026-06-01T00:00:00.000Z',
+      expiresAt: '2027-06-01T00:00:00.000Z',
+    },
+  },
+];
+
+class PreferencePlacesService extends FakePlacesService {
+  readonly searches: SearchCriteria[] = [];
+
+  override async searchNearby(criteria: SearchCriteria): Promise<SearchResults> {
+    this.searches.push(criteria);
+    return {
+      criteria,
+      places: preferencePlaces,
+      fetchedAt: '2026-08-04T00:00:00.000Z',
+    };
   }
 }
 
@@ -136,6 +173,31 @@ function AreaHarness() {
   );
 }
 
+function PreferenceHarness() {
+  const { criteria, results, search } = useSearch();
+  return (
+    <View>
+      <Text testID="preference-results">
+        {results.map((place) => place.id).join('|')}
+      </Text>
+      <Text testID="preference-area">{criteria.areaLabel}</Text>
+      <TouchableOpacity
+        accessibilityLabel="Search preference test area"
+        accessibilityRole="button"
+        onPress={() =>
+          void search({
+            ...criteria,
+            areaLabel: 'Petaling Jaya',
+            center: { latitude: 3.1073, longitude: 101.6067 },
+            query: 'noodles',
+          })
+        }>
+        <Text>Change preference area</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function LocationRaceHarness() {
   const { criteria, searchCurrentLocation, selectArea, userCoordinates } =
     useSearch();
@@ -181,6 +243,133 @@ function LocationRaceHarness() {
 }
 
 describe('SearchProvider synchronization', () => {
+  it('shares soft food interests with normal search ranking', async () => {
+    const service = new PreferencePlacesService();
+    render(
+      <SearchProvider
+        preferenceKeys={new Set<FoodPreferenceKey>(['chinese'])}
+        service={service}>
+        <PreferenceHarness />
+      </SearchProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('preference-results')).toHaveTextContent(
+        'far-chinese|near-malaysian',
+      ),
+    );
+  });
+
+  it('uses a shared hard preference as a default filter', async () => {
+    const service = new PreferencePlacesService();
+    render(
+      <SearchProvider
+        preferenceKeys={new Set<FoodPreferenceKey>(['halal-required'])}
+        service={service}>
+        <PreferenceHarness />
+      </SearchProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('preference-results')).toHaveTextContent(
+        'far-chinese',
+      ),
+    );
+    expect(service.searches[0].verifiedHalalOnly).toBe(true);
+  });
+
+  it('waits for account preferences before publishing the initial search', async () => {
+    const service = new PreferencePlacesService();
+    const tree = (preferencesReady: boolean) => (
+      <SearchProvider
+        preferenceKeys={new Set<FoodPreferenceKey>(['halal-required'])}
+        preferencesReady={preferencesReady}
+        service={service}>
+        <PreferenceHarness />
+      </SearchProvider>
+    );
+    const view = render(tree(false));
+
+    await act(async () => undefined);
+    expect(service.searches).toHaveLength(0);
+    expect(view.getByTestId('preference-results')).toHaveTextContent('');
+    fireEvent.press(
+      view.getByRole('button', { name: 'Search preference test area' }),
+    );
+    await act(async () => undefined);
+    expect(service.searches).toHaveLength(0);
+
+    view.rerender(tree(true));
+    await waitFor(() => expect(service.searches).toHaveLength(1));
+    expect(service.searches[0].verifiedHalalOnly).toBe(true);
+    expect(view.getByTestId('preference-results')).toHaveTextContent(
+      'far-chinese',
+    );
+  });
+
+  it('does not publish an in-flight search after preferences become unready', async () => {
+    let resolveSearch!: (results: SearchResults) => void;
+    const service = new PreferencePlacesService();
+    jest.spyOn(service, 'searchNearby').mockImplementation(
+      (criteria) =>
+        new Promise((resolve) => {
+          resolveSearch = resolve;
+          service.searches.push(criteria);
+        }),
+    );
+    const tree = (preferencesReady: boolean) => (
+      <SearchProvider preferencesReady={preferencesReady} service={service}>
+        <PreferenceHarness />
+      </SearchProvider>
+    );
+    const view = render(tree(true));
+    await waitFor(() => expect(service.searches).toHaveLength(1));
+
+    view.rerender(tree(false));
+    await act(async () =>
+      resolveSearch({
+        criteria: service.searches[0],
+        places: preferencePlaces,
+        fetchedAt: '2026-08-04T00:00:00.000Z',
+      }),
+    );
+
+    expect(view.getByTestId('preference-results')).toHaveTextContent('');
+  });
+
+  it('refreshes the current search instead of resetting location when preferences change', async () => {
+    const service = new PreferencePlacesService();
+    const tree = (key: FoodPreferenceKey) => (
+      <SearchProvider
+        preferenceKeys={new Set<FoodPreferenceKey>([key])}
+        service={service}>
+        <PreferenceHarness />
+      </SearchProvider>
+    );
+    const view = render(tree('chinese'));
+    await waitFor(() => expect(service.searches.length).toBeGreaterThan(0));
+
+    fireEvent.press(
+      view.getByRole('button', { name: 'Search preference test area' }),
+    );
+    await waitFor(() =>
+      expect(view.getByTestId('preference-area')).toHaveTextContent(
+        'Petaling Jaya',
+      ),
+    );
+    view.rerender(tree('indian'));
+
+    await waitFor(() =>
+      expect(service.searches.at(-1)).toMatchObject({
+        areaLabel: 'Petaling Jaya',
+        query: 'noodles',
+      }),
+    );
+    expect(view.getByTestId('preference-area')).toHaveTextContent(
+      'Petaling Jaya',
+    );
+  });
+
   it('keeps criteria and result state synchronized across consumers', async () => {
     render(
       <SearchProvider service={new FakePlacesService()}>

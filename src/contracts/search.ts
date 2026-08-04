@@ -4,6 +4,7 @@ import type {
   PlaceSummary,
   PriceLevel,
 } from '@/contracts/place';
+import type { FoodPreferenceKey } from '@/contracts/food-preference';
 
 export type SearchCriteria = {
   query?: string;
@@ -18,6 +19,7 @@ export type SearchCriteria = {
   priceLevels: PriceLevel[];
   categories: string[];
   verifiedHalalOnly: boolean;
+  explicitPreferenceKeys?: FoodPreferenceKey[];
 };
 
 export type AreaBoundaryPolygon = {

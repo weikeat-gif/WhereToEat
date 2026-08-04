@@ -205,6 +205,14 @@ describe('HomeScreen', () => {
     expect(screen.getByText('Nearby for you')).toBeTruthy();
   });
 
+  it('opens the food assistant from the home discovery flow', () => {
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByLabelText('Ask MakanMana for food ideas'));
+
+    expect(mockPush).toHaveBeenCalledWith('/assistant');
+  });
+
   it('uses the transparent icon-only brand mark', () => {
     const screen = renderScreen();
     const mark = screen.getByTestId('brand-mark');

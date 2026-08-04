@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { AppUser } from '@/contracts/auth';
+import type { FoodPreferenceKey } from '@/contracts/food-preference';
 
 import { ProfileScreen } from './profile-screen';
 
@@ -9,6 +10,17 @@ const mockSetMode = jest.fn();
 const mockPush = jest.fn();
 const mockUpdateDisplayName = jest.fn();
 const mockSignOut = jest.fn();
+const mockAddPreference = jest.fn();
+const mockRemovePreference = jest.fn();
+const mockPreferenceState = {
+  preferenceKeys: new Set<FoodPreferenceKey>(),
+  canPersist: true,
+  isLoading: false,
+  error: null as string | null,
+  add: mockAddPreference,
+  remove: mockRemovePreference,
+  rememberConfirmed: jest.fn(),
+};
 const mockAuthState = {
   user: {
     id: 'user-1',
@@ -26,6 +38,10 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/features/auth/auth-provider', () => ({
   useAuth: () => mockAuthState,
+}));
+
+jest.mock('@/features/food-preferences/food-preferences-provider', () => ({
+  useFoodPreferences: () => mockPreferenceState,
 }));
 
 jest.mock('@/theme/theme-provider', () => ({
@@ -46,6 +62,12 @@ describe('ProfileScreen', () => {
     };
     mockAuthState.error = null;
     mockAuthState.isBusy = false;
+    mockPreferenceState.preferenceKeys = new Set();
+    mockPreferenceState.canPersist = true;
+    mockPreferenceState.error = null;
+    mockPreferenceState.isLoading = false;
+    mockAddPreference.mockResolvedValue('account');
+    mockRemovePreference.mockResolvedValue('account');
     mockUpdateDisplayName.mockResolvedValue(undefined);
     mockSignOut.mockResolvedValue(undefined);
   });
@@ -108,5 +130,46 @@ describe('ProfileScreen', () => {
 
     expect(screen.getByText('Privacy notice')).toBeTruthy();
     expect(screen.getByText('Terms of use')).toBeTruthy();
+  });
+
+  it('adds and removes confirmed food preference labels separately from appearance', () => {
+    const renderProfile = () => (
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <ProfileScreen />
+      </SafeAreaProvider>
+    );
+    const screen = render(renderProfile());
+
+    expect(screen.getByText('Food preferences')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Add Chinese preference'));
+    expect(mockAddPreference).toHaveBeenCalledWith('chinese');
+
+    mockPreferenceState.preferenceKeys = new Set(['chinese']);
+    screen.rerender(renderProfile());
+    fireEvent.press(screen.getByLabelText('Remove Chinese preference'));
+    expect(mockRemovePreference).toHaveBeenCalledWith('chinese');
+  });
+
+  it('asks a guest to sign in before saving food preferences', () => {
+    mockAuthState.user = null;
+    mockPreferenceState.canPersist = false;
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <ProfileScreen />
+      </SafeAreaProvider>,
+    );
+
+    fireEvent.press(screen.getByLabelText('Sign in to save food preferences'));
+
+    expect(mockPush).toHaveBeenCalledWith('/auth');
+    expect(mockAddPreference).not.toHaveBeenCalled();
   });
 });
