@@ -171,6 +171,7 @@ async function loadBoundary(
   await waitForBoundaryRequestSlot();
   const query = new URL('https://nominatim.openstreetmap.org/search');
   query.searchParams.set('format', 'jsonv2');
+  query.searchParams.set('addressdetails', '1');
   query.searchParams.set('countrycodes', 'my');
   query.searchParams.set('limit', '5');
   query.searchParams.set('polygon_geojson', '1');

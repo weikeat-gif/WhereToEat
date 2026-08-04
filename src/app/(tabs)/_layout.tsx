@@ -52,7 +52,11 @@ export default function TabsLayout() {
           tabBarLabelStyle: { fontFamily: fontFamily.medium, fontSize: 10 },
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
+              accessibilityElementsHidden
+              aria-hidden
+              accessible={false}
               color={color}
+              importantForAccessibility="no-hide-descendants"
               name={icons[focused ? 1 : 0]}
               size={size}
             />

@@ -104,6 +104,23 @@ describe('AuthScreen', () => {
     expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
   });
 
+  it('always gives guests a visible exit from sign-in', () => {
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Close sign in' }));
+
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns direct-route guests to Profile when they close sign-in', () => {
+    mockCanGoBack.mockReturnValue(false);
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Close sign in' }));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/profile');
+  });
+
   it('returns to the previous screen when sign-in completes', async () => {
     const screen = renderScreen();
 

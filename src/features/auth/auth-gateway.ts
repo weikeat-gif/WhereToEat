@@ -15,5 +15,6 @@ export interface AuthGateway {
   requestEmailCode(email: string): Promise<void>;
   verifyEmailCode(email: string, code: string): Promise<void>;
   updateDisplayName(displayName: string): Promise<AppUser>;
+  deleteAccount(): Promise<void>;
   signOut(): Promise<void>;
 }

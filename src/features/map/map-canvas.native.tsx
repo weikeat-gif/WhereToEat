@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import MapView, {
   Marker,
   Polygon,
@@ -11,6 +11,7 @@ import MapView, {
 } from 'react-native-maps';
 
 import type { MapCanvasProps } from '@/features/map/map-canvas';
+import { clusterPlaces } from '@/features/map/map-clusters';
 import {
   boundsForMapRegion,
   radiusForMapRegion,
@@ -87,12 +88,20 @@ export function MapCanvas({
   onViewportChange,
   onMapPress,
   onPlacePress,
+  selectedPlaceId,
   showsUserLocation,
   userCoordinates,
 }: MapCanvasProps) {
   const { colors, resolvedMode } = useAppTheme();
   const mapRef = useRef<MapView>(null);
   const [mapLaidOut, setMapLaidOut] = useState(false);
+  const [visibleRegion, setVisibleRegion] = useState<Region>({
+    ...center,
+    latitudeDelta: LATITUDE_DELTA,
+    longitudeDelta: LATITUDE_DELTA,
+  });
+  const zoom = Math.log2(360 / Math.max(visibleRegion.longitudeDelta, 0.00001));
+  const clusters = useMemo(() => clusterPlaces(places, zoom), [places, zoom]);
   const lastRegionRef = useRef<Region>({
     ...center,
     latitudeDelta: 0,
@@ -173,6 +182,7 @@ export function MapCanvas({
     }
 
     lastRegionRef.current = region;
+    setVisibleRegion(region);
     onViewportChange({
       center: nextCenter,
       radiusMeters: radiusForMapRegion(region),
@@ -209,9 +219,40 @@ export function MapCanvas({
             strokeWidth={3}
           />
         ))}
-        {places.map((place) => (
-          <Marker
-            key={place.id}
+        {clusters.map((cluster) => {
+          if (cluster.places.length > 1) {
+            const selected = cluster.placeIds.includes(selectedPlaceId ?? '');
+            return (
+              <Marker
+                key={cluster.id}
+                accessibilityLabel={`${cluster.places.length} restaurants${selected ? ', including the selected restaurant' : ''}. Double tap to zoom in.`}
+                coordinate={cluster.coordinate}
+                stopPropagation
+                onPress={() =>
+                  mapRef.current?.animateToRegion(
+                    {
+                      ...cluster.coordinate,
+                      latitudeDelta: Math.max(visibleRegion.latitudeDelta / 2.5, 0.002),
+                      longitudeDelta: Math.max(visibleRegion.longitudeDelta / 2.5, 0.002),
+                    },
+                    300,
+                  )
+                }>
+                <View
+                  style={[
+                    styles.clusterMarker,
+                    selected && styles.clusterMarkerSelected,
+                  ]}>
+                  <Text style={styles.clusterCount}>{cluster.places.length}</Text>
+                </View>
+              </Marker>
+            );
+          }
+          const place = cluster.places[0];
+          const selected = place.id === selectedPlaceId;
+          return (
+            <Marker
+            key={`${place.id}-${selected ? 'selected' : 'default'}`}
             accessibilityLabel={i18n.t('mapPinAccessibility', {
               name: place.name,
               distance: Math.round(place.distanceMeters),
@@ -219,10 +260,11 @@ export function MapCanvas({
             coordinate={place.coordinates}
             description={place.subtitle}
             onPress={() => onPlacePress(place.id)}
+            stopPropagation
             title={place.name}
             tracksViewChanges={false}>
-            <View style={styles.marker}>
-              <View style={styles.markerHead}>
+            <View style={[styles.marker, selected && styles.markerSelected]}>
+              <View style={[styles.markerHead, selected && styles.markerHeadSelected]}>
                 <View style={styles.markerCore}>
                   <Ionicons color="#171C1B" name="restaurant" size={16} />
                 </View>
@@ -230,7 +272,8 @@ export function MapCanvas({
               <View style={styles.markerTail} />
             </View>
           </Marker>
-        ))}
+          );
+        })}
       </MapView>
     </View>
   );
@@ -242,6 +285,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   marker: { height: 52, width: 40 },
+  markerSelected: { transform: [{ scale: 1.16 }] },
   markerHead: {
     alignItems: 'center',
     backgroundColor: '#E64B3C',
@@ -252,6 +296,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
+  markerHeadSelected: { borderColor: '#C6FF00', borderWidth: 4 },
+  clusterMarker: {
+    alignItems: 'center',
+    backgroundColor: '#C6FF00',
+    borderColor: '#171C1B',
+    borderRadius: 24,
+    borderWidth: 3,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  clusterCount: { color: '#171C1B', fontSize: 15, fontWeight: '700' },
+  clusterMarkerSelected: { borderColor: '#E64B3C', borderWidth: 5 },
   markerCore: {
     alignItems: 'center',
     backgroundColor: '#C6FF00',

@@ -27,6 +27,7 @@ export function ActionButton({
 }: ActionButtonProps) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       onPress={onPress}
       testID={testID}
@@ -48,7 +49,14 @@ export function ActionButton({
                 : 'rgba(255,255,255,0.10)',
           },
         ]}>
-        <Ionicons color={color} name={icon} size={19} />
+        <Ionicons
+          accessibilityElementsHidden
+          accessible={false}
+          color={color}
+          importantForAccessibility="no-hide-descendants"
+          name={icon}
+          size={19}
+        />
       </View>
       <Text style={[styles.label, { color }]}>{label}</Text>
       {trailing ? <View style={styles.trailing}>{trailing}</View> : null}

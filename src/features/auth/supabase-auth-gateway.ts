@@ -152,16 +152,31 @@ export class SupabaseAuthGateway implements AuthGateway {
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
     });
-    if (!credential.identityToken) {
-      throw new Error('Apple did not return an identity token.');
+    if (!credential.identityToken || !credential.authorizationCode) {
+      throw new Error('Apple did not return the credentials needed to sign in.');
     }
 
-    const { error } = await client.auth.signInWithIdToken({
+    const { data, error } = await client.auth.signInWithIdToken({
       provider: 'apple',
       token: credential.identityToken,
       nonce: nonce.raw,
     });
     throwIfError(error);
+    const accessToken = data.session?.access_token;
+    if (!accessToken) throw new Error('Apple sign-in did not create a session.');
+    const { error: credentialError } = await client.functions.invoke(
+      'apple-credential',
+      {
+        body: { authorizationCode: credential.authorizationCode },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    if (credentialError) {
+      await client.auth.signOut({ scope: 'local' });
+      throw new Error(
+        'Apple sign-in could not be prepared for secure account deletion. Please try again.',
+      );
+    }
   }
 
   async requestEmailCode(email: string): Promise<void> {
@@ -204,6 +219,29 @@ export class SupabaseAuthGateway implements AuthGateway {
       throw new Error('Unable to update your account name. Please try again.');
     }
     return toAppUser(data.user);
+  }
+
+  async deleteAccount(): Promise<void> {
+    const client = requireClient();
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+    throwIfError(sessionError);
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken || sessionData.session?.user.is_anonymous) {
+      throw new Error('Sign in to delete your account.');
+    }
+    const { error } = await client.functions.invoke('delete-account', {
+      body: {},
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const response = (error as { context?: Response } | null)?.context;
+    if (response?.status === 403) {
+      throw new Error(
+        'For your security, sign out and sign in again before deleting your account.',
+      );
+    }
+    throwIfError(error);
+    await client.auth.signOut({ scope: 'local' });
   }
 
   async signOut(): Promise<void> {

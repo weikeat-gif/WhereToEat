@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoogleMapsAttribution } from '@/components/google-maps-attribution';
 import { CompactPlaceRow } from '@/components/ui/compact-place-row';
-import type { PriceLevel } from '@/contracts/place';
+import type { PlaceSummary, PriceLevel } from '@/contracts/place';
 import type { AreaSuggestion } from '@/contracts/search';
 import { isCoordinateWithinAreaBoundary } from '@/features/map/area-boundary';
 import { MapCanvas } from '@/features/map/map-canvas';
@@ -30,6 +30,10 @@ import {
 } from '@/features/map/map-viewport';
 import { DISCOVERY_PLACES } from '@/features/home/discovery-data';
 import { useSearch } from '@/features/search/search-provider';
+import {
+  activeSearchFilters,
+  type ActiveSearchFilter,
+} from '@/features/search/search-filter-state';
 import { i18n } from '@/i18n';
 import { useAppTheme } from '@/theme/theme-provider';
 import { fontFamily, radius, spacing } from '@/theme/tokens';
@@ -62,6 +66,7 @@ export function MapScreen() {
   const { colors } = useAppTheme();
   const {
     autocompleteArea,
+    clearFiltersAndSearch,
     clearRecentAreas,
     criteria,
     error,
@@ -98,17 +103,17 @@ export function MapScreen() {
     radiusMeters: criteria.radiusMeters,
   }));
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+  const locationPromptAcknowledged = useRef(false);
   const [viewMode, setViewMode] = useState<MapViewMode>('split');
   const [pendingMapSearch, setPendingMapSearch] =
     useState<MapViewport | null>(null);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const resultsListRef = useRef<FlatList<PlaceSummary>>(null);
   const mapFocused = viewMode === 'map';
   const listFocused = viewMode === 'list';
-  const activeFilterCount =
-    Number(criteria.openNow) +
-    Number(criteria.verifiedHalalOnly) +
-    Number(criteria.priceLevels.length > 0) +
-    Number(criteria.categories.length > 0) +
-    Number(criteria.radiusMeters !== DEFAULT_RADIUS_METERS);
+  const activeFilters = useMemo(() => activeSearchFilters(criteria), [criteria]);
+  const activeFilterCount = activeFilters.length;
   const keepQueryOpen = () => {
     if (queryBlurTimer.current) clearTimeout(queryBlurTimer.current);
     queryBlurTimer.current = null;
@@ -164,11 +169,26 @@ export function MapScreen() {
     router.push({ pathname: '/place/[id]', params: { id: placeId } });
   };
 
+  const selectPlace = (placeId: string) => {
+    setSelectedPlaceId(placeId);
+    setViewMode('split');
+    const index = visibleResults.findIndex((place) => place.id === placeId);
+    if (index >= 0) {
+      setTimeout(() => {
+        resultsListRef.current?.scrollToIndex({ animated: true, index, viewPosition: 0.3 });
+      }, 0);
+    }
+  };
+
   const handleCurrentLocation = async () => {
     setSettingsError(null);
     setQueryFocused(false);
     setFiltersOpen(false);
     if (locationCanAskAgain !== false) {
+      if (locationStatus !== 'granted' && !locationPromptAcknowledged.current) {
+        setLocationPromptOpen(true);
+        return;
+      }
       await searchCurrentLocation();
       setViewMode('map');
       return;
@@ -180,6 +200,19 @@ export function MapScreen() {
         i18n.t('mapSettingsError'),
       );
     }
+  };
+
+  const confirmCurrentLocation = async () => {
+    locationPromptAcknowledged.current = true;
+    setLocationPromptOpen(false);
+    await searchCurrentLocation();
+    setViewMode('map');
+  };
+
+  const continueWithManualSearch = () => {
+    locationPromptAcknowledged.current = true;
+    setLocationPromptOpen(false);
+    setQueryFocused(true);
   };
 
   useEffect(() => {
@@ -279,6 +312,42 @@ export function MapScreen() {
     });
   };
 
+  const clearAllFilters = () => {
+    setQueryInput('');
+    setQueryFocused(false);
+    setFiltersOpen(false);
+    resetDraftFilters();
+    void clearFiltersAndSearch();
+  };
+
+  const removeActiveFilter = (filter: ActiveSearchFilter) => {
+    if (filter.key === 'query') setQueryInput('');
+    const keysToRemove =
+      filter.key === 'open-now'
+        ? new Set(['open-now'])
+        : filter.key === 'verified-halal'
+          ? new Set(['halal-required'])
+            : filter.key === 'category'
+            ? new Set(
+                criteria.categories.map((category) =>
+                  category.toLocaleLowerCase() === 'cafe'
+                    ? 'cafe-dessert'
+                    : category.toLocaleLowerCase(),
+                ),
+              )
+            : undefined;
+    void updateCriteriaAndSearch({
+      ...filter.changes,
+      ...(keysToRemove
+        ? {
+            explicitPreferenceKeys: criteria.explicitPreferenceKeys?.filter(
+              (key) => !keysToRemove.has(key),
+            ),
+          }
+        : {}),
+    });
+  };
+
   const toggleDraftPrice = (price: PriceLevel) => {
     setDraftFilters((current) => ({
       ...current,
@@ -344,7 +413,10 @@ export function MapScreen() {
           <Text style={[styles.resultTitle, { color: colors.text }]}>
             {i18n.t('mapResultsTitle')}
           </Text>
-          <Text style={{ color: colors.textMuted }}>
+          <Text
+            accessibilityLiveRegion="polite"
+            accessibilityRole="text"
+            style={{ color: colors.textMuted }}>
             {i18n.t('mapResultCount', {
               count: visibleResults.length,
               spotLabel:
@@ -445,8 +517,9 @@ export function MapScreen() {
               setFiltersOpen(false);
               setViewMode('map');
             }}
-            onPlacePress={openPlace}
+            onPlacePress={selectPlace}
             places={visibleResults}
+            selectedPlaceId={selectedPlaceId}
             showsUserLocation={locationStatus === 'granted'}
             userCoordinates={userCoordinates}
           />
@@ -509,9 +582,17 @@ export function MapScreen() {
             },
           ]}>
           <View style={styles.queryRow}>
-            <Ionicons color={colors.textMuted} name="search" size={22} />
+            <Ionicons
+              accessibilityElementsHidden
+              accessible={false}
+              color={colors.textMuted}
+              importantForAccessibility="no-hide-descendants"
+              name="search"
+              size={22}
+            />
             <TextInput
               accessibilityLabel={i18n.t('mapQueryAccessibility')}
+              accessibilityState={{ expanded: queryFocused }}
               maxLength={120}
               onChangeText={setQueryInput}
               onFocus={() => {
@@ -535,7 +616,14 @@ export function MapScreen() {
                 styles.submitButton,
                 { backgroundColor: colors.surfaceElevated },
               ]}>
-              <Ionicons color={colors.text} name="options-outline" size={20} />
+              <Ionicons
+                accessibilityElementsHidden
+                accessible={false}
+                color={colors.text}
+                importantForAccessibility="no-hide-descendants"
+                name="options-outline"
+                size={20}
+              />
               {activeFilterCount > 0 ? (
                 <View
                   style={[
@@ -567,6 +655,8 @@ export function MapScreen() {
                 },
               ]}>
               <Ionicons
+                accessibilityElementsHidden
+                accessible={false}
                 color={
                   locationStatus === 'granted'
                     ? colors.accentForeground
@@ -581,8 +671,104 @@ export function MapScreen() {
               />
             </TouchableOpacity>
           </View>
+          {activeFilters.length > 0 && !filtersOpen ? (
+            <View style={styles.activeFiltersRow}>
+              <ScrollView
+                accessibilityLabel="Active search filters"
+                contentContainerStyle={styles.activeFiltersContent}
+                horizontal
+                showsHorizontalScrollIndicator={false}>
+                {activeFilters.map((filter) => (
+                  <Pressable
+                    accessibilityLabel={`Remove ${filter.label} filter`}
+                    accessibilityRole="button"
+                    key={`${filter.key}:${filter.explicitPreferenceKey ?? filter.label}`}
+                    onPress={() => removeActiveFilter(filter)}
+                    style={[
+                      styles.activeFilterChip,
+                      { backgroundColor: `${colors.accent}20`, borderColor: colors.accentForeground },
+                    ]}>
+                    <Text style={[styles.activeFilterText, { color: colors.accentForeground }]}>
+                      {filter.label}
+                    </Text>
+                    <Ionicons
+                      accessibilityElementsHidden
+                      accessible={false}
+                      color={colors.accentForeground}
+                      importantForAccessibility="no-hide-descendants"
+                      name="close"
+                      size={16}
+                    />
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable
+                accessibilityLabel="Clear all search filters"
+                accessibilityRole="button"
+                onPress={clearAllFilters}
+                style={styles.clearAllFilters}>
+                <Text style={[styles.clearAllFiltersText, { color: colors.accentForeground }]}>
+                  Clear all
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {locationPromptOpen ? (
+            <View
+              accessibilityLabel="Location permission explanation"
+              accessibilityLiveRegion="polite"
+              accessibilityViewIsModal
+              style={[
+                styles.locationPrompt,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}>
+              <Text style={[styles.locationPromptTitle, { color: colors.text }]}>
+                Find food near you
+              </Text>
+              <Text style={[styles.locationPromptBody, { color: colors.textMuted }]}>
+                Use your location to rank nearby restaurants. You can still
+                search by area without sharing it.
+              </Text>
+              <View style={styles.locationPromptActions}>
+                <Pressable
+                  accessibilityLabel="Continue with location"
+                  accessibilityRole="button"
+                  onPress={() => void confirmCurrentLocation()}
+                  style={[
+                    styles.locationPromptPrimary,
+                    { backgroundColor: colors.accent },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.locationPromptActionText,
+                      { color: colors.accentText },
+                    ]}>
+                    Continue
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Search by area instead"
+                  accessibilityRole="button"
+                  onPress={continueWithManualSearch}
+                  style={[
+                    styles.locationPromptSecondary,
+                    { borderColor: colors.border },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.locationPromptActionText,
+                      { color: colors.text },
+                    ]}>
+                    Search by area
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
           {filtersOpen ? (
             <View
+              accessibilityLabel="Search filters"
+              accessibilityViewIsModal
               testID="filter-panel"
               style={[styles.filterPanel, { borderColor: colors.border }]}>
               <View style={styles.filterPanelHeader}>
@@ -597,7 +783,7 @@ export function MapScreen() {
                 <TouchableOpacity
                   accessibilityLabel={i18n.t('mapResetFilters')}
                   accessibilityRole="button"
-                  onPress={resetDraftFilters}>
+                  onPress={clearAllFilters}>
                   <Text style={[styles.resetFilters, { color: colors.accentForeground }]}>
                     {i18n.t('mapReset')}
                   </Text>
@@ -828,12 +1014,19 @@ export function MapScreen() {
             <Ionicons color={colors.textMuted} name="chevron-down" size={18} />
           </Pressable>
           <FlatList
+            ref={resultsListRef}
             contentContainerStyle={styles.resultsContent}
             data={visibleResults}
             ItemSeparatorComponent={() => <View style={styles.resultGap} />}
             keyboardShouldPersistTaps="handled"
             keyExtractor={(place) => place.id}
             onScrollBeginDrag={() => setViewMode('list')}
+            onScrollToIndexFailed={({ averageItemLength, index }) => {
+              resultsListRef.current?.scrollToOffset({
+                animated: true,
+                offset: averageItemLength * index,
+              });
+            }}
             ListFooterComponent={
               <View style={styles.attribution}>
                 <GoogleMapsAttribution />
@@ -848,17 +1041,41 @@ export function MapScreen() {
                 setViewMode('list');
               }
             }}
-            renderItem={({ item }) => (
-              <CompactPlaceRow
-                image={
-                  DISCOVERY_PLACES.find(
-                    (candidate) => candidate.id === item.id,
-                  )?.image
-                }
-                place={item}
-                onPress={() => openPlace(item.id)}
-              />
-            )}
+            renderItem={({ item }) => {
+              const selected = item.id === selectedPlaceId;
+              return (
+                <View
+                  style={[
+                    styles.resultSelection,
+                    selected && {
+                      backgroundColor: `${colors.accent}16`,
+                      borderColor: colors.accentForeground,
+                    },
+                  ]}>
+                  <CompactPlaceRow
+                    accessibilityHint="Selects this restaurant on the map. Use View details to open it."
+                    image={
+                      DISCOVERY_PLACES.find(
+                        (candidate) => candidate.id === item.id,
+                      )?.image
+                    }
+                    place={item}
+                    onPress={() => selectPlace(item.id)}
+                  />
+                  {selected ? (
+                    <Pressable
+                      accessibilityLabel={`View details for ${item.name}`}
+                      accessibilityRole="button"
+                      onPress={() => openPlace(item.id)}
+                      style={[styles.viewDetailsButton, { backgroundColor: colors.accent }]}>
+                      <Text style={[styles.viewDetailsText, { color: colors.accentText }]}>
+                        View details
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            }}
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
           />
@@ -1052,6 +1269,29 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingLeft: 8,
   },
+  activeFiltersRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingTop: spacing.xs,
+  },
+  activeFiltersContent: { gap: spacing.xs, paddingRight: spacing.xs },
+  activeFilterChip: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+  },
+  activeFilterText: { fontFamily: fontFamily.semibold, fontSize: 12 },
+  clearAllFilters: {
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+  },
+  clearAllFiltersText: { fontFamily: fontFamily.semibold, fontSize: 12 },
   queryInput: {
     flex: 1,
     fontFamily: fontFamily.regular,
@@ -1233,9 +1473,56 @@ const styles = StyleSheet.create({
   },
   recoveryButton: { justifyContent: 'center', minHeight: 44 },
   state: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  locationPrompt: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+  },
+  locationPromptTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  locationPromptBody: { fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 19 },
+  locationPromptActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  locationPromptPrimary: {
+    minHeight: 44,
+    borderRadius: radius.md,
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  locationPromptSecondary: {
+    minHeight: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  locationPromptActionText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 13,
+    textAlign: 'center',
+  },
   surpriseCard: { borderRadius: radius.md, gap: spacing.xs, padding: spacing.md },
   cardName: { fontFamily: fontFamily.semibold, fontSize: 17 },
   resultGap: { height: spacing.md },
+  resultSelection: {
+    borderColor: 'transparent',
+    borderRadius: radius.lg,
+    borderWidth: 2,
+    gap: spacing.xs,
+    overflow: 'hidden',
+    padding: 2,
+  },
+  viewDetailsButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    borderRadius: radius.pill,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+  },
+  viewDetailsText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   attribution: { paddingTop: spacing.md },
   nearbyDock: {
     alignItems: 'center',

@@ -14,3 +14,9 @@ verify_enabled = true
 
 [functions.places]
 verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.apple-credential]
+verify_jwt = true

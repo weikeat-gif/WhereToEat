@@ -54,11 +54,21 @@ export function AuthScreen() {
     void operation().catch(() => undefined);
   }
 
+  function closeSignIn() {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(tabs)/profile');
+  }
+
   if (isLoading) {
     return (
       <ScreenPlaceholder
+        closeLabel="Close sign in"
         title="Sign in"
-        description="Restoring your account…">
+        description="Restoring your account…"
+        onClose={closeSignIn}>
         <ActivityIndicator color={colors.accentForeground} />
       </ScreenPlaceholder>
     );
@@ -67,8 +77,10 @@ export function AuthScreen() {
   if (user) {
     return (
       <ScreenPlaceholder
+        closeLabel="Close sign in"
         title="You’re signed in"
-        description={user.email ?? user.displayName ?? 'Your MakanMana account'}>
+        description={user.email ?? user.displayName ?? 'Your MakanMana account'}
+        onClose={closeSignIn}>
         <AuthButton
           label="Sign out"
           disabled={isBusy}
@@ -81,8 +93,10 @@ export function AuthScreen() {
 
   return (
     <ScreenPlaceholder
+      closeLabel="Close sign in"
       title="Sign in"
-      description="Save restaurants and sync them across your devices. You can keep browsing as a guest.">
+      description="Save restaurants and sync them across your devices. You can keep browsing as a guest."
+      onClose={closeSignIn}>
       <View style={styles.stack}>
         {backendMode === 'mock' ? (
           <Text style={[styles.notice, { color: colors.warning }]}>
@@ -241,6 +255,7 @@ function AuthButton({
   const { colors } = useAppTheme();
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
@@ -253,7 +268,10 @@ function AuthButton({
       ]}>
       {icon ? (
         <Ionicons
+          accessibilityElementsHidden
+          accessible={false}
           color={disabled ? colors.textMuted : colors.accentText}
+          importantForAccessibility="no-hide-descendants"
           name={icon}
           size={20}
         />

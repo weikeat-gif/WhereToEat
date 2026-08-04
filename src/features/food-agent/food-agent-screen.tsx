@@ -66,6 +66,7 @@ export function FoodAgentScreen() {
   );
   const [pending, setPending] = useState<FoodPreferences | null>(null);
   const [recommendations, setRecommendations] = useState<PlaceSummary[]>([]);
+  const [showRecovery, setShowRecovery] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isRemembering, setIsRemembering] = useState(false);
   const [memoryMessage, setMemoryMessage] = useState<string | null>(null);
@@ -97,6 +98,7 @@ export function FoodAgentScreen() {
     setMemoryMessage(null);
     const request = understandFoodRequest(requestText);
     setRecommendations([]);
+    setShowRecovery(false);
     if (request.kind === 'out-of-scope') {
       setMessage(request.message);
       setPending(null);
@@ -118,11 +120,21 @@ export function FoodAgentScreen() {
     interpretRequest(prompt);
   }
 
-  async function confirmSearch() {
-    if (!pending || isSearching) return;
+  function leaveAssistant() {
+    interactionVersion.current += 1;
+    setPending(null);
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(tabs)/map');
+  }
+
+  async function runConfirmedSearch(confirmed: FoodPreferences) {
+    if (isSearching) return;
     const requestVersion = ++interactionVersion.current;
     setIsSearching(true);
-    const confirmed = pending;
+    setShowRecovery(false);
     let result;
     try {
       result = await search(applyFoodPreferences(criteria, confirmed));
@@ -140,11 +152,29 @@ export function FoodAgentScreen() {
     }
     const topMatches = result.places.slice(0, 3);
     setRecommendations(topMatches);
+    setShowRecovery(topMatches.length === 0);
     setMessage(
       topMatches.length > 0
         ? `Here are ${topMatches.length} nearby matches and why they fit.`
         : 'No nearby place matches all of those preferences yet. Try a wider distance or fewer filters.',
     );
+  }
+
+  async function confirmSearch() {
+    if (!pending) return;
+    await runConfirmedSearch(pending);
+  }
+
+  function recoverWith(changes: Partial<FoodPreferences>) {
+    if (!pending) return;
+    const recovered = { ...pending, ...changes };
+    setPending(recovered);
+    void runConfirmedSearch(recovered);
+  }
+
+  function increaseDistance() {
+    const currentRadius = pending?.radiusMeters ?? criteria.radiusMeters;
+    recoverWith({ radiusMeters: Math.min(Math.max(currentRadius * 2, 5000), 50_000) });
   }
 
   async function rememberPreferences() {
@@ -173,12 +203,20 @@ export function FoodAgentScreen() {
         style={styles.flex}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Pressable
-            accessibilityLabel="Go back"
+            accessibilityLabel="Back to food search"
             accessibilityRole="button"
             hitSlop={10}
-            onPress={() => router.back()}
+            onPress={leaveAssistant}
             style={styles.headerButton}>
-            <Ionicons color={colors.text} name="chevron-back" size={25} />
+            <Ionicons
+              accessibilityElementsHidden
+              accessible={false}
+              color={colors.text}
+              importantForAccessibility="no-hide-descendants"
+              name="chevron-back"
+              size={19}
+            />
+            <Text style={[styles.headerButtonText, { color: colors.text }]}>Back</Text>
           </Pressable>
           <View style={styles.headerCopy}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -192,7 +230,10 @@ export function FoodAgentScreen() {
             accessibilityLabel="Food assistant"
             style={[styles.botMark, { backgroundColor: `${colors.accent}24` }]}>
             <Ionicons
+              accessibilityElementsHidden
+              accessible={false}
               color={colors.accentForeground}
+              importantForAccessibility="no-hide-descendants"
               name="sparkles"
               size={20}
             />
@@ -391,6 +432,33 @@ export function FoodAgentScreen() {
             </View>
           ) : null}
 
+          {showRecovery && pending ? (
+            <View
+              accessibilityLabel="No-result recovery options"
+              accessibilityLiveRegion="polite"
+              style={[
+                styles.recoveryCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}>
+              <Text style={[styles.recoveryTitle, { color: colors.text }]}>Try another safe search</Text>
+              <Text style={[styles.recoveryHint, { color: colors.textMuted }]}>Your dietary requirements stay active unless you explicitly change them.</Text>
+              <RecoveryAction label="Increase search distance" onPress={increaseDistance} />
+              {pending.openNow ? (
+                <RecoveryAction
+                  label="Remove open-now filter"
+                  onPress={() => recoverWith({ openNow: false })}
+                />
+              ) : null}
+              <RecoveryAction
+                label="Edit preferences"
+                onPress={() => {
+                  setShowRecovery(false);
+                  setMessage('Adjust the confirmed preferences above, or tell me what to change.');
+                }}
+              />
+            </View>
+          ) : null}
+
           <Text style={[styles.privacyNote, { color: colors.textMuted }]}>
             Chat preferences are not remembered unless you confirm using the
             save button.
@@ -444,6 +512,22 @@ export function FoodAgentScreen() {
   );
 }
 
+function RecoveryAction({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors } = useAppTheme();
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.recoveryAction,
+        { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+      ]}>
+      <Text style={[styles.recoveryActionText, { color: colors.accentForeground }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { flex: 1 },
@@ -456,11 +540,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   headerButton: {
-    width: 44,
+    minWidth: 72,
     height: 44,
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
     justifyContent: 'center',
   },
+  headerButtonText: { fontFamily: fontFamily.medium, fontSize: 14 },
   headerCopy: { flex: 1 },
   headerTitle: { fontFamily: fontFamily.bold, fontSize: 18 },
   headerSubtitle: {
@@ -538,6 +625,17 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   results: { gap: 9 },
+  recoveryCard: { borderRadius: 18, borderWidth: 1, gap: 9, padding: 15 },
+  recoveryTitle: { fontFamily: fontFamily.semibold, fontSize: 15 },
+  recoveryHint: { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 18 },
+  recoveryAction: {
+    minHeight: 44,
+    borderRadius: 13,
+    borderWidth: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 13,
+  },
+  recoveryActionText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   resultCard: {
     minHeight: 72,
     alignItems: 'center',

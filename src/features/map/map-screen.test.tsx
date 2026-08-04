@@ -26,6 +26,9 @@ jest.mock('@/features/map/map-canvas', () => {
     MapCanvas: ({
       onViewportChange,
       onMapPress,
+      onPlacePress,
+      places,
+      selectedPlaceId,
       showsUserLocation,
       userCoordinates,
     }: {
@@ -41,6 +44,9 @@ jest.mock('@/features/map/map-canvas', () => {
         source: 'gesture' | 'programmatic',
       ) => void;
       onMapPress: () => void;
+      onPlacePress: (placeId: string) => void;
+      places: PlaceSummary[];
+      selectedPlaceId?: string | null;
       showsUserLocation: boolean;
       userCoordinates?: { latitude: number; longitude: number } | null;
     }) => (
@@ -54,6 +60,15 @@ jest.mock('@/features/map/map-canvas', () => {
           accessibilityLabel="Focus map test control"
           onPress={onMapPress}
         />
+        {places[0] ? (
+          <TouchableOpacity
+            accessibilityLabel={`Select ${places[0].name} map marker`}
+            onPress={() => onPlacePress(places[0].id)}
+          />
+        ) : null}
+        {selectedPlaceId ? (
+          <View accessibilityLabel={`Selected marker ${selectedPlaceId}`} />
+        ) : null}
         <TouchableOpacity
           accessibilityLabel="Pan map test control"
           onPress={() =>
@@ -112,6 +127,7 @@ const trustedPlace: PlaceSummary = {
 function searchState(overrides: Record<string, unknown> = {}) {
   return {
     autocompleteArea: jest.fn().mockResolvedValue([]),
+    clearFiltersAndSearch: jest.fn(),
     clearRecentAreas: jest.fn(),
     criteria: {
       center: { latitude: 3.139, longitude: 101.6869 },
@@ -243,12 +259,63 @@ describe('MapScreen states', () => {
     render(<MapScreen />);
 
     fireEvent.press(screen.getByText('Trusted Place'));
+    fireEvent.press(
+      screen.getByRole('button', { name: 'View details for Trusted Place' }),
+    );
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/place/[id]',
       params: { id: 'trusted-place' },
     });
     expect(screen.getByLabelText('Use my current location')).toBeTruthy();
+  });
+
+  it('keeps visible chips, badge count, reset, and shared criteria synchronized', () => {
+    const clearFiltersAndSearch = jest.fn();
+    const updateCriteriaAndSearch = jest.fn();
+    const state = searchState({ clearFiltersAndSearch, updateCriteriaAndSearch });
+    mockUseSearch.mockReturnValue({
+      ...state,
+      criteria: {
+        ...state.criteria,
+        query: 'noodles',
+        categories: ['Chinese'],
+        explicitPreferenceKeys: ['chinese', 'open-now'],
+        radiusMeters: 5000,
+      },
+    });
+    render(<MapScreen />);
+
+    expect(screen.getByText('Search: noodles')).toBeTruthy();
+    expect(screen.getByText('Open now')).toBeTruthy();
+    expect(screen.getByText('Budget, Moderate')).toBeTruthy();
+    expect(screen.getByText('Chinese')).toBeTruthy();
+    expect(screen.getByText('Within 5 km')).toBeTruthy();
+    expect(screen.getByText('5')).toBeTruthy();
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Remove Within 5 km filter' }),
+    );
+    expect(updateCriteriaAndSearch).toHaveBeenCalledWith({ radiusMeters: 3000 });
+
+    fireEvent.press(screen.getByRole('button', { name: 'Clear all search filters' }));
+    expect(clearFiltersAndSearch).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Open search filters' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Reset all search filters' }));
+    expect(clearFiltersAndSearch).toHaveBeenCalledTimes(2);
+  });
+
+  it('synchronizes a selected map marker with the matching list result', () => {
+    render(<MapScreen />);
+
+    fireEvent.press(screen.getByLabelText('Select Trusted Place map marker'));
+
+    expect(screen.getByLabelText('Selected marker trusted-place')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'View details for Trusted Place' }),
+    ).toBeTruthy();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('searches the restaurant or cuisine query shown in criteria', () => {
@@ -612,7 +679,7 @@ describe('MapScreen states', () => {
     expect(screen.getByText('1 spot around George Town, Penang')).toBeTruthy();
   });
 
-  it('requests GPS and nearby food from the in-app map', () => {
+  it('explains location use before requesting GPS and nearby food', async () => {
     const searchCurrentLocation = jest.fn();
     mockUseSearch.mockReturnValue(searchState({ searchCurrentLocation }));
 
@@ -622,7 +689,45 @@ describe('MapScreen states', () => {
       screen.getByRole('button', { name: 'Use my current location' }),
     );
 
+    expect(searchCurrentLocation).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        'Use your location to rank nearby restaurants. You can still search by area without sharing it.',
+      ),
+    ).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Continue with location' }));
+      await Promise.resolve();
+    });
+
     expect(searchCurrentLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets users decline location and continue with manual area search', () => {
+    const searchCurrentLocation = jest.fn();
+    mockUseSearch.mockReturnValue(searchState({ searchCurrentLocation }));
+    render(<MapScreen />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Use my current location' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Search by area instead' }));
+
+    expect(searchCurrentLocation).not.toHaveBeenCalled();
+    expect(
+      screen.getByLabelText('Search restaurants, cuisines, or locations'),
+    ).toHaveProp('accessibilityState', { expanded: true });
+  });
+
+  it('keeps the location explanation visible while the map is focused', () => {
+    mockUseSearch.mockReturnValue(searchState());
+    render(<MapScreen />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Focus map view' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Use my current location' }));
+
+    expect(screen.queryByTestId('results-pane')).toBeNull();
+    expect(
+      screen.getByLabelText('Location permission explanation'),
+    ).toBeTruthy();
   });
 
   it('opens app settings after location permission is permanently denied', () => {

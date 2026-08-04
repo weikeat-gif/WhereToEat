@@ -47,7 +47,8 @@ const MODES: ModeOption[] = [
 
 export function ProfileScreen() {
   const { colors, mode, resolvedMode, setMode } = useAppTheme();
-  const { error, isBusy, signOut, updateDisplayName, user } = useAuth();
+  const { deleteAccount, error, isBusy, signOut, updateDisplayName, user } =
+    useAuth();
   const {
     add: addFoodPreference,
     error: foodPreferenceError,
@@ -60,6 +61,7 @@ export function ProfileScreen() {
     user?.email?.split('@')[0]?.trim() ||
     'MakanMana diner';
   const [editingName, setEditingName] = useState(false);
+  const [confirmingDeletion, setConfirmingDeletion] = useState(false);
   const [nameDraft, setNameDraft] = useState(accountName);
   const normalizedNameDraft = nameDraft.replace(/\s+/g, ' ').trim();
   const validName =
@@ -68,6 +70,7 @@ export function ProfileScreen() {
   useEffect(() => {
     setNameDraft(accountName);
     setEditingName(false);
+    setConfirmingDeletion(false);
   }, [accountName, user?.id]);
 
   async function saveDisplayName() {
@@ -225,23 +228,94 @@ export function ProfileScreen() {
           ) : null}
 
           {user ? (
-            <Pressable
-              accessibilityLabel="Sign out"
-              accessibilityRole="button"
-              disabled={isBusy}
-              onPress={() => void signOut().catch(() => undefined)}
-              style={({ pressed }) => [
-                styles.signOutButton,
-                {
-                  borderColor: colors.border,
-                  opacity: isBusy ? 0.5 : pressed ? 0.72 : 1,
-                },
-              ]}>
-              <Ionicons color={colors.textMuted} name="log-out-outline" size={18} />
-              <Text style={[styles.signOutText, { color: colors.textMuted }]}>
-                Sign out
-              </Text>
-            </Pressable>
+            <View style={styles.accountActions}>
+              <Pressable
+                accessibilityLabel="Sign out"
+                accessibilityRole="button"
+                disabled={isBusy}
+                onPress={() => void signOut().catch(() => undefined)}
+                style={({ pressed }) => [
+                  styles.signOutButton,
+                  {
+                    borderColor: colors.border,
+                    opacity: isBusy ? 0.5 : pressed ? 0.72 : 1,
+                  },
+                ]}>
+                <Ionicons
+                  accessibilityElementsHidden
+                  accessible={false}
+                  color={colors.textMuted}
+                  importantForAccessibility="no-hide-descendants"
+                  name="log-out-outline"
+                  size={18}
+                />
+                <Text style={[styles.signOutText, { color: colors.textMuted }]}>
+                  Sign out
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Delete account and data"
+                accessibilityRole="button"
+                disabled={isBusy}
+                onPress={() => setConfirmingDeletion(true)}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  {
+                    borderColor: colors.warning,
+                    opacity: isBusy ? 0.5 : pressed ? 0.72 : 1,
+                  },
+                ]}>
+                <Text style={[styles.deleteButtonText, { color: colors.warning }]}>
+                  Delete account and data
+                </Text>
+              </Pressable>
+              {confirmingDeletion ? (
+                <View
+                  accessibilityLabel="Account deletion confirmation"
+                  accessibilityLiveRegion="polite"
+                  accessibilityViewIsModal
+                  style={[
+                    styles.deleteConfirmation,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.warning },
+                  ]}>
+                  <Text style={[styles.deleteTitle, { color: colors.text }]}>
+                    Permanently delete your account?
+                  </Text>
+                  <Text style={[styles.deleteDescription, { color: colors.textMuted }]}>
+                    This permanently deletes your account, saved restaurants,
+                    food preferences, local area history, and other account data.
+                    This cannot be undone. If automatic Sign in with Apple
+                    revocation is unavailable, deletion still completes; remove
+                    MakanMana in Apple ID Sign-In &amp; Security settings.
+                  </Text>
+                  <View style={styles.nameActions}>
+                    <Pressable
+                      accessibilityLabel="Keep my account"
+                      accessibilityRole="button"
+                      disabled={isBusy}
+                      onPress={() => setConfirmingDeletion(false)}
+                      style={[styles.nameAction, { borderColor: colors.border }]}>
+                      <Text style={[styles.nameActionText, { color: colors.text }]}>
+                        Keep account
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="Permanently delete my account"
+                      accessibilityRole="button"
+                      disabled={isBusy}
+                      onPress={() => void deleteAccount().catch(() => undefined)}
+                      style={[
+                        styles.nameAction,
+                        { backgroundColor: colors.warning, borderColor: colors.warning },
+                      ]}>
+                      <Text style={[styles.nameActionText, { color: colors.background }]}>
+                        Delete forever
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+            </View>
           ) : null}
         </View>
 
@@ -486,6 +560,7 @@ export function ProfileScreen() {
         </Text>
         <View style={[styles.legal, { borderColor: colors.border }]}>
           <Pressable
+            accessibilityLabel="Privacy notice"
             accessibilityRole="link"
             onPress={() => router.push('/privacy')}
             style={styles.legalLink}>
@@ -495,11 +570,22 @@ export function ProfileScreen() {
             <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
           </Pressable>
           <Pressable
+            accessibilityLabel="Terms of use"
             accessibilityRole="link"
             onPress={() => router.push('/terms')}
             style={styles.legalLink}>
             <Text style={[styles.legalText, { color: colors.text }]}>
               Terms of use
+            </Text>
+            <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Delete account help"
+            accessibilityRole="link"
+            onPress={() => router.push('/delete-account')}
+            style={styles.legalLink}>
+            <Text style={[styles.legalText, { color: colors.text }]}>
+              Delete account help
             </Text>
             <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
           </Pressable>
@@ -600,6 +686,7 @@ const styles = StyleSheet.create({
   },
   nameActionText: { fontFamily: fontFamily.semibold, fontSize: 13 },
   accountError: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 18 },
+  accountActions: { alignItems: 'flex-start', gap: 10 },
   signOutButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -612,6 +699,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   signOutText: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  deleteButton: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  deleteButtonText: { fontFamily: fontFamily.semibold, fontSize: 13 },
+  deleteConfirmation: {
+    alignSelf: 'stretch',
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    padding: 14,
+  },
+  deleteTitle: { fontFamily: fontFamily.bold, fontSize: 16 },
+  deleteDescription: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    lineHeight: 19,
+  },
   preview: { borderRadius: 18, borderWidth: 1, gap: 18, padding: 16 },
   previewTop: {
     alignItems: 'center',

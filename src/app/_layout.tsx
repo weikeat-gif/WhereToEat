@@ -29,6 +29,7 @@ function RootNavigator() {
         <Stack.Screen name="directions/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="privacy" options={{ presentation: 'card' }} />
         <Stack.Screen name="terms" options={{ presentation: 'card' }} />
+        <Stack.Screen name="delete-account" options={{ presentation: 'card' }} />
         <Stack.Screen name="auth" options={{ presentation: 'modal' }} />
       </Stack>
     </>

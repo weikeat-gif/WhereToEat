@@ -1,6 +1,7 @@
 # MakanMana Supabase setup
 
-Apply all migrations before deploying `functions/places`, then set the
+Apply all migrations before deploying `functions/places`,
+`functions/apple-credential`, and `functions/delete-account`, then set the
 function secret `GOOGLE_MAPS_SERVER_API_KEY`. Enable both Places API (New) and
 Routes API for that server key. `GOOGLE_PLACES_API_KEY` remains a
 backwards-compatible fallback while existing environments are migrated. The
@@ -13,6 +14,15 @@ Create a random rate-limit signing secret and store both server secrets:
 ```powershell
 supabase secrets set GOOGLE_MAPS_SERVER_API_KEY=...
 supabase secrets set RATE_LIMIT_HMAC_SECRET=...
+```
+
+For native Sign in with Apple, generate the Apple client secret server-side and
+store it with the native client ID. The secret must never use an
+`EXPO_PUBLIC_` prefix:
+
+```powershell
+supabase secrets set APPLE_CLIENT_ID=com.makanmana.app
+supabase secrets set APPLE_CLIENT_SECRET=...
 ```
 
 Google review excerpts are disabled by default because requesting the
@@ -70,6 +80,31 @@ only for the moderate pilot described by the
 move `loadBoundary` to a managed or self-hosted provider before higher traffic.
 The provider remains server-side so it can be changed without releasing a new
 app build.
+
+## Account deletion
+
+Deploy `functions/delete-account` with JWT verification enabled. The function
+verifies the bearer token against Supabase Auth, requires session-bound `amr`
+evidence of an interactive sign-in no older than ten minutes, and uses the service role only
+inside the Edge Function to delete that verified user. Foreign-key cascades
+remove saved places, food preferences, and promotion-view rows owned by the
+deleted account. Never expose the service-role key to Expo.
+
+The static web export includes `/delete-account`. Deploy the web app to a stable
+HTTPS origin and submit that exact URL in Google Play Console; the route lets a
+signed-out user sign in, return, confirm, and complete deletion without
+reinstalling the native app.
+
+Native Apple sign-in sends Apple's single-use authorization code to the
+protected `apple-credential` Edge Function. That function exchanges it on
+Apple's server, stores the refresh token in a client-inaccessible RLS table, and
+the deletion function revokes it with Apple before deleting the Supabase user.
+Revocation is retried up to three times. A legacy account with no stored Apple
+credential, missing Apple configuration, or a failed Apple response is still
+deleted and the public deletion screen explains how to remove MakanMana from
+Apple ID settings manually. Before iOS
+submission, verify this complete flow with real Apple credentials and rotate the
+Apple client secret before it expires.
 
 ## Manual restaurant promotion pilot
 

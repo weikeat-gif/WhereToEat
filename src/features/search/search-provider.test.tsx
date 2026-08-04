@@ -199,11 +199,12 @@ function PreferenceHarness() {
 }
 
 function LocationRaceHarness() {
-  const { criteria, searchCurrentLocation, selectArea, userCoordinates } =
+  const { criteria, locationStatus, searchCurrentLocation, selectArea, userCoordinates } =
     useSearch();
   return (
     <View>
       <Text testID="race-area">{criteria.areaLabel}</Text>
+      <Text testID="location-status">{locationStatus}</Text>
       <Text testID="user-coordinates">
         {userCoordinates
           ? `${userCoordinates.latitude},${userCoordinates.longitude}`
@@ -447,7 +448,7 @@ describe('SearchProvider synchronization', () => {
     jest.spyOn(service, 'getAreaBoundary').mockResolvedValue({
       source: 'openstreetmap',
       sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
-      label: 'Bandar Sentosa',
+      label: 'Klang District',
       polygons: [
         {
           outer: [
@@ -470,9 +471,10 @@ describe('SearchProvider synchronization', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('area-boundary')).toHaveTextContent(
-        'Bandar Sentosa',
+        'Klang District',
       ),
     );
+    expect(screen.getByTestId('area')).toHaveTextContent('Klang District');
     expect(service.getAreaBoundary).toHaveBeenCalledWith(
       'Klang, Selangor',
       { latitude: 3.0449, longitude: 101.4456 },
@@ -662,6 +664,9 @@ describe('SearchProvider synchronization', () => {
     expect(locationClient.getCurrentPositionAsync).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('user-coordinates')).toHaveTextContent(
       'unavailable',
+    );
+    expect(screen.getByTestId('location-status')).not.toHaveTextContent(
+      'requesting',
     );
   });
 

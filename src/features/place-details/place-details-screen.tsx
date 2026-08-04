@@ -203,15 +203,35 @@ export function PlaceDetailsScreen() {
             {loadError}
           </Text>
         ) : (
-          <>
+          <View
+            accessibilityLabel="Loading restaurant"
+            style={styles.loadingSkeleton}>
+            <View
+              testID="restaurant-loading-hero"
+              style={[styles.loadingHero, { backgroundColor: colors.surface }]}>
+              <ActivityIndicator
+                color={colors.accentForeground}
+              />
+            </View>
+            <View
+              style={[
+                styles.loadingLineWide,
+                { backgroundColor: colors.surfaceElevated },
+              ]}
+            />
+            <View
+              style={[
+                styles.loadingLine,
+                { backgroundColor: colors.surfaceElevated },
+              ]}
+            />
             <ActivityIndicator
-              accessibilityLabel="Loading restaurant"
               color={colors.accentForeground}
             />
             <Text style={{ color: colors.textMuted }}>
               Loading restaurant…
             </Text>
-          </>
+          </View>
         )}
       </View>
     );
@@ -222,7 +242,9 @@ export function PlaceDetailsScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: 118 + insets.bottom }}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
+        <View
+          testID={!place.image ? 'no-photo-hero' : undefined}
+          style={[styles.hero, !place.image && styles.heroCompact]}>
           {place.image ? (
             <Image
               accessibilityLabel={`${place.name} signature dish`}
@@ -239,9 +261,12 @@ export function PlaceDetailsScreen() {
                 styles.heroNoPhoto,
               ]}>
               <Ionicons
+                accessibilityElementsHidden
+                accessible={false}
                 color="#D7DAD5"
+                importantForAccessibility="no-hide-descendants"
                 name="restaurant-outline"
-                size={54}
+                size={38}
               />
               <Text style={styles.heroNoPhotoText}>
                 Photo unavailable
@@ -764,13 +789,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
+  loadingSkeleton: { alignItems: 'center', gap: 14, width: '100%' },
+  loadingHero: {
+    height: 260,
+    alignItems: 'center',
+    borderRadius: 20,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  loadingLineWide: { borderRadius: 7, height: 18, width: '88%' },
+  loadingLine: { borderRadius: 7, height: 14, width: '64%' },
   hero: { height: 350, justifyContent: 'flex-end' },
+  heroCompact: { height: 260 },
   heroNoPhoto: {
     alignItems: 'center',
     backgroundColor: '#20231F',
     gap: 8,
-    justifyContent: 'center',
-    paddingBottom: 82,
+    justifyContent: 'flex-start',
+    paddingTop: 38,
   },
   heroNoPhotoText: {
     color: '#D7DAD5',

@@ -10,6 +10,7 @@ const mockSetMode = jest.fn();
 const mockPush = jest.fn();
 const mockUpdateDisplayName = jest.fn();
 const mockSignOut = jest.fn();
+const mockDeleteAccount = jest.fn();
 const mockAddPreference = jest.fn();
 const mockRemovePreference = jest.fn();
 const mockPreferenceState = {
@@ -29,6 +30,7 @@ const mockAuthState = {
   isBusy: false,
   error: null as string | null,
   updateDisplayName: mockUpdateDisplayName,
+  deleteAccount: mockDeleteAccount,
   signOut: mockSignOut,
 };
 
@@ -70,6 +72,7 @@ describe('ProfileScreen', () => {
     mockRemovePreference.mockResolvedValue('account');
     mockUpdateDisplayName.mockResolvedValue(undefined);
     mockSignOut.mockResolvedValue(undefined);
+    mockDeleteAccount.mockResolvedValue(undefined);
   });
 
   it('offers accessible theme options and selects dark mode', () => {
@@ -130,6 +133,31 @@ describe('ProfileScreen', () => {
 
     expect(screen.getByText('Privacy notice')).toBeTruthy();
     expect(screen.getByText('Terms of use')).toBeTruthy();
+  });
+
+  it('requires confirmation before permanently deleting the account', async () => {
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <ProfileScreen />
+      </SafeAreaProvider>,
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Delete account and data' }));
+    expect(screen.getByText(/permanently deletes your account/)).toBeTruthy();
+    expect(screen.getByText(/Apple ID Sign-In & Security settings/)).toBeTruthy();
+    expect(mockDeleteAccount).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Keep my account' }));
+    expect(mockDeleteAccount).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Delete account and data' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Permanently delete my account' }));
+
+    await waitFor(() => expect(mockDeleteAccount).toHaveBeenCalledTimes(1));
   });
 
   it('adds and removes confirmed food preference labels separately from appearance', () => {

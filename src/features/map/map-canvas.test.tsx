@@ -4,7 +4,11 @@ import { act, render, waitFor } from '@testing-library/react-native';
 
 import type { Coordinates } from '@/contracts/place';
 
-import { FOOD_PIN_ICON_URL, MapCanvas } from './map-canvas.tsx';
+import {
+  FOOD_PIN_ICON_URL,
+  MapCanvas,
+  zoomMapIntoCluster,
+} from './map-canvas.tsx';
 
 jest.mock('@/config/env', () => ({
   env: { EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY: 'browser-restricted-key' },
@@ -28,6 +32,19 @@ describe('web MapCanvas', () => {
 
     expect(icon).toContain('#E64B3C');
     expect(icon).toContain('#C6FF00');
+  });
+
+  it('pans and zooms predictably when a cluster is selected', () => {
+    const map = {
+      getZoom: jest.fn(() => 13),
+      panTo: jest.fn(),
+      setZoom: jest.fn(),
+    };
+
+    zoomMapIntoCluster(map, { latitude: 3.1391, longitude: 101.687 }, 13);
+
+    expect(map.panTo).toHaveBeenCalledWith({ lat: 3.1391, lng: 101.687 });
+    expect(map.setZoom).toHaveBeenCalledWith(15);
   });
 
   it('initializes at the latest area when GPS changes while Maps is loading', async () => {
@@ -66,6 +83,11 @@ describe('web MapCanvas', () => {
           }),
         };
       }
+      getZoom() {
+        return 14;
+      }
+      panTo() {}
+      setZoom() {}
       setCenter(next: { lat: number; lng: number }) {
         currentCenter = { lat: () => next.lat, lng: () => next.lng };
       }
@@ -249,6 +271,11 @@ describe('web MapCanvas', () => {
       getBounds() {
         return undefined;
       }
+      getZoom() {
+        return 14;
+      }
+      panTo() {}
+      setZoom() {}
       fitBounds() {}
       setCenter() {}
     }
@@ -327,6 +354,95 @@ describe('web MapCanvas', () => {
 
     act(() => markerListeners.get('click')?.());
     expect(onPlacePress).toHaveBeenCalledWith('hover-place');
+  });
+
+  it('zooms into a dense cluster before exposing individual restaurants', async () => {
+    const clusterClick = { current: undefined as (() => void) | undefined };
+    const panToSpy = jest.fn();
+    const setZoomSpy = jest.fn();
+    class FakeMap {
+      addListener() {
+        return { remove: jest.fn() };
+      }
+      getBounds() {
+        return undefined;
+      }
+      getCenter() {
+        return { lat: () => 3.139, lng: () => 101.6869 };
+      }
+      getZoom() {
+        return 13;
+      }
+      fitBounds() {}
+      setCenter() {}
+      panTo(center: { lat: number; lng: number }) {
+        panToSpy(center);
+      }
+      setZoom(nextZoom: number) {
+        setZoomSpy(nextZoom);
+      }
+    }
+    class FakeMarker {
+      constructor(private options: Record<string, unknown>) {}
+      addListener(event: string, listener: () => void) {
+        if (this.options.title === '2 restaurants' && event === 'click') {
+          clusterClick.current = listener;
+        }
+        return { remove: jest.fn() };
+      }
+      setMap() {}
+    }
+
+    render(
+      <MapCanvas
+        center={{ latitude: 3.139, longitude: 101.6869 }}
+        onMapPress={jest.fn()}
+        onPlacePress={jest.fn()}
+        onViewportChange={jest.fn()}
+        places={[
+          {
+            id: 'a',
+            name: 'A',
+            subtitle: 'A',
+            coordinates: { latitude: 3.139, longitude: 101.6869 },
+            distanceMeters: 100,
+            rating: 4,
+            reviewCount: 10,
+            categories: ['Restaurant'],
+          },
+          {
+            id: 'b',
+            name: 'B',
+            subtitle: 'B',
+            coordinates: { latitude: 3.1392, longitude: 101.6871 },
+            distanceMeters: 120,
+            rating: 4,
+            reviewCount: 10,
+            categories: ['Restaurant'],
+          },
+        ]}
+        showsUserLocation={false}
+      />,
+    );
+
+    await act(async () => {
+      window.google = {
+        maps: {
+          Map: FakeMap,
+          Marker: FakeMarker,
+          InfoWindow: class FakeInfoWindow {
+            close() {}
+            open() {}
+            setContent() {}
+          },
+        },
+      };
+      window.__makanManaGoogleMapsReady?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(clusterClick.current).toBeDefined());
+    expect(clusterClick.current).toBeDefined();
   });
 
 });

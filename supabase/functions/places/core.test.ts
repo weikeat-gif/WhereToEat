@@ -174,6 +174,7 @@ describe('places Edge Function core', () => {
         },
         {
           display_name: 'Bandar Sentosa, Klang, Selangor, Malaysia',
+          addresstype: 'town',
           category: 'place',
           osm_type: 'relation',
           osm_id: 18743759,
@@ -199,7 +200,7 @@ describe('places Edge Function core', () => {
     expect(boundary).toMatchObject({
       source: 'openstreetmap',
       sourceUrl: 'https://www.openstreetmap.org/relation/18743759',
-      label: 'Bandar Sentosa, Klang, Selangor, Malaysia',
+      label: 'Bandar Sentosa Town',
     });
   });
 

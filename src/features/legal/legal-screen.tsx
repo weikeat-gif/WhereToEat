@@ -66,6 +66,10 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
               body="You can deny location and search by area. You can revoke permission at any time in iPhone or Android Settings. Saved places are stored only after sign-in and can be removed from the app."
               title="Your choices"
             />
+            <Section
+              body="Signed-in users can permanently delete their account from Profile or the public Delete account page. Deletion removes the account, saved restaurants, food preferences, profile metadata, locally stored account area history, and other rows owned by that account immediately. We do not retain those records after deletion. For security, you may be asked to sign in again if your session authentication is older than ten minutes. For Sign in with Apple, we attempt automatic authorization revocation first; if Apple credentials are unavailable, deletion still completes and you can remove MakanMana in Apple ID Sign-In & Security settings."
+              title="Account deletion"
+            />
           </>
         ) : (
           <>
@@ -112,7 +116,7 @@ export function LegalScreen({ kind }: { kind: LegalKind }) {
         </View>
 
         <Text style={[styles.updated, { color: colors.textMuted }]}>
-          English MVP notice · Updated 29 July 2026
+          English MVP notice · Updated 4 August 2026
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -139,13 +143,21 @@ function LegalLink({
   const { colors } = useAppTheme();
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="link"
       onPress={onPress}
       style={styles.link}>
       <Text style={[styles.linkText, { color: colors.accentForeground }]}>
         {label}
       </Text>
-      <Ionicons color={colors.accentForeground} name="open-outline" size={18} />
+      <Ionicons
+        accessibilityElementsHidden
+        accessible={false}
+        color={colors.accentForeground}
+        importantForAccessibility="no-hide-descendants"
+        name="open-outline"
+        size={18}
+      />
     </Pressable>
   );
 }

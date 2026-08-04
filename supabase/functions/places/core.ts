@@ -547,7 +547,7 @@ export function normalizeBoundaryResponse(
         boundary: {
           source: 'openstreetmap' as const,
           sourceUrl,
-          label: candidate.display_name,
+          label: preciseBoundaryLabel(candidate),
           polygons,
         },
         score,
@@ -568,6 +568,30 @@ export function normalizeBoundaryResponse(
     )
     .sort((left, right) => right.score - left.score);
   return candidates[0]?.boundary ?? null;
+}
+
+function preciseBoundaryLabel(candidate: Record<string, unknown>) {
+  const displayName = candidate.display_name as string;
+  const primaryName = displayName.split(',')[0]?.trim() || displayName;
+  const addressType =
+    typeof candidate.addresstype === 'string'
+      ? candidate.addresstype.toLocaleLowerCase()
+      : typeof candidate.type === 'string'
+        ? candidate.type.toLocaleLowerCase()
+        : '';
+  const suffix: Record<string, string> = {
+    city: 'City',
+    city_district: 'District',
+    district: 'District',
+    municipality: 'Municipality',
+    town: 'Town',
+    village: 'Village',
+  };
+  const boundaryType = suffix[addressType];
+  if (!boundaryType || primaryName.toLocaleLowerCase().includes(boundaryType.toLocaleLowerCase())) {
+    return boundaryType ? primaryName : `${primaryName} · Administrative boundary`;
+  }
+  return `${primaryName} ${boundaryType}`;
 }
 
 const SUPPORTED_KLANG_VALLEY_BOUNDS = {

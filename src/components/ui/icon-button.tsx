@@ -34,7 +34,14 @@ export function IconButton({
         styles.button,
         { backgroundColor, opacity: disabled ? 0.45 : pressed ? 0.7 : 1 },
       ]}>
-      <Ionicons color={color} name={icon} size={22} />
+      <Ionicons
+        accessibilityElementsHidden
+        accessible={false}
+        color={color}
+        importantForAccessibility="no-hide-descendants"
+        name={icon}
+        size={22}
+      />
     </Pressable>
   );
 }

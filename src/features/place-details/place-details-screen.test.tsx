@@ -238,8 +238,29 @@ describe('PlaceDetailsScreen', () => {
         screen.getByLabelText('Jalan 21 Burger has no photo'),
       ).toHaveStyle({ backgroundColor: '#20231F' }),
     );
+    expect(screen.getByTestId('no-photo-hero')).toHaveStyle({ height: 260 });
     expect(screen.getByText('Photo unavailable')).toHaveStyle({
       color: '#D7DAD5',
+    });
+  });
+
+  it('uses a theme-aware, size-reserved loading placeholder', () => {
+    mockThemeMode = 'light';
+    mockDataMode = 'live';
+    mockLoadDisplayPlace.mockReturnValue(new Promise(() => undefined));
+    const screen = render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}>
+        <PlaceDetailsScreen />
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByLabelText('Loading restaurant')).toBeTruthy();
+    expect(screen.getByTestId('restaurant-loading-hero')).toHaveStyle({
+      height: 260,
     });
   });
 

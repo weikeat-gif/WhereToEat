@@ -7,11 +7,19 @@ import {
 } from './supabase-auth-gateway';
 
 const mockUpdateUser = jest.fn();
+const mockGetSession = jest.fn();
+const mockInvoke = jest.fn();
+const mockSignOut = jest.fn();
 
 jest.mock('@/services/supabase/client', () => ({
   supabase: {
     auth: {
+      getSession: (...args: unknown[]) => mockGetSession(...args),
+      signOut: (...args: unknown[]) => mockSignOut(...args),
       updateUser: (...args: unknown[]) => mockUpdateUser(...args),
+    },
+    functions: {
+      invoke: (...args: unknown[]) => mockInvoke(...args),
     },
   },
 }));
@@ -77,6 +85,28 @@ describe('Supabase auth UI session mapping', () => {
       gateway.updateDisplayName('Klang\u202EFoodie'),
     ).rejects.toThrow('unsupported characters');
     expect(mockUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('uses the signed-in user token for account deletion and clears the local session', async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'fresh-user-token',
+          user: { is_anonymous: false },
+        },
+      },
+      error: null,
+    });
+    mockInvoke.mockResolvedValue({ data: { deleted: true }, error: null });
+    mockSignOut.mockResolvedValue({ error: null });
+
+    await new SupabaseAuthGateway().deleteAccount();
+
+    expect(mockInvoke).toHaveBeenCalledWith('delete-account', {
+      body: {},
+      headers: { Authorization: 'Bearer fresh-user-token' },
+    });
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 });
 

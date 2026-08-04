@@ -9,6 +9,8 @@ import { FoodAgentScreen } from './food-agent-screen';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockCanGoBack = jest.fn();
+const mockReplace = jest.fn();
 const mockSearch = jest.fn();
 const mockRememberConfirmed = jest.fn();
 const mockFoodPreferenceState = {
@@ -71,7 +73,9 @@ const places: PlaceSummary[] = [
 jest.mock('expo-router', () => ({
   router: {
     back: (...args: unknown[]) => mockBack(...args),
+    canGoBack: (...args: unknown[]) => mockCanGoBack(...args),
     push: (...args: unknown[]) => mockPush(...args),
+    replace: (...args: unknown[]) => mockReplace(...args),
   },
 }));
 
@@ -115,10 +119,21 @@ function renderScreen() {
 describe('FoodAgentScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(true);
     mockFoodPreferenceState.preferenceKeys = new Set();
     mockFoodPreferenceState.canPersist = true;
     mockRememberConfirmed.mockResolvedValue('account');
     mockSearch.mockResolvedValue({ places });
+  });
+
+  it('has a visible exit and returns to Search when opened directly', () => {
+    mockCanGoBack.mockReturnValue(false);
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Back to food search' }));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/map');
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('keeps non-food requests inside the supported food flow', () => {
@@ -241,5 +256,46 @@ describe('FoodAgentScreen', () => {
     ).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Sign in to save preferences'));
     expect(mockPush).toHaveBeenCalledWith('/auth');
+  });
+
+  it('offers safe shared-search recovery without weakening Halal requirements', async () => {
+    mockSearch.mockResolvedValue({ places: [] });
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByText('Find halal food nearby'));
+    fireEvent.press(screen.getByLabelText('Find matching food'));
+
+    expect(
+      await screen.findByRole('button', { name: 'Increase search distance' }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/remove halal/i)).toBeNull();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Increase search distance' }));
+
+    await waitFor(() =>
+      expect(mockSearch).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          radiusMeters: 10_000,
+          verifiedHalalOnly: true,
+        }),
+      ),
+    );
+  });
+
+  it('can explicitly remove open-now after an empty result', async () => {
+    mockSearch.mockResolvedValue({ places: [] });
+    const screen = renderScreen();
+
+    fireEvent.press(screen.getByText('Cheap Chinese food open now'));
+    fireEvent.press(screen.getByLabelText('Find matching food'));
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Remove open-now filter' }),
+    );
+
+    await waitFor(() =>
+      expect(mockSearch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ openNow: false }),
+      ),
+    );
   });
 });

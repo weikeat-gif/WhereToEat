@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -7,6 +7,7 @@ import { env } from '@/config/env';
 import type { Coordinates, PlaceSummary } from '@/contracts/place';
 import type { AreaBoundary } from '@/contracts/search';
 import { mapBoundsForAreaBoundary } from '@/features/map/area-boundary';
+import { clusterPlaces } from '@/features/map/map-clusters';
 import {
   radiusForMapBounds,
   type MapBounds,
@@ -27,6 +28,7 @@ export type MapCanvasProps = {
   ) => void;
   onMapPress: () => void;
   onPlacePress: (placeId: string) => void;
+  selectedPlaceId?: string | null;
   showsUserLocation: boolean;
   userCoordinates?: Coordinates | null;
 };
@@ -46,6 +48,9 @@ type WebMap = {
     padding?: number,
   ): void;
   setCenter(center: { lat: number; lng: number }): void;
+  getZoom(): number | undefined;
+  panTo(center: { lat: number; lng: number }): void;
+  setZoom(zoom: number): void;
   setOptions?(options: Record<string, unknown>): void;
 };
 type WebMarker = {
@@ -93,6 +98,33 @@ export const FOOD_PIN_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURICo
     <path d="M16.5 14v6.5M19 14v6.5M16.5 17h2.5M17.75 20.5V28M25 14v14M25 14c3.2 2.4 3.2 7 0 8.8" fill="none" stroke="#171C1B" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
   </svg>
 `)}`;
+export const SELECTED_FOOD_PIN_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="50" height="62" viewBox="0 0 50 62">
+    <circle cx="25" cy="25" r="23" fill="#C6FF00" stroke="#171C1B" stroke-width="3"/>
+    <path d="M25 60C22 53 9 41 9 25C9 15 16 7 25 7s16 8 16 18c0 16-13 28-16 35z" fill="#E64B3C" stroke="#171C1B" stroke-width="2.5"/>
+    <circle cx="25" cy="25" r="11.5" fill="#C6FF00" stroke="#FFFFFF" stroke-width="2"/>
+    <path d="M20.5 18v6.5M23 18v6.5M20.5 21h2.5M21.75 24.5V32M29 18v14M29 18c3.2 2.4 3.2 7 0 8.8" fill="none" stroke="#171C1B" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
+  </svg>
+`)}`;
+
+export function clusterIconUrl(count: number, selected = false) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="${selected ? 56 : 48}" height="${selected ? 56 : 48}" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="22" fill="${selected ? '#E64B3C' : '#C6FF00'}" stroke="#171C1B" stroke-width="3"/>
+      <circle cx="24" cy="24" r="16" fill="#F8FFF0" stroke="#E64B3C" stroke-width="2"/>
+      <text x="24" y="29" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#171C1B">${count}</text>
+    </svg>
+  `)}`;
+}
+
+export function zoomMapIntoCluster(
+  map: Pick<WebMap, 'getZoom' | 'panTo' | 'setZoom'>,
+  coordinate: Coordinates,
+  fallbackZoom: number,
+) {
+  map.panTo({ lat: coordinate.latitude, lng: coordinate.longitude });
+  map.setZoom(Math.min((map.getZoom() ?? fallbackZoom) + 2, 20));
+}
 export const USER_LOCATION_ICON_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">
     <circle cx="17" cy="17" r="15" fill="#4285F4" fill-opacity=".2"/>
@@ -289,6 +321,7 @@ export function MapCanvas({
   onViewportChange,
   onMapPress,
   onPlacePress,
+  selectedPlaceId,
   showsUserLocation,
   userCoordinates,
 }: MapCanvasProps) {
@@ -310,9 +343,11 @@ export function MapCanvas({
   const onViewportChangeRef = useRef(onViewportChange);
   const onMapPressRef = useRef(onMapPress);
   const [mapReady, setMapReady] = useState(false);
+  const [mapZoom, setMapZoom] = useState(14);
   const [mapError, setMapError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const webKey = env.EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY;
+  const clusters = useMemo(() => clusterPlaces(places, mapZoom), [mapZoom, places]);
   latestCenterRef.current = center;
   latestResolvedModeRef.current = resolvedMode;
 
@@ -355,6 +390,7 @@ export function MapCanvas({
           mapWasDraggedRef.current = true;
         });
         mapListenerRef.current = map.addListener('idle', () => {
+          setMapZoom(map.getZoom() ?? 14);
           const next = map.getCenter();
           if (!next) return;
           const nextCenter = {
@@ -512,19 +548,44 @@ export function MapCanvas({
     if (!mapReady || !mapRef.current || !window.google?.maps) return;
 
     const maps = window.google.maps;
+    const map = mapRef.current;
     const infoWindow =
-      places.length > 0
+      clusters.length > 0
         ? new maps.InfoWindow({ disableAutoPan: true })
         : undefined;
-    const nextMarkers = places.map((place) => {
+    const nextMarkers = clusters.map((cluster) => {
+      if (cluster.places.length > 1) {
+        const selected = cluster.placeIds.includes(selectedPlaceId ?? '');
+        const marker = new maps.Marker({
+          icon: clusterIconUrl(cluster.places.length, selected),
+          map,
+          position: {
+            lat: cluster.coordinate.latitude,
+            lng: cluster.coordinate.longitude,
+          },
+          title: selected
+            ? `${cluster.places.length} restaurants, selected restaurant inside`
+            : `${cluster.places.length} restaurants`,
+          zIndex: selected ? 700 : 500,
+        });
+        marker.addListener('click', () => {
+          zoomMapIntoCluster(map, cluster.coordinate, mapZoom);
+        });
+        return marker;
+      }
+      const place = cluster.places[0];
       const marker = new maps.Marker({
-        map: mapRef.current,
+        map,
         position: {
           lat: place.coordinates.latitude,
           lng: place.coordinates.longitude,
         },
-        icon: FOOD_PIN_ICON_URL,
+        icon:
+          place.id === selectedPlaceId
+            ? SELECTED_FOOD_PIN_ICON_URL
+            : FOOD_PIN_ICON_URL,
         title: place.name,
+        zIndex: place.id === selectedPlaceId ? 700 : 10,
       });
       marker.addListener('mouseover', () => {
         infoWindow?.setContent(
@@ -567,11 +628,13 @@ export function MapCanvas({
   }, [
     center.latitude,
     center.longitude,
+    clusters,
     mapReady,
     onPlacePress,
-    places,
+    mapZoom,
     resolvedMode,
     showsUserLocation,
+    selectedPlaceId,
     userCoordinates,
   ]);
 

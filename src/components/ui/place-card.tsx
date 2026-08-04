@@ -21,6 +21,7 @@ export function PlaceCard({ place, image, onPress }: PlaceCardProps) {
 
   return (
     <Pressable
+      accessibilityLabel={`${place.name}. ${place.subtitle}. ${formatDistance(place.distanceMeters)}.`}
       accessibilityHint="Opens restaurant details"
       accessibilityRole="button"
       onPress={onPress}

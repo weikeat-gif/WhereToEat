@@ -15,6 +15,7 @@ type CompactPlaceRowProps = {
   place: PlaceSummary;
   image?: ImageSource;
   onPress: () => void;
+  accessibilityHint?: string;
   trailing?: 'bookmark' | 'rating';
 };
 
@@ -22,6 +23,7 @@ export function CompactPlaceRow({
   place,
   image,
   onPress,
+  accessibilityHint = 'Opens restaurant details',
   trailing = 'rating',
 }: CompactPlaceRowProps) {
   const { colors } = useAppTheme();
@@ -34,7 +36,8 @@ export function CompactPlaceRow({
 
   return (
     <Pressable
-      accessibilityHint="Opens restaurant details"
+      accessibilityLabel={`${place.name}. ${place.subtitle}. ${formatDistance(place.distanceMeters)}.`}
+      accessibilityHint={accessibilityHint}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [

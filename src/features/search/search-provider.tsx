@@ -38,6 +38,7 @@ import {
   criteriaWithHardFoodPreferences,
 } from '@/features/food-preferences/food-preference-policy';
 import { pickSurprise } from '@/features/search/surprise';
+import { clearedSearchFilters } from '@/features/search/search-filter-state';
 import { placesService } from '@/services/places';
 import type { PlacesService } from '@/services/places/places-service';
 
@@ -75,6 +76,7 @@ type SearchContextValue = {
     area: AreaSuggestion,
     changes?: Pick<SearchCriteria, 'query'>,
   ) => Promise<SearchResults | undefined>;
+  clearFiltersAndSearch: () => Promise<SearchResults | undefined>;
   searchCurrentLocation: () => Promise<SearchResults | undefined>;
   surpriseMe: () => PlaceSummary | undefined;
 };
@@ -120,6 +122,7 @@ export function SearchProvider({
   const preferencesReadyRef = useRef(preferencesReady);
   preferencesReadyRef.current = preferencesReady;
   const requestIdRef = useRef(0);
+  const locationRequestIdRef = useRef(0);
   const recentAreasRef = useRef<AreaSuggestion[]>([]);
   const historyEpochRef = useRef(0);
   const historyScopeRef = useRef(historyScope);
@@ -229,6 +232,10 @@ export function SearchProvider({
     (input: string) =>
       service.autocompleteArea(input, autocompleteSessionRef.current),
     [service],
+  );
+  const clearFiltersAndSearch = useCallback(
+    () => search(clearedSearchFilters(criteriaRef.current)),
+    [search],
   );
 
   const addRecentArea = useCallback((area: AreaSuggestion) => {
@@ -347,6 +354,7 @@ export function SearchProvider({
         const boundaryCriteria = {
           ...criteriaRef.current,
           areaBoundary: boundary,
+          areaLabel: boundary.label,
         };
         setSynchronizedCriteria(boundaryCriteria);
         setResults(boundaryPlaces);
@@ -386,6 +394,7 @@ export function SearchProvider({
   const searchCurrentLocation = useCallback(async () => {
     if (!preferencesReadyRef.current) return undefined;
     const operationId = ++requestIdRef.current;
+    const locationOperationId = ++locationRequestIdRef.current;
     setLocationStatus('requesting');
     setLocationMessage(null);
     setLocationCanAskAgain(null);
@@ -394,6 +403,11 @@ export function SearchProvider({
       operationId !== requestIdRef.current ||
       !preferencesReadyRef.current
     ) {
+      if (locationOperationId === locationRequestIdRef.current) {
+        setLocationStatus((current) =>
+          current === 'requesting' ? 'idle' : current,
+        );
+      }
       return undefined;
     }
     if (location.kind === 'manual') {
@@ -479,6 +493,7 @@ export function SearchProvider({
       setResults: setSynchronizedResults,
       search,
       updateCriteriaAndSearch,
+      clearFiltersAndSearch,
       autocompleteArea,
       clearRecentAreas,
       selectArea,
@@ -487,6 +502,7 @@ export function SearchProvider({
     }),
     [
       autocompleteArea,
+      clearFiltersAndSearch,
       clearRecentAreas,
       criteria,
       error,

@@ -25,7 +25,14 @@ export function SemanticChip({
 }: SemanticChipProps) {
   const content = (
     <>
-      <Ionicons color={color} name={icon} size={15} />
+      <Ionicons
+        accessibilityElementsHidden
+        accessible={false}
+        color={color}
+        importantForAccessibility="no-hide-descendants"
+        name={icon}
+        size={15}
+      />
       <Text style={[styles.label, { color }]}>{label}</Text>
     </>
   );
@@ -45,6 +52,7 @@ export function SemanticChip({
 
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}

@@ -17,6 +17,10 @@ jest.mock('@/services/supabase/client', () => ({
 jest.mock('./supabase-auth-gateway', () => ({
   defaultAuthGateway: {},
 }));
+const mockClearRecentAreaHistory = jest.fn().mockResolvedValue(undefined);
+jest.mock('@/features/search/recent-areas', () => ({
+  clearRecentAreaHistory: (...args: unknown[]) => mockClearRecentAreaHistory(...args),
+}));
 
 function Consumer() {
   const { user, isLoading } = useAuth();
@@ -24,16 +28,21 @@ function Consumer() {
 }
 
 function AccountConsumer() {
-  const { error, updateDisplayName, user } = useAuth();
+  const { deleteAccount, error, updateDisplayName, user } = useAuth();
   return (
     <>
-      <Text>{user?.displayName ?? 'no-name'}</Text>
+      <Text>{user?.displayName ?? user?.email ?? 'no-name'}</Text>
       <Pressable
         accessibilityRole="button"
         onPress={() =>
           void updateDisplayName('Klang Foodie').catch(() => undefined)
         }>
         <Text>Update display name</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void deleteAccount().catch(() => undefined)}>
+        <Text>Delete account</Text>
       </Pressable>
       {error ? <Text>{error}</Text> : null}
     </>
@@ -52,11 +61,15 @@ function fakeGateway(): AuthGateway {
     requestEmailCode: jest.fn(),
     verifyEmailCode: jest.fn(),
     updateDisplayName: jest.fn(),
+    deleteAccount: jest.fn(),
     signOut: jest.fn(),
   };
 }
 
 describe('AuthProvider', () => {
+  beforeEach(() => {
+    mockClearRecentAreaHistory.mockClear();
+  });
   it('restores the persisted session before exposing the account', async () => {
     const gateway = fakeGateway();
     const screen = render(
@@ -161,5 +174,26 @@ describe('AuthProvider', () => {
       expect(screen.getByText('Unable to update your account name.')).toBeTruthy(),
     );
     expect(screen.getByText('weikeatpeng')).toBeTruthy();
+  });
+
+  it('removes the local user after the backend deletes the account', async () => {
+    const gateway = fakeGateway();
+    gateway.deleteAccount = jest.fn().mockResolvedValue(undefined);
+    gateway.restoreSession = jest.fn().mockResolvedValue({
+      accessToken: 'token',
+      user: { id: 'user-1', email: 'test@example.com' },
+    });
+    render(
+      <AuthProvider gateway={gateway}>
+        <AccountConsumer />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('test@example.com')).toBeTruthy());
+
+    fireEvent.press(screen.getByRole('button', { name: 'Delete account' }));
+
+    await waitFor(() => expect(gateway.deleteAccount).toHaveBeenCalledTimes(1));
+    expect(mockClearRecentAreaHistory).toHaveBeenCalledWith('user-1');
+    expect(screen.getByText('no-name')).toBeTruthy();
   });
 });

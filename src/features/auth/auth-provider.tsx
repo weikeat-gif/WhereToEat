@@ -11,6 +11,7 @@ import {
 import type { AppUser } from '@/contracts/auth';
 import { isSupabaseConfigured } from '@/services/supabase/client';
 import { toUserMessage } from '@/services/supabase/errors';
+import { clearRecentAreaHistory } from '@/features/search/recent-areas';
 
 import type { AuthGateway } from './auth-gateway';
 import { defaultAuthGateway } from './supabase-auth-gateway';
@@ -28,6 +29,7 @@ type AuthContextValue = {
   requestEmailCode: (email: string) => Promise<void>;
   verifyEmailCode: (email: string, code: string) => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   resetEmailCode: () => void;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -126,6 +128,14 @@ export function AuthProvider({
     },
     [gateway, perform],
   );
+  const deleteAccount = useCallback(async () => {
+    const deletedUserId = user?.id;
+    await perform(() => gateway.deleteAccount());
+    if (deletedUserId) await clearRecentAreaHistory(deletedUserId);
+    setMockUser(null);
+    setEmailCodeSent(false);
+    setEmailCodeAddress('');
+  }, [gateway, perform, user?.id]);
   const signOut = useCallback(async () => {
     await perform(() => gateway.signOut());
     setEmailCodeSent(false);
@@ -151,6 +161,7 @@ export function AuthProvider({
       requestEmailCode,
       verifyEmailCode,
       updateDisplayName,
+      deleteAccount,
       resetEmailCode,
       signOut,
       clearError: () => setError(null),
@@ -159,6 +170,7 @@ export function AuthProvider({
     [
       emailCodeSent,
       emailCodeAddress,
+      deleteAccount,
       error,
       isBusy,
       isLoading,
